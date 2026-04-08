@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read",
+      "Edit",
+      "Write",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-turbopack --force)",
+      "Bash(psql --version)",
+      "Bash(brew services:*)",
+      "Bash(brew list:*)",
+      "Bash(pg_isready)",
+      "Bash(brew install:*)",
+      "Bash(/opt/homebrew/opt/postgresql@16/bin/pg_isready)",
+      "Bash(export PATH=\"/opt/homebrew/opt/postgresql@16/bin:$PATH\")",
+      "Bash(createdb content_radar)",
+      "Bash(DATABASE_URL=postgresql://aegon@localhost:5432/content_radar npm run db:push)",
+      "Bash(DATABASE_URL=postgresql://aegon@localhost:5432/content_radar npm run db:seed)",
+      "Bash(npm run:*)"
+    ],
+    "defaultMode": "bypassPermissions"
+  }
+}
