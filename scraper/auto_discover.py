@@ -235,83 +235,105 @@ def fetch_youtube_videos(channel_id: str, since: datetime) -> list[dict]:
     """
     Возвращает список {'url', 'description', 'published_at'}.
     Принимает channel ID или @handle — резолвит автоматически.
+
+    Пагинация: до 5 страниц по 50 = 250 видео максимум за период. Без
+    пагинации мы пропускали свежие публикации у активных креаторов
+    (например, у Полины 50 видео за 30 дней, а maxResults=20 без
+    pageToken возвращало только верхние 20).
     """
     if not YOUTUBE_API_KEY:
         logger.warning("YOUTUBE_API_KEY не задан, пропускаем YouTube auto-discover")
         return []
 
-    # Резолвим handle в channel ID если нужно
     resolved_id = resolve_youtube_channel_id(channel_id)
     if not resolved_id:
         return []
     channel_id = resolved_id
 
-    results = []
     published_after = since.strftime("%Y-%m-%dT%H:%M:%SZ")
+    video_ids: list[str] = []
+    page_token: Optional[str] = None
 
     try:
-        # Шаг 1: получаем список video_id через search
-        search_resp = requests.get(
-            "https://www.googleapis.com/youtube/v3/search",
-            params={
+        for _ in range(5):  # safety cap: 250 videos per creator per run
+            params = {
                 "channelId": channel_id,
                 "part": "id",
                 "type": "video",
                 "publishedAfter": published_after,
-                "maxResults": 20,
+                "maxResults": 50,
                 "order": "date",
                 "key": YOUTUBE_API_KEY,
-            },
-            timeout=_DEFAULT_TIMEOUT,
-        )
-        if not search_resp.ok:
-            logger.warning("YouTube search status=%d для channel=%s", search_resp.status_code, channel_id)
-            return []
+            }
+            if page_token:
+                params["pageToken"] = page_token
 
-        items = search_resp.json().get("items", [])
-        if not items:
+            search_resp = requests.get(
+                "https://www.googleapis.com/youtube/v3/search",
+                params=params,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+            if not search_resp.ok:
+                logger.warning("YouTube search status=%d для channel=%s", search_resp.status_code, channel_id)
+                break
+
+            payload = search_resp.json()
+            for item in payload.get("items", []):
+                vid = item.get("id", {}).get("videoId")
+                if vid:
+                    video_ids.append(vid)
+
+            page_token = payload.get("nextPageToken")
+            if not page_token:
+                break
+
+        if not video_ids:
             logger.info("YouTube channel=%s: новых видео нет", channel_id)
             return []
 
-        video_ids = [i["id"]["videoId"] for i in items if i.get("id", {}).get("videoId")]
-
-        # Шаг 2: берём description и publishedAt через videos API
-        videos_resp = requests.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params={
-                "id": ",".join(video_ids),
-                "part": "snippet",
-                "key": YOUTUBE_API_KEY,
-            },
-            timeout=_DEFAULT_TIMEOUT,
-        )
-        if not videos_resp.ok:
-            return []
-
-        for v in videos_resp.json().get("items", []):
-            snippet = v.get("snippet", {})
-            published_str = snippet.get("publishedAt", "")
-            try:
-                published_at = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
-            except ValueError:
+        # Step 2: descriptions + publishedAt via videos endpoint, batched 50.
+        results: list[dict] = []
+        for chunk_start in range(0, len(video_ids), 50):
+            chunk = video_ids[chunk_start:chunk_start + 50]
+            videos_resp = requests.get(
+                "https://www.googleapis.com/youtube/v3/videos",
+                params={
+                    "id": ",".join(chunk),
+                    "part": "snippet",
+                    "key": YOUTUBE_API_KEY,
+                },
+                timeout=_DEFAULT_TIMEOUT,
+            )
+            if not videos_resp.ok:
                 continue
 
-            url = f"https://www.youtube.com/watch?v={v['id']}"
-            # Артикул может быть в title (Shorts часто пустой description)
-            title = snippet.get("title", "")
-            desc = snippet.get("description", "")
-            combined_text = f"{title} {desc}"
+            for v in videos_resp.json().get("items", []):
+                snippet = v.get("snippet", {})
+                published_str = snippet.get("publishedAt", "")
+                try:
+                    published_at = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
 
-            results.append({
-                "url": url,
-                "description": combined_text,
-                "published_at": published_at,
-            })
+                url = f"https://www.youtube.com/watch?v={v['id']}"
+                title = snippet.get("title", "")
+                desc = snippet.get("description", "")
+                combined_text = f"{title} {desc}"
+
+                results.append({
+                    "url": url,
+                    "description": combined_text,
+                    "published_at": published_at,
+                })
 
     except Exception as e:
         logger.error("Ошибка при запросе YouTube API для channel=%s: %s", channel_id, e)
+        return []
 
-    logger.info("YouTube channel=%s: найдено %d видео за последние %dч", channel_id, len(results), LOOKBACK_HOURS)
+    logger.info(
+        "YouTube channel=%s: найдено %d видео за последние %dч",
+        channel_id, len(results), LOOKBACK_HOURS,
+    )
     return results
 
 
