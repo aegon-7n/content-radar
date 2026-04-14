@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck + build
+        # next build runs type-check internally. Uses dummy DB/auth env so
+        # the static optimizer does not fail trying to connect.
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://ci@localhost:5432/ci
+          NEXTAUTH_URL: http://localhost:3000
+          NEXTAUTH_SECRET: ci-secret
+          ADMIN_EMAIL: ci@example.com
+          ADMIN_PASSWORD: ci
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install scraper deps
+        run: pip install -r scraper/requirements.txt
+
+      - name: Syntax check all scraper modules
+        run: python -m compileall scraper
