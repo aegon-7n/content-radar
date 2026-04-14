@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { RefreshCw, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 
@@ -20,38 +20,11 @@ export default function Header() {
     path === "/" ? pathname === "/" : pathname.startsWith(path)
   )?.[1] ?? "ContentRadar";
 
-  const [scraping, setScraping] = useState(false);
-  const [status, setStatus] = useState<"idle" | "ok" | "error">("idle");
   const [showUserMenu, setShowUserMenu] = useState(false);
-
-  async function triggerScrape() {
-    setScraping(true);
-    setStatus("idle");
-    try {
-      const res = await fetch("/api/scrape", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.NEXT_PUBLIC_SCRAPE_SECRET ?? "dev-secret"}` },
-        body: JSON.stringify({ async: true }),
-      });
-      setStatus(res.ok ? "ok" : "error");
-    } catch {
-      setStatus("error");
-    } finally {
-      setScraping(false);
-      setTimeout(() => setStatus("idle"), 3000);
-    }
-  }
 
   const initials = session?.user?.email
     ? session.user.email[0].toUpperCase()
     : "?";
-
-  const scrapeButtonStyle =
-    status === "ok"
-      ? { color: "var(--success-text)", borderColor: "var(--success-border)", background: "var(--success-bg)" }
-      : status === "error"
-      ? { color: "var(--error-text)", borderColor: "var(--error-border)", background: "var(--error-bg)" }
-      : { color: "var(--text-muted)", borderColor: "var(--border-default)", background: "var(--bg-muted)" };
 
   return (
     <header
@@ -66,17 +39,6 @@ export default function Header() {
       </span>
 
       <div className="flex items-center gap-3">
-        <button
-          onClick={triggerScrape}
-          disabled={scraping}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs border transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-          style={scrapeButtonStyle}
-          type="button"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${scraping ? "animate-spin" : ""}`} />
-          {scraping ? "Запуск..." : status === "ok" ? "Запущено" : status === "error" ? "Ошибка" : "Обновить данные"}
-        </button>
-
         {/* User avatar + dropdown */}
         <div className="relative">
           <button
