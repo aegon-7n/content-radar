@@ -13,6 +13,7 @@ from scraper.config import DATABASE_URL, SCRAPE_HORIZON_DAYS
 from scraper.scrapers.tiktok import TikTokScraper
 from scraper.scrapers.youtube import YouTubeScraper
 from scraper.scrapers.instagram import InstagramScraper
+from scraper.scrapers.likee import LikeeScraper
 
 import psycopg2
 
@@ -44,6 +45,7 @@ def main():
         "tiktok": TikTokScraper(),
         "youtube": YouTubeScraper(),
         "instagram": InstagramScraper(),
+        "likee": LikeeScraper(),
     }
 
     ok = 0

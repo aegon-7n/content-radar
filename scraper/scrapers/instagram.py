@@ -23,7 +23,7 @@ from .base import BaseScraper
 
 logger = logging.getLogger(__name__)
 
-_HIKERAPI_BASE = "https://hikerapi.com/api/v1"
+_HIKERAPI_BASE = "https://api.hikerapi.com/v1"
 
 _HEADERS = {
     "User-Agent": config.USER_AGENT,
@@ -93,17 +93,23 @@ class InstagramScraper(BaseScraper):
             logger.debug("instagram HikerAPI request failed video_id=%s: %s", video_id, exc)
             return None
 
-        # HikerAPI может вернуть объект напрямую или вложить в data/items[0]
+        # api.hikerapi.com/v1/media/by/url возвращает объект напрямую
+        # Поля: pk, code, play_count, like_count, comment_count, view_count
         media = data
         if isinstance(data, dict) and "data" in data:
             media = data["data"]
         if isinstance(media, list):
             media = media[0] if media else {}
 
-        views = (
-            _to_int(media.get("video_view_count"))
-            or _to_int(media.get("play_count"))
-            or _to_int(media.get("view_count"))
+        # Приоритет полей: play_count (Reels) > view_count > video_view_count
+        # Используем next() чтобы не пропускать легитимные нули
+        views = next(
+            (v for v in (
+                _to_int(media.get("play_count")),
+                _to_int(media.get("view_count")),
+                _to_int(media.get("video_view_count")),
+            ) if v is not None),
+            None,
         )
         likes = _to_int(media.get("like_count"))
         comments = _to_int(media.get("comment_count"))
