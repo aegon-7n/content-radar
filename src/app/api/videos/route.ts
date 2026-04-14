@@ -12,7 +12,7 @@ const querySchema = z.object({
   platform: z.enum(PLATFORM_VALUES).optional(),
   sort: z.enum(["views", "date"]).optional().default("views"),
   page: z.coerce.number().int().min(1).optional().default(1),
-  limit: z.coerce.number().int().min(1).max(200).optional().default(50),
+  limit: z.coerce.number().int().min(1).max(1000).optional().default(50),
 });
 
 export async function GET(request: NextRequest) {
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 
     const total = Number((countResult[0] as unknown as { total: number }).total ?? 0);
 
-    // Videos with latest metrics
+    // Videos with latest metrics (any time, not restricted to period)
     const videosResult = await db.execute(sql`
       WITH latest_metrics AS (
         SELECT DISTINCT ON (video_id)
@@ -69,7 +69,6 @@ export async function GET(request: NextRequest) {
           shares,
           saves
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -89,8 +88,8 @@ export async function GET(request: NextRequest) {
         p.wb_article
       FROM videos v
       LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      INNER JOIN creators c ON c.id = v.creator_id
-      INNER JOIN products p ON p.id = v.product_id
+      LEFT JOIN creators c ON c.id = v.creator_id
+      LEFT JOIN products p ON p.id = v.product_id
       WHERE v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
         ${creatorFilter}
         ${productFilter}
@@ -104,16 +103,16 @@ export async function GET(request: NextRequest) {
       url: string;
       platform: string;
       published_at: string;
-      creator_id: string;
-      product_id: string;
+      creator_id: string | null;
+      product_id: string | null;
       views: string;
       likes: number;
       comments: number;
       shares: number;
       saves: number;
-      creator_name: string;
-      product_name: string;
-      wb_article: string;
+      creator_name: string | null;
+      product_name: string | null;
+      wb_article: string | null;
     };
 
     const videosList = (videosResult as unknown as VideoRow[]).map((row) => ({
@@ -125,11 +124,11 @@ export async function GET(request: NextRequest) {
       comments: Number(row.comments),
       shares: Number(row.shares),
       saves: Number(row.saves),
-      creatorId: row.creator_id,
-      creatorName: row.creator_name,
-      productId: row.product_id,
-      productName: row.product_name,
-      wbArticle: row.wb_article,
+      creatorId: row.creator_id ?? "",
+      creatorName: row.creator_name ?? "—",
+      productId: row.product_id ?? "",
+      productName: row.product_name ?? "—",
+      wbArticle: row.wb_article ?? "",
       publishedAt: new Date(row.published_at).toISOString(),
     }));
 

@@ -63,15 +63,14 @@ export async function GET(request: NextRequest) {
           views,
           scraped_at
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
         COALESCE(SUM(lm.views), 0)::bigint AS total_views,
         COUNT(DISTINCT v.id)::int AS total_videos
       FROM videos v
-      INNER JOIN latest_metrics lm ON lm.video_id = v.id
-      INNER JOIN products p ON p.id = v.product_id
+      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
+      LEFT JOIN products p ON p.id = v.product_id
       WHERE v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
         ${categoryFilter}
     `);
@@ -84,15 +83,14 @@ export async function GET(request: NextRequest) {
           views,
           scraped_at
         FROM video_metrics
-        WHERE scraped_at >= ${prevFrom.toISOString()} AND scraped_at <= ${prevTo.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
         COALESCE(SUM(lm.views), 0)::bigint AS total_views,
         COUNT(DISTINCT v.id)::int AS total_videos
       FROM videos v
-      INNER JOIN latest_metrics lm ON lm.video_id = v.id
-      INNER JOIN products p ON p.id = v.product_id
+      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
+      LEFT JOIN products p ON p.id = v.product_id
       WHERE v.published_at >= ${prevFrom.toISOString()} AND v.published_at <= ${prevTo.toISOString()}
         ${categoryFilter}
     `);
@@ -105,7 +103,6 @@ export async function GET(request: NextRequest) {
           views,
           scraped_at
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -113,8 +110,8 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(lm.views), 0)::bigint AS views,
         COUNT(DISTINCT v.id)::int AS videos
       FROM videos v
-      INNER JOIN latest_metrics lm ON lm.video_id = v.id
-      INNER JOIN products p ON p.id = v.product_id
+      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
+      LEFT JOIN products p ON p.id = v.product_id
       WHERE v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
         ${categoryFilter}
       GROUP BY v.platform
@@ -162,7 +159,6 @@ export async function GET(request: NextRequest) {
           views,
           scraped_at
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -170,16 +166,16 @@ export async function GET(request: NextRequest) {
         v.url,
         v.platform,
         v.published_at,
-        lm.views,
+        COALESCE(lm.views, 0)::bigint AS views,
         c.name AS creator_name,
         p.name AS product_name
       FROM videos v
-      INNER JOIN latest_metrics lm ON lm.video_id = v.id
-      INNER JOIN creators c ON c.id = v.creator_id
-      INNER JOIN products p ON p.id = v.product_id
+      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
+      LEFT JOIN creators c ON c.id = v.creator_id
+      LEFT JOIN products p ON p.id = v.product_id
       WHERE v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
         ${categoryFilter}
-      ORDER BY lm.views DESC
+      ORDER BY views DESC
       LIMIT 5
     `);
 

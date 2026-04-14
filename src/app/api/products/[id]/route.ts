@@ -45,7 +45,6 @@ export async function GET(
           video_id,
           views
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -64,7 +63,6 @@ export async function GET(
           video_id,
           views
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -86,7 +84,6 @@ export async function GET(
           video_id,
           views
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -95,7 +92,7 @@ export async function GET(
         COALESCE(SUM(lm.views), 0)::bigint AS views,
         COUNT(DISTINCT v.id)::int AS videos
       FROM videos v
-      INNER JOIN creators c ON c.id = v.creator_id
+      LEFT JOIN creators c ON c.id = v.creator_id
       LEFT JOIN latest_metrics lm ON lm.video_id = v.id
       WHERE v.product_id = ${id}
         AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
@@ -114,7 +111,6 @@ export async function GET(
           shares,
           saves
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -127,10 +123,10 @@ export async function GET(
         COALESCE(lm.comments, 0)::int AS comments,
         COALESCE(lm.shares, 0)::int AS shares,
         COALESCE(lm.saves, 0)::int AS saves,
-        c.name AS creator_name
+        COALESCE(c.name, '—') AS creator_name
       FROM videos v
       LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      INNER JOIN creators c ON c.id = v.creator_id
+      LEFT JOIN creators c ON c.id = v.creator_id
       WHERE v.product_id = ${id}
         AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
       ORDER BY views DESC

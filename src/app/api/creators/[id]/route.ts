@@ -59,7 +59,6 @@ export async function GET(
           video_id,
           views
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -78,7 +77,6 @@ export async function GET(
           video_id,
           views
         FROM video_metrics
-        WHERE scraped_at >= ${prevFrom.toISOString()} AND scraped_at <= ${prevTo.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -96,7 +94,6 @@ export async function GET(
           video_id,
           views
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -118,7 +115,6 @@ export async function GET(
           video_id,
           views
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -128,7 +124,7 @@ export async function GET(
         COALESCE(SUM(lm.views), 0)::bigint AS views,
         COUNT(DISTINCT v.id)::int AS videos
       FROM videos v
-      INNER JOIN products p ON p.id = v.product_id
+      LEFT JOIN products p ON p.id = v.product_id
       LEFT JOIN latest_metrics lm ON lm.video_id = v.id
       WHERE v.creator_id = ${id}
         AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
@@ -172,7 +168,6 @@ export async function GET(
           video_id,
           views
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -180,14 +175,14 @@ export async function GET(
         v.url,
         v.platform,
         v.published_at,
-        lm.views,
+        COALESCE(lm.views, 0)::bigint AS views,
         p.name AS product_name
       FROM videos v
-      INNER JOIN latest_metrics lm ON lm.video_id = v.id
-      INNER JOIN products p ON p.id = v.product_id
+      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
+      LEFT JOIN products p ON p.id = v.product_id
       WHERE v.creator_id = ${id}
         AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
-      ORDER BY lm.views DESC
+      ORDER BY views DESC
       LIMIT 10
     `);
 

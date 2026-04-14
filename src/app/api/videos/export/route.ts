@@ -44,7 +44,6 @@ export async function GET(request: NextRequest) {
           shares,
           saves
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -56,13 +55,13 @@ export async function GET(request: NextRequest) {
         COALESCE(lm.comments, 0)::int AS comments,
         COALESCE(lm.shares, 0)::int AS shares,
         COALESCE(lm.saves, 0)::int AS saves,
-        c.name AS creator_name,
-        p.name AS product_name,
-        p.wb_article
+        COALESCE(c.name, '—') AS creator_name,
+        COALESCE(p.name, '—') AS product_name,
+        COALESCE(p.wb_article, '') AS wb_article
       FROM videos v
       LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      INNER JOIN creators c ON c.id = v.creator_id
-      INNER JOIN products p ON p.id = v.product_id
+      LEFT JOIN creators c ON c.id = v.creator_id
+      LEFT JOIN products p ON p.id = v.product_id
       WHERE v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
         ${creatorFilter}
         ${productFilter}

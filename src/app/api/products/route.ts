@@ -26,7 +26,6 @@ export async function GET(request: NextRequest) {
           video_id,
           views
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -50,7 +49,6 @@ export async function GET(request: NextRequest) {
           video_id,
           views
         FROM video_metrics
-        WHERE scraped_at >= ${from.toISOString()} AND scraped_at <= ${to.toISOString()}
         ORDER BY video_id, scraped_at DESC
       )
       SELECT
@@ -58,7 +56,7 @@ export async function GET(request: NextRequest) {
         v.platform,
         COALESCE(SUM(lm.views), 0)::bigint AS views
       FROM videos v
-      INNER JOIN latest_metrics lm ON lm.video_id = v.id
+      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
       WHERE v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
       GROUP BY v.product_id, v.platform
       ORDER BY v.product_id, views DESC
