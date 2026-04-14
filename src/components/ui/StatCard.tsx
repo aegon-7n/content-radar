@@ -1,11 +1,15 @@
 import { cn } from "@/lib/utils";
+import { formatPercent } from "@/lib/format";
 
 interface StatCardProps {
   title: string;
   value: string | number;
-  change?: number;
+  /** Period-over-period delta in percent. `null` = no comparable prior period. */
+  change?: number | null;
   icon?: React.ReactNode;
   subtitle?: string;
+  /** Tooltip text shown on hover over the title — explains what the number is. */
+  help?: string;
   mono?: boolean;
 }
 
@@ -15,10 +19,11 @@ export default function StatCard({
   change,
   icon,
   subtitle,
+  help,
   mono = true,
 }: StatCardProps) {
-  const isPositive = change !== undefined && change >= 0;
-  const isNegative = change !== undefined && change < 0;
+  const hasChange = change !== undefined && change !== null;
+  const isPositive = hasChange && (change as number) >= 0;
 
   return (
     <div
@@ -35,6 +40,7 @@ export default function StatCard({
         <span
           className="text-[13px]"
           style={{ color: "var(--text-muted)" }}
+          title={help}
         >
           {title}
         </span>
@@ -50,10 +56,7 @@ export default function StatCard({
 
       <div className="flex flex-col gap-1">
         <span
-          className={cn(
-            "leading-none",
-            mono && "font-mono"
-          )}
+          className={cn("leading-none", mono && "font-mono")}
           style={{
             fontSize: "30px",
             fontWeight: 700,
@@ -70,21 +73,30 @@ export default function StatCard({
       </div>
 
       {change !== undefined && (
-        <div className="flex items-center gap-1 text-xs font-medium">
-          <span
-            className="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold"
-            style={{
-              color: isPositive ? "var(--success-text)" : "var(--error-text)",
-              background: isPositive ? "var(--success-bg)" : "var(--error-bg)",
-            }}
+        hasChange ? (
+          <div className="flex items-center gap-1 text-xs font-medium">
+            <span
+              className="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold"
+              style={{
+                color: isPositive ? "var(--success-text)" : "var(--error-text)",
+                background: isPositive ? "var(--success-bg)" : "var(--error-bg)",
+              }}
+            >
+              {isPositive ? "↑" : "↓"}
+            </span>
+            <span style={{ color: isPositive ? "var(--success-text)" : "var(--error-text)" }}>
+              {formatPercent(change as number)} к прошлому периоду
+            </span>
+          </div>
+        ) : (
+          <div
+            className="text-xs"
+            style={{ color: "var(--text-disabled)" }}
+            title="За предыдущий период нет данных для сравнения"
           >
-            {isPositive ? "↑" : "↓"}
-          </span>
-          <span style={{ color: isPositive ? "var(--success-text)" : "var(--error-text)" }}>
-            {isPositive ? "+" : ""}
-            {change.toFixed(1)}% к прошлому периоду
-          </span>
-        </div>
+            Нет данных за прошлый период
+          </div>
+        )
       )}
     </div>
   );
