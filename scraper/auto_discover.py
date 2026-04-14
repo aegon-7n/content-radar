@@ -38,7 +38,23 @@ logger = logging.getLogger(__name__)
 _DEFAULT_TIMEOUT = (10, 30)  # (connect, read)
 
 WB_ARTICLE_RE = re.compile(r"\b(\d{5,})\b")  # 5+ цифр подряд = артикул WB
-LOOKBACK_HOURS = 168  # смотрим назад 7 дней — чтобы не пропускать свежие ролики
+
+# Minimum lookback on a normal daily run — we always look at least 7 days back
+# even if the previous run was 10 minutes ago, in case something slipped.
+MIN_LOOKBACK_HOURS = 168
+
+# Safety cap so a really old last_success_at does not blow up API quotas.
+MAX_LOOKBACK_HOURS = 24 * 30  # 30 days
+
+# Extra buffer added on top of "gap since last success". Prevents off-by-one
+# when the previous run finished a few minutes before a new publish.
+LOOKBACK_BUFFER_HOURS = 24
+
+# Used as the global default when compute_lookback_hours hasn't been called yet
+# (tests, direct imports from run_daily, etc.).
+LOOKBACK_HOURS = MIN_LOOKBACK_HOURS
+
+JOB_NAME = "auto_discover"
 
 
 # ---------------------------------------------------------------------------
@@ -65,13 +81,15 @@ def get_creators(cur) -> list[dict]:
                youtube_channel_id,
                instagram_username,
                likee_username,
-               likee_uid
+               likee_uid,
+               pinterest_username
         FROM creators
         WHERE tiktok_username IS NOT NULL
            OR youtube_channel_id IS NOT NULL
            OR instagram_username IS NOT NULL
            OR likee_username IS NOT NULL
            OR likee_uid IS NOT NULL
+           OR pinterest_username IS NOT NULL
     """)
     return [dict(r) for r in cur.fetchall()]
 
@@ -688,19 +706,176 @@ def fetch_instagram_videos(username: str, since: datetime) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Pinterest — через публичный RSS фид профиля
+# ---------------------------------------------------------------------------
+
+_PINTEREST_RSS_URL = "https://www.pinterest.com/{username}/feed.rss"
+
+_PINTEREST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/rss+xml, application/xml;q=0.9, */*;q=0.8",
+}
+
+
+def fetch_pinterest_videos(username: str, since: datetime) -> list[dict]:
+    """
+    Возвращает список {'url', 'description', 'published_at'} за последние LOOKBACK_HOURS.
+
+    Pinterest публикует RSS для каждого публичного профиля по адресу
+    pinterest.com/{username}/feed.rss. RSS содержит последние ~25 пинов с
+    title/description/link/pubDate — достаточно для auto-discover. Метрики
+    (saves/views) уже собираются отдельно через PinterestScraper в run_daily.
+    """
+    import xml.etree.ElementTree as ET
+
+    clean = username.strip().lstrip("@").strip("/")
+    url = _PINTEREST_RSS_URL.format(username=clean)
+
+    try:
+        resp = requests.get(url, headers=_PINTEREST_HEADERS, timeout=_DEFAULT_TIMEOUT)
+    except Exception as e:
+        logger.warning("Pinterest @%s: ошибка запроса RSS: %s", clean, e)
+        return []
+
+    if not resp.ok:
+        logger.warning("Pinterest @%s: RSS статус %d", clean, resp.status_code)
+        return []
+
+    try:
+        root = ET.fromstring(resp.content)
+    except ET.ParseError as e:
+        logger.warning("Pinterest @%s: невалидный XML: %s", clean, e)
+        return []
+
+    results = []
+    for item in root.findall("./channel/item"):
+        link_el = item.find("link")
+        pubdate_el = item.find("pubDate")
+        title_el = item.find("title")
+        desc_el = item.find("description")
+        if link_el is None or pubdate_el is None:
+            continue
+
+        pin_url = (link_el.text or "").strip()
+        if not pin_url:
+            continue
+
+        # RFC 822 date parse
+        try:
+            from email.utils import parsedate_to_datetime
+            published_at = parsedate_to_datetime(pubdate_el.text or "")
+            if published_at.tzinfo is None:
+                published_at = published_at.replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
+
+        if published_at < since:
+            continue
+
+        title = (title_el.text or "") if title_el is not None else ""
+        desc = (desc_el.text or "") if desc_el is not None else ""
+        combined = f"{title} {desc}".strip()
+
+        results.append({
+            "url": pin_url,
+            "description": combined,
+            "published_at": published_at,
+        })
+
+    logger.info(
+        "Pinterest @%s: найдено %d пинов за последние %dч",
+        clean, len(results), LOOKBACK_HOURS,
+    )
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
-def main():
-    since = datetime.now(tz=timezone.utc) - timedelta(hours=LOOKBACK_HOURS)
-    logger.info("Auto-discover: ищем видео с %s", since.isoformat())
+def _get_scraper_state(cur, job_name: str) -> Optional[datetime]:
+    """Return last_success_at for a job, or None if never succeeded."""
+    cur.execute(
+        "SELECT last_success_at FROM scraper_state WHERE job_name = %s",
+        (job_name,),
+    )
+    row = cur.fetchone()
+    if not row or not row[0]:
+        return None
+    return row[0]
 
+
+def _upsert_scraper_state(cur, job_name: str, status: str, message: str) -> None:
+    """Record a run outcome. Updates last_success_at only on status='ok'."""
+    now = datetime.now(tz=timezone.utc)
+    cur.execute(
+        """
+        INSERT INTO scraper_state (job_name, last_run_at, last_success_at, last_status, last_message)
+        VALUES (%s, %s, CASE WHEN %s = 'ok' THEN %s ELSE NULL END, %s, %s)
+        ON CONFLICT (job_name) DO UPDATE SET
+          last_run_at = EXCLUDED.last_run_at,
+          last_success_at = COALESCE(EXCLUDED.last_success_at, scraper_state.last_success_at),
+          last_status = EXCLUDED.last_status,
+          last_message = EXCLUDED.last_message
+        """,
+        (job_name, now, status, now, status, message),
+    )
+
+
+def compute_lookback_hours(cur) -> int:
+    """
+    Self-healing lookback:
+
+      lookback = clamp(
+        gap_since_last_success + buffer,
+        MIN_LOOKBACK_HOURS,
+        MAX_LOOKBACK_HOURS,
+      )
+
+    If the scraper was down for 3 days, the next run uses ≈ 3d + 24h buffer so
+    nothing slips through. On a healthy daily cadence gap is ~24h and we fall
+    back to the minimum 168h (7 days) so a single bad day still doesn't cost
+    us anything.
+    """
+    global LOOKBACK_HOURS
+    last_success = _get_scraper_state(cur, JOB_NAME)
+    if not last_success:
+        logger.info("Нет истории запусков, использую MIN_LOOKBACK_HOURS=%d", MIN_LOOKBACK_HOURS)
+        LOOKBACK_HOURS = MIN_LOOKBACK_HOURS
+        return MIN_LOOKBACK_HOURS
+
+    gap_hours = int((datetime.now(tz=timezone.utc) - last_success).total_seconds() / 3600)
+    candidate = gap_hours + LOOKBACK_BUFFER_HOURS
+    clamped = max(MIN_LOOKBACK_HOURS, min(candidate, MAX_LOOKBACK_HOURS))
+
+    if clamped > MIN_LOOKBACK_HOURS:
+        logger.info(
+            "Последний успех %s назад (%dч). Lookback %dч (min=%d, max=%d).",
+            last_success.strftime("%Y-%m-%d %H:%M"),
+            gap_hours, clamped, MIN_LOOKBACK_HOURS, MAX_LOOKBACK_HOURS,
+        )
+    else:
+        logger.info("Последний успех %dч назад, использую MIN_LOOKBACK_HOURS=%d", gap_hours, MIN_LOOKBACK_HOURS)
+
+    LOOKBACK_HOURS = clamped
+    return clamped
+
+
+def main():
     conn = _conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+    lookback_hours = compute_lookback_hours(cur)
+    since = datetime.now(tz=timezone.utc) - timedelta(hours=lookback_hours)
+    logger.info("Auto-discover: ищем видео с %s", since.isoformat())
 
     creators = get_creators(cur)
     if not creators:
         logger.info("Нет креаторов с заданными аккаунтами. Добавь tiktok_username / youtube_channel_id / instagram_username в настройках.")
+        _upsert_scraper_state(cur, JOB_NAME, "ok", "no creators configured")
+        conn.commit()
+        cur.close()
+        conn.close()
         return
 
     logger.info("Найдено %d креаторов с аккаунтами", len(creators))
@@ -745,6 +920,12 @@ def main():
                 v["platform"] = "likee"
             candidate_videos.extend(vids)
 
+        if creator.get("pinterest_username"):
+            vids = fetch_pinterest_videos(creator["pinterest_username"], since)
+            for v in vids:
+                v["platform"] = "pinterest"
+            candidate_videos.extend(vids)
+
         for v in candidate_videos:
             url = v["url"]
 
@@ -770,6 +951,11 @@ def main():
             logger.info("  + Добавлено: %s | артикул=%s | %s", v["platform"], article, url[:60])
             total_added += 1
 
+    summary = (
+        f"added={total_added} skipped_no_article={total_skipped_no_article} "
+        f"skipped_exists={total_skipped_exists} lookback={lookback_hours}h"
+    )
+    _upsert_scraper_state(cur, JOB_NAME, "ok", summary)
     conn.commit()
     cur.close()
     conn.close()

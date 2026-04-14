@@ -14,6 +14,7 @@ from scraper.scrapers.tiktok import TikTokScraper
 from scraper.scrapers.youtube import YouTubeScraper
 from scraper.scrapers.instagram import InstagramScraper
 from scraper.scrapers.likee import LikeeScraper
+from scraper.scrapers.pinterest import PinterestScraper
 
 import psycopg2
 
@@ -46,6 +47,7 @@ def main():
         "youtube": YouTubeScraper(),
         "instagram": InstagramScraper(),
         "likee": LikeeScraper(),
+        "pinterest": PinterestScraper(),
     }
 
     ok = 0
@@ -73,6 +75,25 @@ def main():
         else:
             logger.warning("FAIL platform=%s video_id=%s url=%s", platform, video_id, url)
             fail += 1
+
+    # Mark state — ok/partial/fail based on outcome so downstream consumers
+    # (health endpoint, Telegram alerting) can tell a bad run from a silent
+    # failure.
+    status = "ok" if fail == 0 else ("partial" if ok > 0 else "fail")
+    summary = f"ok={ok} fail={fail} skipped={skipped}"
+    now = datetime.now(tz=timezone.utc)
+    cur.execute(
+        """
+        INSERT INTO scraper_state (job_name, last_run_at, last_success_at, last_status, last_message)
+        VALUES ('run_daily', %s, CASE WHEN %s = 'ok' THEN %s ELSE NULL END, %s, %s)
+        ON CONFLICT (job_name) DO UPDATE SET
+          last_run_at = EXCLUDED.last_run_at,
+          last_success_at = COALESCE(EXCLUDED.last_success_at, scraper_state.last_success_at),
+          last_status = EXCLUDED.last_status,
+          last_message = EXCLUDED.last_message
+        """,
+        (now, status, now, status, summary),
+    )
 
     conn.commit()
     cur.close()

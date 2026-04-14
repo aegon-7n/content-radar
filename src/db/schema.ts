@@ -40,6 +40,7 @@ export const creators = pgTable("creators", {
   // protection. The seller pastes the numeric uid manually from devtools
   // and we use it directly in fetch_likee_videos.
   likeeUid: text("likee_uid"),
+  pinterestUsername: text("pinterest_username"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -93,6 +94,17 @@ export const videoMetrics = pgTable("video_metrics", {
     .notNull(),
 });
 
+// One row per scraper job (`auto_discover`, `run_daily`, `audit`). Lets the
+// scraper compute a self-healing lookback window — if prod was down for a
+// week, the next run back-fills that week instead of the hardcoded 168h.
+export const scraperState = pgTable("scraper_state", {
+  jobName: text("job_name").primaryKey(),
+  lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  lastStatus: text("last_status"), // 'ok' | 'fail' | 'partial'
+  lastMessage: text("last_message"),
+});
+
 // Inferred types for use in application code
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -108,5 +120,8 @@ export type NewVideo = typeof videos.$inferInsert;
 
 export type VideoMetric = typeof videoMetrics.$inferSelect;
 export type NewVideoMetric = typeof videoMetrics.$inferInsert;
+
+export type ScraperState = typeof scraperState.$inferSelect;
+export type NewScraperState = typeof scraperState.$inferInsert;
 
 export type Platform = (typeof platformEnum.enumValues)[number];

@@ -142,6 +142,39 @@ def youtube_count(channel_id: Optional[str]) -> Optional[int] | str:
         return f"exc {e.__class__.__name__}"
 
 
+def pinterest_count(username: Optional[str]) -> Optional[int] | str:
+    """Count pins from the last LOOKBACK_DAYS via public RSS feed."""
+    if not username:
+        return None
+    try:
+        import xml.etree.ElementTree as ET
+        from email.utils import parsedate_to_datetime
+
+        r = requests.get(
+            f"https://www.pinterest.com/{username.lstrip('@').strip('/')}/feed.rss",
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=TIMEOUT,
+        )
+        if not r.ok:
+            return f"rss {r.status_code}"
+        root = ET.fromstring(r.content)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
+        recent = 0
+        for item in root.findall("./channel/item"):
+            pubdate = item.findtext("pubDate", "")
+            try:
+                ts = parsedate_to_datetime(pubdate)
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+            except Exception:
+                continue
+            if ts >= cutoff:
+                recent += 1
+        return recent
+    except Exception as e:
+        return f"exc {e.__class__.__name__}"
+
+
 def instagram_count(username: Optional[str]) -> Optional[int] | str:
     if not username:
         return None
@@ -212,7 +245,7 @@ def main() -> int:
     with _conn() as c, c.cursor() as cur:
         cur.execute("""
             SELECT id, name,
-                   tiktok_username, youtube_channel_id, instagram_username
+                   tiktok_username, youtube_channel_id, instagram_username, pinterest_username
             FROM creators
             ORDER BY name
         """)
@@ -222,13 +255,14 @@ def main() -> int:
 
     total_gap = 0
     total_fail = 0
-    for cid, name, tt, yt, ig in creators:
+    for cid, name, tt, yt, ig, pin in creators:
         db = db_counts(cid)
 
         for platform, real in (
             ("tiktok",    tiktok_count(tt)),
             ("youtube",   youtube_count(yt)),
             ("instagram", instagram_count(ig)),
+            ("pinterest", pinterest_count(pin)),
         ):
             db_n = db.get(platform, 0)
 
@@ -253,8 +287,26 @@ def main() -> int:
                 )
 
     logger.info("Done. Total missing videos: %d. API failures: %d.", total_gap, total_fail)
-    # Exit non-zero on any gap so cron can wire it to whatever alerting we
-    # add later (Telegram / email). For now the log line is the signal.
+
+    # Persist outcome so the health endpoint / Telegram alerting can read it.
+    status = "ok" if (total_gap == 0 and total_fail == 0) else ("partial" if total_fail == 0 else "fail")
+    message = f"missing={total_gap} failures={total_fail}"
+    now = datetime.now(timezone.utc)
+    with _conn() as c2, c2.cursor() as cur2:
+        cur2.execute(
+            """
+            INSERT INTO scraper_state (job_name, last_run_at, last_success_at, last_status, last_message)
+            VALUES ('audit', %s, CASE WHEN %s = 'ok' THEN %s ELSE NULL END, %s, %s)
+            ON CONFLICT (job_name) DO UPDATE SET
+              last_run_at = EXCLUDED.last_run_at,
+              last_success_at = COALESCE(EXCLUDED.last_success_at, scraper_state.last_success_at),
+              last_status = EXCLUDED.last_status,
+              last_message = EXCLUDED.last_message
+            """,
+            (now, status, now, status, message),
+        )
+
+    # Exit non-zero on any gap so cron can wire it to Telegram alerting.
     return 1 if (total_gap > 0 or total_fail > 0) else 0
 
 
