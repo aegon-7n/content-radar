@@ -34,6 +34,8 @@ export const creators = pgTable("creators", {
   avatarUrl: text("avatar_url"),
   tiktokUsername: text("tiktok_username"),
   youtubeChannelId: text("youtube_channel_id"),
+  instagramUsername: text("instagram_username"),
+  likeeUsername: text("likee_username"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
