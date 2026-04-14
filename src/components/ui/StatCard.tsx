@@ -21,11 +21,28 @@ export default function StatCard({
   const isNegative = change !== undefined && change < 0;
 
   return (
-    <div className="bg-[#111111] border border-white/[0.06] rounded-xl p-5 flex flex-col gap-3">
+    <div
+      className="flex flex-col gap-3 rounded-lg"
+      style={{
+        background: "var(--surface-1)",
+        border: "1px solid var(--border-default)",
+        boxShadow: "var(--shadow-card)",
+        padding: "24px",
+        borderRadius: "8px",
+      }}
+    >
       <div className="flex items-center justify-between">
-        <span className="text-sm text-[#888]">{title}</span>
+        <span
+          className="text-[13px]"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {title}
+        </span>
         {icon && (
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.04]">
+          <div
+            className="flex items-center justify-center w-8 h-8 rounded-lg"
+            style={{ background: "var(--bg-muted)" }}
+          >
             {icon}
           </div>
         )}
@@ -34,35 +51,36 @@ export default function StatCard({
       <div className="flex flex-col gap-1">
         <span
           className={cn(
-            "text-2xl font-semibold text-white leading-none",
+            "leading-none",
             mono && "font-mono"
           )}
+          style={{
+            fontSize: "30px",
+            fontWeight: 700,
+            color: "var(--text-primary)",
+          }}
         >
           {value}
         </span>
         {subtitle && (
-          <span className="text-xs text-[#555]">{subtitle}</span>
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            {subtitle}
+          </span>
         )}
       </div>
 
       {change !== undefined && (
-        <div
-          className={cn(
-            "flex items-center gap-1 text-xs font-medium",
-            isPositive && "text-emerald-400",
-            isNegative && "text-red-400"
-          )}
-        >
+        <div className="flex items-center gap-1 text-xs font-medium">
           <span
-            className={cn(
-              "inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold",
-              isPositive && "bg-emerald-400/10",
-              isNegative && "bg-red-400/10"
-            )}
+            className="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold"
+            style={{
+              color: isPositive ? "var(--success-text)" : "var(--error-text)",
+              background: isPositive ? "var(--success-bg)" : "var(--error-bg)",
+            }}
           >
             {isPositive ? "↑" : "↓"}
           </span>
-          <span>
+          <span style={{ color: isPositive ? "var(--success-text)" : "var(--error-text)" }}>
             {isPositive ? "+" : ""}
             {change.toFixed(1)}% к прошлому периоду
           </span>

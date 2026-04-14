@@ -27,16 +27,28 @@ export default function Modal({ open, onClose, title, children }: ModalProps) {
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
-      <div className="absolute inset-0 backdrop-blur-sm bg-black/60" />
+      <div className="absolute inset-0 backdrop-blur-sm bg-black/40" />
       <div
-        className="relative z-10 w-full max-w-md bg-[#111111] border border-white/[0.08] rounded-xl shadow-2xl"
+        className="relative z-10 w-full max-w-md rounded-xl shadow-2xl"
+        style={{
+          background: "var(--surface-1)",
+          border: "1px solid var(--border-default)",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
-          <h2 className="text-sm font-semibold text-white">{title}</h2>
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: "1px solid var(--border-default)" }}
+        >
+          <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+            {title}
+          </h2>
           <button
             onClick={onClose}
-            className="text-[#555] hover:text-white transition-colors p-0.5 rounded"
+            className="p-0.5 rounded transition-colors"
+            style={{ color: "var(--text-disabled)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-disabled)")}
           >
             <X className="w-4 h-4" />
           </button>

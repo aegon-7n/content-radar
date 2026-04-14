@@ -40,15 +40,15 @@ export function formatNumber(n: number | undefined | null): string {
 export function getPlatformColor(platform: string): string {
   switch (platform.toLowerCase()) {
     case "tiktok":
-      return "#fe2c55";
+      return "#EE1D52";
     case "youtube":
-      return "#ff0000";
+      return "#E53935";
     case "instagram":
-      return "#e1306c";
+      return "#E1306C";
     case "likee":
-      return "#1dd1a1";
+      return "#FF5700";
     case "pinterest":
-      return "#e60023";
+      return "#BD081C";
     default:
       return "#888888";
   }

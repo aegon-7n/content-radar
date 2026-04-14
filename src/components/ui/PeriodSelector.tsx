@@ -60,7 +60,14 @@ export default function PeriodSelector({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111111] border border-white/[0.06] rounded-lg text-xs text-[#888] hover:text-white transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors"
+        style={{
+          background: "var(--surface-1)",
+          border: "1px solid var(--border-default)",
+          color: "var(--text-muted)",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
       >
         <Calendar className="w-3.5 h-3.5" />
         {presetLabel(value, customFrom, customTo)}
@@ -68,41 +75,81 @@ export default function PeriodSelector({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-52 bg-[#111111] border border-white/[0.08] rounded-xl shadow-2xl z-50 p-1.5">
-          {presets.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => { onChange(opt.value); setOpen(false); }}
-              className={cn(
-                "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors",
-                value === opt.value ? "bg-white/[0.08] text-white" : "text-[#666] hover:text-[#aaa] hover:bg-white/[0.04]"
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div
+          className="absolute right-0 top-full mt-1.5 w-52 rounded-xl shadow-2xl z-50 p-1.5"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          {presets.map((opt) => {
+            const isActive = value === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg text-xs transition-colors"
+                style={{
+                  background: isActive ? "var(--surface-3)" : "transparent",
+                  color: isActive ? "var(--text-primary)" : "var(--text-muted)",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                    (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
+                  }
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
 
-          <div className="border-t border-white/[0.06] mt-1.5 pt-1.5 px-1">
-            <p className="text-[10px] text-[#444] mb-1.5 px-2">Произвольный период</p>
+          <div
+            className="mt-1.5 pt-1.5 px-1"
+            style={{ borderTop: "1px solid var(--border-default)" }}
+          >
+            <p className="text-[10px] mb-1.5 px-2" style={{ color: "var(--text-disabled)" }}>
+              Произвольный период
+            </p>
             <div className="flex flex-col gap-1">
               <input
                 type="date"
                 value={localFrom}
                 max={localTo || undefined}
                 onChange={(e) => setLocalFrom(e.target.value)}
-                className="w-full bg-[#1a1a1a] border border-white/[0.08] rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500/50"
+                className="w-full rounded-md px-2 py-1.5 text-xs focus:outline-none transition-colors"
+                style={{
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-primary)",
+                }}
               />
               <input
                 type="date"
                 value={localTo}
                 min={localFrom || undefined}
                 onChange={(e) => setLocalTo(e.target.value)}
-                className="w-full bg-[#1a1a1a] border border-white/[0.08] rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500/50"
+                className="w-full rounded-md px-2 py-1.5 text-xs focus:outline-none transition-colors"
+                style={{
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-primary)",
+                }}
               />
               <button
                 disabled={!localFrom || !localTo}
                 onClick={applyCustom}
-                className="w-full mt-0.5 px-2 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs rounded-md transition-colors"
+                className="w-full mt-0.5 px-2 py-1.5 text-white text-xs rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: "var(--accent-primary)" }}
+                onMouseEnter={(e) => { if (localFrom && localTo) (e.currentTarget.style.background = "var(--accent-hover)"); }}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "var(--accent-primary)")}
               >
                 Применить
               </button>
