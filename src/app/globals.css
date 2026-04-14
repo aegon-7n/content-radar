@@ -1,34 +1,92 @@
 @import "tailwindcss";
 
+/* ─── Premium Light Theme (single theme, Linear/Vercel style) ─── */
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  /* Backgrounds — soft off-white, never sterile white */
+  --bg-base:          #fafbfc;
+  --bg-subtle:        #f4f5f7;
+  --bg-muted:         #f0f1f4;
+  --bg-overlay:       #e7e9ee;
+
+  /* Surfaces — cards, sidebar, modals */
+  --surface-1:        #ffffff;
+  --surface-2:        #ffffff;
+  --surface-3:        #f8f9fb;
+
+  /* Borders — hairline, very subtle */
+  --border-subtle:    rgba(17, 24, 39, 0.04);
+  --border-default:   rgba(17, 24, 39, 0.08);
+  --border-strong:    rgba(17, 24, 39, 0.14);
+
+  /* Text — warm near-black, never pure #000 */
+  --text-primary:     #0f172a;
+  --text-secondary:   #334155;
+  --text-muted:       #64748b;
+  --text-disabled:    #94a3b8;
+  --text-inverse:     #ffffff;
+
+  /* Accent — indigo, premium, calm */
+  --accent-primary:   #5b5bd6;
+  --accent-hover:     #4f46e5;
+  --accent-muted:     #eef2ff;
+  --accent-border:    #c7d2fe;
+  --accent-text:      #4338ca;
+
+  /* Semantic states — soft washes, never saturated */
+  --success-bg:       #ecfdf5;
+  --success-text:     #047857;
+  --success-border:   #a7f3d0;
+
+  --warning-bg:       #fffbeb;
+  --warning-text:     #b45309;
+  --warning-border:   #fde68a;
+
+  --error-bg:         #fef2f2;
+  --error-text:       #b91c1c;
+  --error-border:     #fecaca;
+
+  --neutral-bg:       #f3f4f6;
+  --neutral-text:     #374151;
+  --neutral-border:   #e5e7eb;
+
+  /* Shadows — diffuse, Linear-style, NEVER heavy */
+  --shadow-xs:        0 1px 2px rgba(17, 24, 39, 0.04);
+  --shadow-sm:        0 1px 3px rgba(17, 24, 39, 0.06), 0 1px 2px rgba(17, 24, 39, 0.04);
+  --shadow-md:        0 4px 12px rgba(17, 24, 39, 0.06), 0 2px 4px rgba(17, 24, 39, 0.03);
+  --shadow-lg:        0 12px 24px rgba(17, 24, 39, 0.08), 0 4px 8px rgba(17, 24, 39, 0.04);
+  --shadow-card:      0 1px 2px rgba(17, 24, 39, 0.04), 0 0 0 1px rgba(17, 24, 39, 0.04);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, sans-serif;
+html, body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv11", "ss01", "ss03";
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 3px;
+  background: rgba(17, 24, 39, 0.08);
+  border-radius: 8px;
+  border: 2px solid var(--bg-base);
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(17, 24, 39, 0.16); }
+
+/* Focus rings — subtle indigo, never harsh */
+*:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #444;
+/* Selection — soft indigo wash */
+::selection {
+  background: #e0e7ff;
+  color: var(--text-primary);
 }
