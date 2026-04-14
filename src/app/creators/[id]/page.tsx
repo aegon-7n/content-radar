@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   LineChart,
   Line,
@@ -23,19 +23,21 @@ import { formatViews, formatDate, formatDateShort, formatPercent, getPlatformCol
 import { MOCK_CREATOR_DETAIL, type CreatorDetail, type Platform } from "@/lib/mock-data";
 
 const tooltipStyle = {
-  backgroundColor: "#1a1a1a",
-  border: "1px solid rgba(255,255,255,0.08)",
+  backgroundColor: "var(--surface-1)",
+  border: "1px solid var(--border-default)",
   borderRadius: "8px",
-  color: "#fff",
+  color: "var(--text-primary)",
   fontSize: "12px",
 };
 
 export default function CreatorDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
 
-  const [period, setPeriod] = useState<Period>("30d");
+  const initialPeriod = (searchParams.get("period") as Period) || "30d";
+  const [period, setPeriod] = useState<Period>(initialPeriod);
   const [data, setData] = useState<CreatorDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +47,6 @@ export default function CreatorDetailPage() {
     fetch(`/api/creators/${id}?from=${from}&to=${to}`)
       .then((r) => r.json())
       .then((d) => {
-        // Flatten nested API response into the shape the page expects
         if (d.stats) {
           d.name = d.creator?.name ?? d.name;
           d.totalViews = d.stats.views ?? 0;
@@ -70,17 +71,22 @@ export default function CreatorDetailPage() {
           <button
             type="button"
             onClick={() => router.push("/creators")}
-            className="flex items-center gap-1.5 text-xs text-[#555] hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-xs transition-colors"
+            style={{ color: "var(--text-muted)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Назад
           </button>
-          <div className="w-px h-4 bg-white/[0.08]" />
+          <div className="w-px h-4" style={{ background: "var(--border-default)" }} />
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/40 to-violet-600/40 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
               <span className="text-xs font-semibold text-white">{d?.name?.[0] ?? "?"}</span>
             </div>
-            <h1 className="text-xl font-semibold text-white">{d?.name ?? "Загрузка..."}</h1>
+            <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+              {d?.name ?? "Загрузка..."}
+            </h1>
           </div>
         </div>
         <PeriodSelector value={period} onChange={setPeriod} />
@@ -97,22 +103,22 @@ export default function CreatorDetailPage() {
             title="Просмотры"
             value={formatViews(d.totalViews)}
             change={d.viewsChange}
-            icon={<Eye className="w-4 h-4 text-blue-400" />}
+            icon={<Eye className="w-4 h-4" style={{ color: "var(--accent-primary)" }} />}
           />
           <StatCard
             title="Роликов"
             value={d.totalVideos}
-            icon={<Film className="w-4 h-4 text-violet-400" />}
+            icon={<Film className="w-4 h-4" style={{ color: "#7C3AED" }} />}
           />
           <StatCard
             title="Среднее на ролик"
             value={formatViews(d.avgViewsPerVideo)}
-            icon={<TrendingUp className="w-4 h-4 text-emerald-400" />}
+            icon={<TrendingUp className="w-4 h-4" style={{ color: "#059669" }} />}
           />
           <StatCard
             title="% изменение"
             value={`${d.viewsChange >= 0 ? "+" : ""}${d.viewsChange.toFixed(1)}%`}
-            icon={<BarChart2 className="w-4 h-4 text-orange-400" />}
+            icon={<BarChart2 className="w-4 h-4" style={{ color: "#D97706" }} />}
             subtitle="к прошлому периоду"
             mono={false}
           />
@@ -128,22 +134,30 @@ export default function CreatorDetailPage() {
       ) : (
         <div className="grid grid-cols-2 gap-4">
           {/* Line chart */}
-          <div className="bg-[#111111] border border-white/[0.06] rounded-xl p-5">
-            <h2 className="text-sm font-medium text-white mb-5">Просмотры по дням</h2>
+          <div
+            className="rounded-xl p-5"
+            style={{
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
+            }}
+          >
+            <h2 className="text-sm font-medium mb-5" style={{ color: "var(--text-primary)" }}>
+              Просмотры по дням
+            </h2>
             <ResponsiveContainer width="100%" height={210}>
               <LineChart data={d.dailyViews} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
                 <XAxis
                   dataKey="date"
                   tickFormatter={formatDateShort}
-                  tick={{ fill: "#555", fontSize: 11 }}
+                  tick={{ fill: "var(--text-disabled)", fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                   interval="preserveStartEnd"
                 />
                 <YAxis
                   tickFormatter={formatViews}
-                  tick={{ fill: "#555", fontSize: 11 }}
+                  tick={{ fill: "var(--text-disabled)", fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                   width={48}
@@ -152,23 +166,31 @@ export default function CreatorDetailPage() {
                   contentStyle={tooltipStyle}
                   labelFormatter={(v) => formatDate(v as string)}
                   formatter={(v) => [formatViews(Number(v)), "Просмотры"]}
-                  cursor={{ stroke: "rgba(255,255,255,0.06)" }}
+                  cursor={{ stroke: "var(--border-default)" }}
                 />
                 <Line
                   type="monotone"
                   dataKey="views"
-                  stroke="#3b82f6"
+                  stroke="var(--accent-primary)"
                   strokeWidth={2}
                   dot={false}
-                  activeDot={{ r: 4, fill: "#3b82f6", strokeWidth: 0 }}
+                  activeDot={{ r: 4, fill: "var(--accent-primary)", strokeWidth: 0 }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
           {/* Bar chart by platform */}
-          <div className="bg-[#111111] border border-white/[0.06] rounded-xl p-5">
-            <h2 className="text-sm font-medium text-white mb-5">По платформам</h2>
+          <div
+            className="rounded-xl p-5"
+            style={{
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
+            }}
+          >
+            <h2 className="text-sm font-medium mb-5" style={{ color: "var(--text-primary)" }}>
+              По платформам
+            </h2>
             <ResponsiveContainer width="100%" height={210}>
               <BarChart
                 data={d.byPlatform.map((p) => ({
@@ -178,16 +200,16 @@ export default function CreatorDetailPage() {
                 }))}
                 margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
                 <XAxis
                   dataKey="name"
-                  tick={{ fill: "#555", fontSize: 11 }}
+                  tick={{ fill: "var(--text-disabled)", fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
                   tickFormatter={formatViews}
-                  tick={{ fill: "#555", fontSize: 11 }}
+                  tick={{ fill: "var(--text-disabled)", fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                   width={48}
@@ -195,7 +217,7 @@ export default function CreatorDetailPage() {
                 <Tooltip
                   contentStyle={tooltipStyle}
                   formatter={(v) => [formatViews(Number(v)), "Просмотры"]}
-                  cursor={{ fill: "rgba(255,255,255,0.03)" }}
+                  cursor={{ fill: "var(--bg-muted)" }}
                 />
                 <Bar dataKey="views" radius={[4, 4, 0, 0]}>
                   {d.byPlatform.map((p) => (
@@ -210,26 +232,52 @@ export default function CreatorDetailPage() {
 
       {/* Products table */}
       {d && (
-        <div className="bg-[#111111] border border-white/[0.06] rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/[0.06]">
-            <h2 className="text-sm font-medium text-white">По товарам</h2>
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border-default)" }}>
+            <h2 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              По товарам
+            </h2>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/[0.06]">
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Товар</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Артикул WB</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Просмотры</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Ролики</th>
+              <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Товар</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Артикул WB</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Просмотры</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Ролики</th>
               </tr>
             </thead>
             <tbody>
               {d.byProduct.map((p) => (
-                <tr key={p.wbArticle} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02]">
-                  <td className="px-4 py-3 text-sm text-white">{p.productName}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#555]">{p.wbArticle}</td>
-                  <td className="px-4 py-3 font-mono text-sm text-white">{formatViews(p.views)}</td>
-                  <td className="px-4 py-3 font-mono text-sm text-white">{p.videos}</td>
+                <tr
+                  key={p.wbArticle}
+                  className="last:border-0 transition-colors"
+                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <td className="px-4 py-3 text-sm" style={{ color: "var(--text-primary)" }}>
+                    {p.productName}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                    {p.wbArticle}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                    {formatViews(p.views)}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                    {p.videos}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -239,23 +287,42 @@ export default function CreatorDetailPage() {
 
       {/* Top videos table */}
       {d && d.topVideos.length > 0 && (
-        <div className="bg-[#111111] border border-white/[0.06] rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/[0.06]">
-            <h2 className="text-sm font-medium text-white">Топ роликов</h2>
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border-default)" }}>
+            <h2 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              Топ роликов
+            </h2>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/[0.06]">
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Платформа</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Ссылка</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Просмотры</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Товар</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Дата</th>
+              <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Платформа</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Ссылка</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Просмотры</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Товар</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Дата</th>
               </tr>
             </thead>
             <tbody>
               {d.topVideos.map((v) => (
-                <tr key={v.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02]">
+                <tr
+                  key={v.id}
+                  className="last:border-0 transition-colors"
+                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
                   <td className="px-4 py-3">
                     <PlatformBadge platform={v.platform as Platform} size="sm" />
                   </td>
@@ -264,14 +331,23 @@ export default function CreatorDetailPage() {
                       href={v.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-[#888] hover:text-white transition-colors"
+                      className="text-xs transition-colors"
+                      style={{ color: "var(--text-muted)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
                     >
                       {v.url.replace(/^https?:\/\//, "").slice(0, 40)}…
                     </a>
                   </td>
-                  <td className="px-4 py-3 font-mono text-sm text-white">{formatViews(v.views)}</td>
-                  <td className="px-4 py-3 text-xs text-[#888]">{v.productName}</td>
-                  <td className="px-4 py-3 text-xs text-[#555]">{formatDate(v.publishedAt)}</td>
+                  <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                    {formatViews(v.views)}
+                  </td>
+                  <td className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
+                    {v.productName}
+                  </td>
+                  <td className="px-4 py-3 text-xs" style={{ color: "var(--text-disabled)" }}>
+                    {formatDate(v.publishedAt)}
+                  </td>
                 </tr>
               ))}
             </tbody>

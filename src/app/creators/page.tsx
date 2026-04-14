@@ -8,16 +8,15 @@ import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSe
 import { TableSkeleton } from "@/components/ui/SkeletonCard";
 import { formatViews, formatPercent } from "@/lib/format";
 import { MOCK_CREATORS, type Creator, type Platform } from "@/lib/mock-data";
-import { cn } from "@/lib/utils";
 
 type SortKey = "totalViews" | "totalVideos" | "avgViewsPerVideo" | "viewsChange";
 type SortDir = "asc" | "desc";
 
-function SortIcon({ col, active, dir }: { col: string; active: boolean; dir: SortDir }) {
-  if (!active) return <ArrowUpDown className="w-3 h-3 text-[#444]" />;
+function SortIcon({ active, dir }: { col?: string; active: boolean; dir: SortDir }) {
+  if (!active) return <ArrowUpDown className="w-3 h-3" style={{ color: "var(--text-disabled)" }} />;
   return dir === "asc"
-    ? <ArrowUp className="w-3 h-3 text-blue-400" />
-    : <ArrowDown className="w-3 h-3 text-blue-400" />;
+    ? <ArrowUp className="w-3 h-3" style={{ color: "var(--accent-primary)" }} />
+    : <ArrowDown className="w-3 h-3" style={{ color: "var(--accent-primary)" }} />;
 }
 
 export default function CreatorsPage() {
@@ -72,8 +71,12 @@ export default function CreatorsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">Креаторы</h1>
-          <p className="text-xs text-[#555] mt-0.5">{creators.length} креаторов</p>
+          <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+            Креаторы
+          </h1>
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+            {creators.length} креаторов
+          </p>
         </div>
         <PeriodSelector value={period} onChange={setPeriod} />
       </div>
@@ -82,26 +85,41 @@ export default function CreatorsPage() {
       {loading ? (
         <TableSkeleton rows={3} />
       ) : (
-        <div className="bg-[#111111] border border-white/[0.06] rounded-xl overflow-hidden">
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/[0.06]">
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">
+              <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>
                   Имя
                 </th>
                 {headers.map((h) => (
                   <th
                     key={h.key}
-                    className="text-left px-4 py-3 text-xs text-[#555] font-medium cursor-pointer select-none group"
+                    className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none group"
+                    style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
                     onClick={() => handleSort(h.key)}
                   >
                     <div className="flex items-center gap-1.5">
-                      <span className="group-hover:text-white transition-colors">{h.label}</span>
+                      <span
+                        className="transition-colors"
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                      >
+                        {h.label}
+                      </span>
                       <SortIcon col={h.key} active={sortKey === h.key} dir={sortDir} />
                     </div>
                   </th>
                 ))}
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>
                   По платформам
                 </th>
               </tr>
@@ -110,34 +128,45 @@ export default function CreatorsPage() {
               {sorted.map((creator) => (
                 <tr
                   key={creator.id}
-                  className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] cursor-pointer transition-colors"
-                  onClick={() => router.push(`/creators/${creator.id}`)}
+                  className="cursor-pointer transition-colors last:border-0"
+                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                  onClick={() => router.push(`/creators/${creator.id}?period=${period}`)}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500/40 to-violet-600/40 flex items-center justify-center shrink-0">
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
                         <span className="text-[10px] font-semibold text-white">
                           {creator.name[0]}
                         </span>
                       </div>
-                      <span className="text-sm text-white font-medium">{creator.name}</span>
+                      <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                        {creator.name}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-3.5">
-                    <span className="font-mono text-sm text-white">{formatViews(creator.totalViews)}</span>
+                    <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                      {formatViews(creator.totalViews)}
+                    </span>
                   </td>
                   <td className="px-4 py-3.5">
-                    <span className="font-mono text-sm text-white">{creator.totalVideos}</span>
+                    <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                      {creator.totalVideos}
+                    </span>
                   </td>
                   <td className="px-4 py-3.5">
-                    <span className="font-mono text-sm text-white">{formatViews(creator.avgViewsPerVideo)}</span>
+                    <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                      {formatViews(creator.avgViewsPerVideo)}
+                    </span>
                   </td>
                   <td className="px-4 py-3.5">
                     <span
-                      className={cn(
-                        "text-sm font-medium font-mono",
-                        creator.viewsChange >= 0 ? "text-emerald-400" : "text-red-400"
-                      )}
+                      className="text-sm font-medium font-mono"
+                      style={{
+                        color: creator.viewsChange >= 0 ? "var(--success-text)" : "var(--error-text)",
+                      }}
                     >
                       {formatPercent(creator.viewsChange)}
                     </span>
@@ -150,7 +179,7 @@ export default function CreatorsPage() {
                         .map((p) => (
                           <div key={p.platform} className="flex items-center gap-1">
                             <PlatformBadge platform={p.platform as Platform} size="sm" />
-                            <span className="font-mono text-[10px] text-[#555]">
+                            <span className="font-mono text-[10px]" style={{ color: "var(--text-disabled)" }}>
                               {formatViews(p.views)}
                             </span>
                           </div>

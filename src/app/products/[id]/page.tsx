@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   BarChart,
   Bar,
@@ -21,19 +21,21 @@ import { formatViews, formatDate, getPlatformColor, getPlatformLabel } from "@/l
 import { MOCK_PRODUCT_DETAIL, type ProductDetail, type Platform } from "@/lib/mock-data";
 
 const tooltipStyle = {
-  backgroundColor: "#1a1a1a",
-  border: "1px solid rgba(255,255,255,0.08)",
+  backgroundColor: "var(--surface-1)",
+  border: "1px solid var(--border-default)",
   borderRadius: "8px",
-  color: "#fff",
+  color: "var(--text-primary)",
   fontSize: "12px",
 };
 
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
 
-  const [period, setPeriod] = useState<Period>("30d");
+  const initialPeriod = (searchParams.get("period") as Period) || "30d";
+  const [period, setPeriod] = useState<Period>(initialPeriod);
   const [data, setData] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -65,16 +67,28 @@ export default function ProductDetailPage() {
           <button
             type="button"
             onClick={() => router.push("/products")}
-            className="flex items-center gap-1.5 text-xs text-[#555] hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-xs transition-colors"
+            style={{ color: "var(--text-muted)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Назад
           </button>
-          <div className="w-px h-4 bg-white/[0.08]" />
+          <div className="w-px h-4" style={{ background: "var(--border-default)" }} />
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-semibold text-white">{d?.name ?? "Загрузка..."}</h1>
+            <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+              {d?.name ?? "Загрузка..."}
+            </h1>
             {d && (
-              <span className="font-mono text-xs text-[#555] bg-white/[0.04] border border-white/[0.06] px-2 py-1 rounded">
+              <span
+                className="font-mono text-xs px-2 py-1 rounded"
+                style={{
+                  color: "var(--text-muted)",
+                  background: "var(--bg-muted)",
+                  border: "1px solid var(--border-default)",
+                }}
+              >
                 {d.wbArticle}
               </span>
             )}
@@ -93,17 +107,17 @@ export default function ProductDetailPage() {
           <StatCard
             title="Просмотры"
             value={formatViews(d.totalViews)}
-            icon={<Eye className="w-4 h-4 text-blue-400" />}
+            icon={<Eye className="w-4 h-4" style={{ color: "var(--accent-primary)" }} />}
           />
           <StatCard
             title="Роликов"
             value={d.totalVideos}
-            icon={<Film className="w-4 h-4 text-violet-400" />}
+            icon={<Film className="w-4 h-4" style={{ color: "#7C3AED" }} />}
           />
           <StatCard
             title="Платформ"
             value={d.byPlatform.length}
-            icon={<LayoutGrid className="w-4 h-4 text-emerald-400" />}
+            icon={<LayoutGrid className="w-4 h-4" style={{ color: "#059669" }} />}
             subtitle="активных платформ"
             mono={false}
           />
@@ -114,8 +128,16 @@ export default function ProductDetailPage() {
       {loading || !d ? (
         <ChartSkeleton height={260} />
       ) : (
-        <div className="bg-[#111111] border border-white/[0.06] rounded-xl p-5">
-          <h2 className="text-sm font-medium text-white mb-5">По платформам</h2>
+        <div
+          className="rounded-xl p-5"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          <h2 className="text-sm font-medium mb-5" style={{ color: "var(--text-primary)" }}>
+            По платформам
+          </h2>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart
               data={d.byPlatform.map((p) => ({
@@ -125,16 +147,16 @@ export default function ProductDetailPage() {
               }))}
               margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
               <XAxis
                 dataKey="name"
-                tick={{ fill: "#555", fontSize: 11 }}
+                tick={{ fill: "var(--text-disabled)", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
                 tickFormatter={formatViews}
-                tick={{ fill: "#555", fontSize: 11 }}
+                tick={{ fill: "var(--text-disabled)", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
                 width={48}
@@ -142,7 +164,7 @@ export default function ProductDetailPage() {
               <Tooltip
                 contentStyle={tooltipStyle}
                 formatter={(v) => [formatViews(Number(v)), "Просмотры"]}
-                cursor={{ fill: "rgba(255,255,255,0.03)" }}
+                cursor={{ fill: "var(--bg-muted)" }}
               />
               <Bar dataKey="views" radius={[4, 4, 0, 0]}>
                 {d.byPlatform.map((p) => (
@@ -156,34 +178,54 @@ export default function ProductDetailPage() {
 
       {/* By creator table */}
       {d && (
-        <div className="bg-[#111111] border border-white/[0.06] rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/[0.06]">
-            <h2 className="text-sm font-medium text-white">По креаторам</h2>
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border-default)" }}>
+            <h2 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              По креаторам
+            </h2>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/[0.06]">
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Имя</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Просмотры</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Ролики</th>
+              <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Имя</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Просмотры</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Ролики</th>
               </tr>
             </thead>
             <tbody>
               {d.byCreator.map((c) => (
                 <tr
                   key={c.creatorName}
-                  className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02]"
+                  className="last:border-0 transition-colors"
+                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500/40 to-violet-600/40 flex items-center justify-center shrink-0">
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
                         <span className="text-[9px] font-semibold text-white">{c.creatorName[0]}</span>
                       </div>
-                      <span className="text-sm text-white">{c.creatorName}</span>
+                      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+                        {c.creatorName}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 font-mono text-sm text-white">{formatViews(c.views)}</td>
-                  <td className="px-4 py-3 font-mono text-sm text-white">{c.videos}</td>
+                  <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                    {formatViews(c.views)}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                    {c.videos}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -193,24 +235,44 @@ export default function ProductDetailPage() {
 
       {/* All videos table */}
       {d && d.videos.length > 0 && (
-        <div className="bg-[#111111] border border-white/[0.06] rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/[0.06]">
-            <h2 className="text-sm font-medium text-white">Все ролики</h2>
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border-default)" }}>
+            <h2 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              Все ролики
+            </h2>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/[0.06]">
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Платформа</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Ссылка</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Просмотры</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Лайки</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Дата</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Автор</th>
+              <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Платформа</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Ссылка</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Просмотры</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Лайки</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Дата</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Автор</th>
               </tr>
             </thead>
             <tbody>
               {d.videos.map((v) => (
-                <tr key={v.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02]">
+                <tr
+                  key={v.id}
+                  className="last:border-0 transition-colors"
+                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
                   <td className="px-4 py-3">
                     <PlatformBadge platform={v.platform as Platform} size="sm" />
                   </td>
@@ -219,15 +281,26 @@ export default function ProductDetailPage() {
                       href={v.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-[#888] hover:text-white transition-colors"
+                      className="text-xs transition-colors"
+                      style={{ color: "var(--text-muted)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
                     >
                       {v.url.replace(/^https?:\/\//, "").slice(0, 40)}…
                     </a>
                   </td>
-                  <td className="px-4 py-3 font-mono text-sm text-white">{formatViews(v.views)}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#888]">{formatViews(v.likes)}</td>
-                  <td className="px-4 py-3 text-xs text-[#555]">{formatDate(v.publishedAt)}</td>
-                  <td className="px-4 py-3 text-xs text-[#888]">{v.creatorName}</td>
+                  <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                    {formatViews(v.views)}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                    {formatViews(v.likes)}
+                  </td>
+                  <td className="px-4 py-3 text-xs" style={{ color: "var(--text-disabled)" }}>
+                    {formatDate(v.publishedAt)}
+                  </td>
+                  <td className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
+                    {v.creatorName}
+                  </td>
                 </tr>
               ))}
             </tbody>

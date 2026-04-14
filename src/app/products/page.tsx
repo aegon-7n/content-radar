@@ -8,16 +8,15 @@ import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSe
 import { TableSkeleton } from "@/components/ui/SkeletonCard";
 import { formatViews } from "@/lib/format";
 import { MOCK_PRODUCTS, type Product, type Platform } from "@/lib/mock-data";
-import { cn } from "@/lib/utils";
 
 type SortKey = "totalViews" | "totalVideos";
 type SortDir = "asc" | "desc";
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) return <ArrowUpDown className="w-3 h-3 text-[#444]" />;
+  if (!active) return <ArrowUpDown className="w-3 h-3" style={{ color: "var(--text-disabled)" }} />;
   return dir === "asc"
-    ? <ArrowUp className="w-3 h-3 text-blue-400" />
-    : <ArrowDown className="w-3 h-3 text-blue-400" />;
+    ? <ArrowUp className="w-3 h-3" style={{ color: "var(--accent-primary)" }} />
+    : <ArrowDown className="w-3 h-3" style={{ color: "var(--accent-primary)" }} />;
 }
 
 export default function ProductsPage() {
@@ -66,8 +65,12 @@ export default function ProductsPage() {
     <div className="p-6 flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">Товары</h1>
-          <p className="text-xs text-[#555] mt-0.5">{products.length} товаров</p>
+          <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+            Товары
+          </h1>
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+            {products.length} товаров
+          </p>
         </div>
         <PeriodSelector value={period} onChange={setPeriod} />
       </div>
@@ -75,53 +78,91 @@ export default function ProductsPage() {
       {loading ? (
         <TableSkeleton rows={8} />
       ) : (
-        <div className="bg-[#111111] border border-white/[0.06] rounded-xl overflow-hidden">
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/[0.06]">
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Название</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Артикул WB</th>
+              <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Название</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Артикул WB</th>
                 <th
-                  className="text-left px-4 py-3 text-xs text-[#555] font-medium cursor-pointer select-none group"
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
                   onClick={() => handleSort("totalViews")}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span className="group-hover:text-white transition-colors">Просмотры</span>
+                    <span
+                      className="transition-colors"
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                    >
+                      Просмотры
+                    </span>
                     <SortIcon active={sortKey === "totalViews"} dir={sortDir} />
                   </div>
                 </th>
                 <th
-                  className="text-left px-4 py-3 text-xs text-[#555] font-medium cursor-pointer select-none group"
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
                   onClick={() => handleSort("totalVideos")}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span className="group-hover:text-white transition-colors">Ролики</span>
+                    <span
+                      className="transition-colors"
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                    >
+                      Ролики
+                    </span>
                     <SortIcon active={sortKey === "totalVideos"} dir={sortDir} />
                   </div>
                 </th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">По платформам</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>По платформам</th>
               </tr>
             </thead>
             <tbody>
               {sorted.map((product) => (
                 <tr
                   key={product.id}
-                  className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] cursor-pointer transition-colors"
-                  onClick={() => router.push(`/products/${product.id}`)}
+                  className="cursor-pointer transition-colors last:border-0"
+                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                  onClick={() => router.push(`/products/${product.id}?period=${period}`)}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <td className="px-4 py-3.5">
-                    <span className="text-sm text-white font-medium">{product.name}</span>
+                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                      {product.name}
+                    </span>
                   </td>
                   <td className="px-4 py-3.5">
-                    <span className="font-mono text-xs text-[#555] bg-white/[0.04] px-2 py-0.5 rounded">
+                    <span
+                      className="font-mono text-xs px-2 py-0.5 rounded"
+                      style={{
+                        color: "var(--text-muted)",
+                        background: "var(--bg-muted)",
+                      }}
+                    >
                       {product.wbArticle}
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
-                    <span className="font-mono text-sm text-white">{formatViews(product.totalViews)}</span>
+                    <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                      {formatViews(product.totalViews)}
+                    </span>
                   </td>
                   <td className="px-4 py-3.5">
-                    <span className="font-mono text-sm text-white">{product.totalVideos}</span>
+                    <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                      {product.totalVideos}
+                    </span>
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -130,7 +171,7 @@ export default function ProductsPage() {
                         .map((p) => (
                           <div key={p.platform} className="flex items-center gap-1">
                             <PlatformBadge platform={p.platform as Platform} size="sm" />
-                            <span className="font-mono text-[10px] text-[#555]">
+                            <span className="font-mono text-[10px]" style={{ color: "var(--text-disabled)" }}>
                               {formatViews(p.views)}
                             </span>
                           </div>
