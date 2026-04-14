@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -11,7 +12,6 @@ import {
   Radio,
   RefreshCw,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Дашборд", icon: LayoutDashboard },
@@ -21,17 +21,50 @@ const navItems = [
   { href: "/settings", label: "Настройки", icon: Settings },
 ];
 
+function formatLastSync(iso: string | null): string {
+  if (!iso) return "нет данных";
+  const d = new Date(iso);
+  return d.toLocaleString("ru-RU", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+    timeZone: "Europe/Moscow",
+  });
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const [lastSync, setLastSync] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/last-sync")
+      .then(r => r.json())
+      .then(d => setLastSync(d.lastSync ?? null))
+      .catch(() => {});
+  }, []);
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-60 bg-[#111111] border-r border-white/[0.06] flex flex-col z-40">
+    <aside
+      className="fixed left-0 top-0 h-screen w-60 flex flex-col z-40"
+      style={{
+        background: "var(--surface-1)",
+        borderRight: "1px solid var(--border-default)",
+      }}
+    >
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 h-14 border-b border-white/[0.06]">
-        <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-500/20">
-          <Radio className="w-4 h-4 text-blue-400" />
+      <div
+        className="flex items-center gap-2.5 px-4 h-14"
+        style={{ borderBottom: "1px solid var(--border-default)" }}
+      >
+        <div
+          className="flex items-center justify-center w-7 h-7 rounded-lg"
+          style={{ background: "var(--accent-muted)" }}
+        >
+          <Radio className="w-4 h-4" style={{ color: "var(--accent-primary)" }} />
         </div>
-        <span className="text-sm font-semibold text-white tracking-tight">
+        <span
+          className="text-sm tracking-tight"
+          style={{ color: "var(--text-primary)", fontWeight: 600 }}
+        >
           ContentRadar
         </span>
       </div>
@@ -41,23 +74,34 @@ export default function Sidebar() {
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive =
             href === "/" ? pathname === "/" : pathname.startsWith(href);
-
           return (
             <Link
               key={href}
               href={href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150",
-                isActive
-                  ? "bg-[#1f1f1f] text-white"
-                  : "text-[#888] hover:text-white hover:bg-[#1a1a1a]"
-              )}
+              className="flex items-center gap-3 rounded-md text-sm transition-colors duration-150"
+              style={{
+                height: "36px",
+                padding: "0 12px",
+                color: isActive ? "var(--accent-primary)" : "var(--text-muted)",
+                background: isActive ? "var(--accent-muted)" : "transparent",
+                borderLeft: isActive ? "2px solid var(--accent-primary)" : "2px solid transparent",
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)";
+                  (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                  (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
+                }
+              }}
             >
               <Icon
-                className={cn(
-                  "w-4 h-4 shrink-0",
-                  isActive ? "text-white" : "text-[#666]"
-                )}
+                className="w-4 h-4 shrink-0"
+                style={{ color: isActive ? "var(--accent-primary)" : "var(--text-disabled)" }}
               />
               {label}
             </Link>
@@ -65,38 +109,29 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Bottom gradient fade */}
-      <div className="relative">
+      {/* Last sync */}
+      <div
+        className="px-3 pb-4 pt-2"
+        style={{ borderTop: "1px solid var(--border-default)" }}
+      >
         <div
-          className="absolute -top-8 left-0 right-0 h-8 pointer-events-none"
+          className="flex items-center gap-2 px-2 py-2 rounded-md"
           style={{
-            background: "linear-gradient(to bottom, transparent, #111111)",
+            background: "var(--bg-muted)",
+            border: "1px solid var(--border-subtle)",
           }}
-        />
-
-        {/* Last updated */}
-        <div className="px-3 pb-2 pt-1">
-          <div className="flex items-center gap-2 px-2 py-2.5 rounded-md bg-white/[0.02] border border-white/[0.04]">
-            <RefreshCw className="w-3.5 h-3.5 text-[#444] shrink-0" />
-            <div className="flex flex-col min-w-0">
-              <span className="text-[11px] text-[#555] font-medium">Последнее обновление</span>
-              <span className="text-[11px] text-[#333] font-mono">02.04.2026, 06:00</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Account */}
-        <div className="px-3 pb-4 pt-1 border-t border-white/[0.06]">
-          <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-md">
-            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 shrink-0" />
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs text-white font-medium truncate">
-                Аккаунт
-              </span>
-              <span className="text-[11px] text-[#555] truncate">
-                content-radar
-              </span>
-            </div>
+        >
+          <RefreshCw className="w-3 h-3 shrink-0" style={{ color: "var(--text-disabled)" }} />
+          <div className="flex flex-col min-w-0">
+            <span className="text-[10px]" style={{ color: "var(--text-disabled)" }}>
+              Последнее обновление
+            </span>
+            <span
+              className="text-[11px] font-mono"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {formatLastSync(lastSync)}
+            </span>
           </div>
         </div>
       </div>
