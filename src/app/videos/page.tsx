@@ -20,15 +20,12 @@ export default function VideosPage() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState<string>("");
 
-  // Sort
   const [sortKey, setSortKey] = useState<SortKey>("views");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  // Pagination
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -36,6 +33,7 @@ export default function VideosPage() {
     const { from, to } = getPeriodDates(period);
     const params = new URLSearchParams({ from, to });
     if (platformFilter) params.set("platform", platformFilter);
+    params.set("limit", "1000");
     fetch(`/api/videos?${params}`)
       .then((r) => r.json())
       .then((d) => setVideos(d.videos ?? d))
@@ -83,18 +81,35 @@ export default function VideosPage() {
 
   const hasFilters = search !== "" || platformFilter !== "";
 
+  const inputBase = {
+    background: "var(--surface-1)",
+    border: "1px solid var(--border-default)",
+    color: "var(--text-primary)",
+  };
+
   return (
     <div className="p-6 flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold text-white">Ролики</h1>
-            <span className="text-xs text-[#555] bg-white/[0.04] border border-white/[0.06] px-2 py-0.5 rounded font-mono">
+            <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+              Ролики
+            </h1>
+            <span
+              className="text-xs px-2 py-0.5 rounded font-mono border"
+              style={{
+                color: "var(--text-muted)",
+                background: "var(--bg-muted)",
+                borderColor: "var(--border-default)",
+              }}
+            >
               {filtered.length.toLocaleString("ru-RU")} роликов
             </span>
           </div>
-          <p className="text-xs text-[#555] mt-0.5">Все публикации по всем платформам</p>
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+            Все публикации по всем платформам
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -106,7 +121,20 @@ export default function VideosPage() {
               if (search) params.set("search", search);
               window.location.href = `/api/videos/export?${params}`;
             }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs text-[#888] border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06] hover:text-white transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs border transition-colors"
+            style={{
+              color: "var(--text-muted)",
+              borderColor: "var(--border-default)",
+              background: "var(--bg-muted)",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "var(--bg-overlay)";
+              (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)";
+              (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
+            }}
           >
             <Download className="w-3.5 h-3.5" />
             Экспорт CSV
@@ -117,23 +145,26 @@ export default function VideosPage() {
 
       {/* Filters */}
       <div className="flex items-center gap-3">
-        {/* Search */}
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#444]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "var(--text-disabled)" }} />
           <input
             type="text"
             placeholder="Поиск по URL, автору, товару..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-9 pr-4 py-2 bg-[#111111] border border-white/[0.06] rounded-lg text-xs text-white placeholder:text-[#444] focus:outline-none focus:border-white/[0.12] transition-colors"
+            className="w-full pl-9 pr-4 py-2 rounded-lg text-xs focus:outline-none transition-colors"
+            style={{
+              ...inputBase,
+              color: "var(--text-primary)",
+            }}
           />
         </div>
 
-        {/* Platform filter */}
         <select
           value={platformFilter}
           onChange={(e) => { setPlatformFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 bg-[#111111] border border-white/[0.06] rounded-lg text-xs text-white focus:outline-none focus:border-white/[0.12] transition-colors appearance-none cursor-pointer"
+          className="px-3 py-2 rounded-lg text-xs focus:outline-none transition-colors appearance-none cursor-pointer"
+          style={inputBase}
         >
           <option value="">Все платформы</option>
           {PLATFORMS.map((p) => (
@@ -141,12 +172,24 @@ export default function VideosPage() {
           ))}
         </select>
 
-        {/* Reset */}
         {hasFilters && (
           <button
             type="button"
             onClick={resetFilters}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs text-[#888] border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06] hover:text-white transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs border transition-colors"
+            style={{
+              color: "var(--text-muted)",
+              borderColor: "var(--border-default)",
+              background: "var(--bg-muted)",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
+              (e.currentTarget as HTMLElement).style.background = "var(--bg-overlay)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
+              (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)";
+            }}
           >
             <X className="w-3 h-3" />
             Сбросить
@@ -158,34 +201,63 @@ export default function VideosPage() {
       {loading ? (
         <TableSkeleton rows={10} />
       ) : (
-        <div className="bg-[#111111] border border-white/[0.06] rounded-xl overflow-hidden">
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/[0.06]">
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Платформа</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">URL</th>
+              <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Платформа</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>URL</th>
                 <th
-                  className="text-left px-4 py-3 text-xs text-[#555] font-medium cursor-pointer select-none group"
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
                   onClick={() => handleSort("views")}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span className="group-hover:text-white transition-colors">Просмотры</span>
+                    <span
+                      className="transition-colors"
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                    >
+                      Просмотры
+                    </span>
                     {sortKey === "views" && (
-                      <span className="text-blue-400">{sortDir === "asc" ? "↑" : "↓"}</span>
+                      <span style={{ color: "var(--accent-primary)" }}>
+                        {sortDir === "asc" ? "↑" : "↓"}
+                      </span>
                     )}
                   </div>
                 </th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Лайки</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Автор</th>
-                <th className="text-left px-4 py-3 text-xs text-[#555] font-medium">Товар</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Лайки</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Автор</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Товар</th>
                 <th
-                  className="text-left px-4 py-3 text-xs text-[#555] font-medium cursor-pointer select-none group"
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
                   onClick={() => handleSort("publishedAt")}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span className="group-hover:text-white transition-colors">Дата</span>
+                    <span
+                      className="transition-colors"
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                    >
+                      Дата
+                    </span>
                     {sortKey === "publishedAt" && (
-                      <span className="text-blue-400">{sortDir === "asc" ? "↑" : "↓"}</span>
+                      <span style={{ color: "var(--accent-primary)" }}>
+                        {sortDir === "asc" ? "↑" : "↓"}
+                      </span>
                     )}
                   </div>
                 </th>
@@ -194,7 +266,7 @@ export default function VideosPage() {
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-[#555]">
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
                     Ролики не найдены
                   </td>
                 </tr>
@@ -202,7 +274,10 @@ export default function VideosPage() {
                 paginated.map((v) => (
                   <tr
                     key={v.id}
-                    className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors"
+                    className="last:border-0 transition-colors"
+                    style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   >
                     <td className="px-4 py-3">
                       <PlatformBadge platform={v.platform as Platform} size="sm" />
@@ -212,26 +287,41 @@ export default function VideosPage() {
                         href={v.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-[#888] hover:text-white transition-colors block truncate"
+                        className="text-xs transition-colors block truncate"
+                        style={{ color: "var(--text-muted)" }}
                         title={v.url}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
                       >
                         {v.url.replace(/^https?:\/\//, "").slice(0, 40)}
                       </a>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="font-mono text-sm text-white">{formatViews(v.views)}</span>
+                      <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                        {formatViews(v.views)}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="font-mono text-xs text-[#888]">{formatViews(v.likes)}</span>
+                      <span className="font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                        {formatViews(v.likes)}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-[#888]">{v.creatorName}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
+                      {v.creatorName}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-xs text-[#888]">{v.productName}</span>
-                        <span className="font-mono text-[10px] text-[#444]">{v.wbArticle}</span>
+                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                          {v.productName}
+                        </span>
+                        <span className="font-mono text-[10px]" style={{ color: "var(--text-disabled)" }}>
+                          {v.wbArticle}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-[#555]">{formatDate(v.publishedAt)}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: "var(--text-disabled)" }}>
+                      {formatDate(v.publishedAt)}
+                    </td>
                   </tr>
                 ))
               )}
@@ -243,7 +333,7 @@ export default function VideosPage() {
       {/* Pagination */}
       {!loading && totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[#555]">
+          <span className="text-xs" style={{ color: "var(--text-disabled)" }}>
             Показано {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} из {filtered.length}
           </span>
           <div className="flex items-center gap-1">
@@ -253,10 +343,13 @@ export default function VideosPage() {
               disabled={page === 1}
               className={cn(
                 "flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs border transition-colors",
-                page === 1
-                  ? "border-white/[0.04] text-[#333] cursor-not-allowed"
-                  : "border-white/[0.06] text-[#888] hover:text-white hover:bg-white/[0.04]"
               )}
+              style={{
+                borderColor: "var(--border-default)",
+                color: page === 1 ? "var(--text-disabled)" : "var(--text-muted)",
+                cursor: page === 1 ? "not-allowed" : "pointer",
+                opacity: page === 1 ? 0.5 : 1,
+              }}
             >
               <ChevronLeft className="w-3 h-3" />
               Предыдущая
@@ -264,34 +357,38 @@ export default function VideosPage() {
 
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               const p = i + 1;
+              const isActive = page === p;
               return (
                 <button
                   key={p}
                   type="button"
                   onClick={() => setPage(p)}
-                  className={cn(
-                    "w-8 h-8 rounded-lg text-xs font-medium transition-colors",
-                    page === p
-                      ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                      : "text-[#555] hover:text-white hover:bg-white/[0.04]"
-                  )}
+                  className="w-8 h-8 rounded-lg text-xs font-medium transition-colors"
+                  style={{
+                    background: isActive ? "var(--accent-muted)" : "transparent",
+                    color: isActive ? "var(--accent-primary)" : "var(--text-muted)",
+                    border: isActive ? "1px solid var(--accent-border)" : "1px solid transparent",
+                  }}
                 >
                   {p}
                 </button>
               );
             })}
-            {totalPages > 5 && <span className="text-[#444] text-xs px-1">…</span>}
+            {totalPages > 5 && (
+              <span className="text-xs px-1" style={{ color: "var(--text-disabled)" }}>…</span>
+            )}
 
             <button
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className={cn(
-                "flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs border transition-colors",
-                page === totalPages
-                  ? "border-white/[0.04] text-[#333] cursor-not-allowed"
-                  : "border-white/[0.06] text-[#888] hover:text-white hover:bg-white/[0.04]"
-              )}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs border transition-colors"
+              style={{
+                borderColor: "var(--border-default)",
+                color: page === totalPages ? "var(--text-disabled)" : "var(--text-muted)",
+                cursor: page === totalPages ? "not-allowed" : "pointer",
+                opacity: page === totalPages ? 0.5 : 1,
+              }}
             >
               Следующая
               <ChevronRight className="w-3 h-3" />
