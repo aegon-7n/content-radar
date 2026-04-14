@@ -27,14 +27,16 @@ export interface TopVideo {
 
 export interface DashboardData {
   totalViews: number;
-  totalVideos: number;
-  avgViewsPerVideo: number;
+  activeVideos: number;
+  newVideos: number;
+  avgPerVideo: number;
   activePlatforms: number;
-  viewsChange: number;
-  videosChange: number;
+  viewsChange: number | null;
+  newVideosChange: number | null;
   dailyViews: DailyMetric[];
   byPlatform: PlatformMetric[];
   topVideos: TopVideo[];
+  period?: { from: string; to: string; days: number };
 }
 
 export interface Creator {
@@ -100,11 +102,12 @@ function generateDailyViews(days: number, base: number): DailyMetric[] {
 
 export const MOCK_DASHBOARD: DashboardData = {
   totalViews: 5_922_153,
-  totalVideos: 115,
-  avgViewsPerVideo: 51_497,
+  activeVideos: 115,
+  newVideos: 42,
+  avgPerVideo: 51_497,
   activePlatforms: 5,
   viewsChange: 65.99,
-  videosChange: 12.4,
+  newVideosChange: 12.4,
   dailyViews: generateDailyViews(30, 197_405),
   byPlatform: [
     { platform: "tiktok", views: 1_400_000, videos: 23 },

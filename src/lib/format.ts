@@ -27,7 +27,16 @@ export function formatDateShort(iso: string): string {
 }
 
 export function formatPercent(n: number | undefined | null): string {
-  if (n == null || isNaN(n)) return "0%";
+  if (n == null || isNaN(n)) return "—";
+  // Above ±300% the percentage stops reading as a comparison and starts
+  // reading as a typo. Switch to a "×N" multiplier instead — much easier
+  // to skim ("×26" beats "+2574%").
+  if (n >= 300) return `×${(1 + n / 100).toFixed(1)}`;
+  if (n <= -75) {
+    const factor = 1 / (1 + n / 100);
+    if (!isFinite(factor)) return "—";
+    return `÷${factor.toFixed(1)}`;
+  }
   const sign = n >= 0 ? "+" : "";
   return `${sign}${n.toFixed(1)}%`;
 }
