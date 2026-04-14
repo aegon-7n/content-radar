@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 
+/**
+ * Product detail — cumulative delta for the product's videos in the selected
+ * period. Same model as /api/dashboard so numbers agree across screens.
+ *
+ * The videos table at the bottom shows the video's **latest metrics** (not
+ * delta) because that is the operational view — the seller wants to see how
+ * each individual creative is performing right now, which is a different
+ * question than "how much did my catalog gain this week".
+ */
 const querySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
@@ -21,95 +31,99 @@ export async function GET(
       ? new Date(query.from + "T00:00:00Z")
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    const { sql } = await import("drizzle-orm");
-
-    // Product info
+    // Product info.
     const productResult = await db.execute(sql`
       SELECT id, name, wb_article FROM products WHERE id = ${id}
     `);
-
     if (!productResult.length) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
-
     const product = productResult[0] as unknown as {
       id: string;
       name: string;
       wb_article: string;
     };
 
-    // Stats
-    const statsResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
+    // Per-video delta scoped to this product.
+    const perVideoDelta = sql`
+      WITH
+      product_videos AS (
+        SELECT v.id, v.platform, v.creator_id, v.published_at
+        FROM videos v
+        WHERE v.product_id = ${id}
+      ),
+      end_views AS (
+        SELECT DISTINCT ON (vm.video_id) vm.video_id, vm.views
+        FROM video_metrics vm
+        INNER JOIN product_videos pv ON pv.id = vm.video_id
+        WHERE vm.scraped_at <= ${to.toISOString()}
+        ORDER BY vm.video_id, vm.scraped_at DESC
+      ),
+      start_views AS (
+        SELECT DISTINCT ON (vm.video_id) vm.video_id, vm.views
+        FROM video_metrics vm
+        INNER JOIN product_videos pv ON pv.id = vm.video_id
+        WHERE vm.scraped_at < ${from.toISOString()}
+        ORDER BY vm.video_id, vm.scraped_at DESC
       )
       SELECT
-        COALESCE(SUM(lm.views), 0)::bigint AS views,
-        COUNT(DISTINCT v.id)::int AS videos
-      FROM videos v
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      WHERE v.product_id = ${id}
-        AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
+        pv.id AS video_id,
+        pv.platform,
+        pv.creator_id,
+        pv.published_at,
+        GREATEST(COALESCE(ev.views, 0) - COALESCE(sv.views, 0), 0) AS delta
+      FROM product_videos pv
+      LEFT JOIN end_views ev ON ev.video_id = pv.id
+      LEFT JOIN start_views sv ON sv.video_id = pv.id
+    `;
+
+    // Totals for the product.
+    const statsResult = await db.execute(sql`
+      WITH deltas AS (${perVideoDelta})
+      SELECT
+        COALESCE(SUM(delta), 0)::bigint AS views,
+        COUNT(*) FILTER (WHERE delta > 0)::int AS active_videos,
+        COUNT(*) FILTER (
+          WHERE published_at >= ${from.toISOString()}
+            AND published_at <= ${to.toISOString()}
+        )::int AS new_videos
+      FROM deltas
     `);
 
-    // By platform
+    // By platform.
     const byPlatformResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
-      )
+      WITH deltas AS (${perVideoDelta})
       SELECT
-        v.platform,
-        COALESCE(SUM(lm.views), 0)::bigint AS views,
-        COUNT(DISTINCT v.id)::int AS videos
-      FROM videos v
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      WHERE v.product_id = ${id}
-        AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
-      GROUP BY v.platform
+        platform,
+        COALESCE(SUM(delta), 0)::bigint AS views,
+        COUNT(*) FILTER (WHERE delta > 0)::int AS videos
+      FROM deltas
+      GROUP BY platform
       ORDER BY views DESC
     `);
 
-    // By creator
+    // By creator.
     const byCreatorResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
-      )
+      WITH deltas AS (${perVideoDelta})
       SELECT
         c.id AS creator_id,
         c.name AS creator_name,
-        COALESCE(SUM(lm.views), 0)::bigint AS views,
-        COUNT(DISTINCT v.id)::int AS videos
-      FROM videos v
-      LEFT JOIN creators c ON c.id = v.creator_id
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      WHERE v.product_id = ${id}
-        AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
+        COALESCE(SUM(d.delta), 0)::bigint AS views,
+        COUNT(*) FILTER (WHERE d.delta > 0)::int AS videos
+      FROM deltas d
+      LEFT JOIN creators c ON c.id = d.creator_id
       GROUP BY c.id, c.name
       ORDER BY views DESC
     `);
 
-    // All videos with latest metrics
+    // All videos for this product — list with latest metrics (NOT delta).
+    // Operational view: "how is each video actually performing right now".
+    // Not restricted to the selected period because the seller is looking at
+    // the product's creatives, not aggregate trends.
     const videosResult = await db.execute(sql`
       WITH latest_metrics AS (
         SELECT DISTINCT ON (video_id)
-          video_id,
-          views,
-          likes,
-          comments,
-          shares,
-          saves
+          video_id, views, likes, comments, shares, saves
         FROM video_metrics
         ORDER BY video_id, scraped_at DESC
       )
@@ -128,11 +142,14 @@ export async function GET(
       LEFT JOIN latest_metrics lm ON lm.video_id = v.id
       LEFT JOIN creators c ON c.id = v.creator_id
       WHERE v.product_id = ${id}
-        AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
       ORDER BY views DESC
     `);
 
-    const statsRow = statsResult[0] as unknown as { views: string; videos: number };
+    const statsRow = statsResult[0] as unknown as {
+      views: string;
+      active_videos: number;
+      new_videos: number;
+    };
 
     return NextResponse.json({
       product: {
@@ -142,7 +159,8 @@ export async function GET(
       },
       stats: {
         views: Number(statsRow?.views ?? 0),
-        videos: Number(statsRow?.videos ?? 0),
+        videos: Number(statsRow?.active_videos ?? 0),
+        newVideos: Number(statsRow?.new_videos ?? 0),
       },
       byPlatform: (byPlatformResult as unknown as Array<{
         platform: string;

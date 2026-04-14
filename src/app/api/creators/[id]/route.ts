@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 
+/**
+ * Creator detail — cumulative delta model, same as /api/dashboard.
+ *
+ * Everything (stats card, platform split, product split, daily series, top
+ * videos) is computed against `max(views@to − views@from, 0)` per video so
+ * the user never sees one number on the dashboard and an incompatible number
+ * on the creator page for the same period.
+ */
 const querySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
@@ -14,9 +23,9 @@ function getPreviousPeriod(from: Date, to: Date): { prevFrom: Date; prevTo: Date
   return { prevFrom, prevTo };
 }
 
-function calcChange(current: number, previous: number): number {
-  if (previous === 0) return current > 0 ? 100 : 0;
-  return Math.round(((current - previous) / previous) * 100 * 100) / 100;
+function calcChange(current: number, previous: number): number | null {
+  if (previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 100 * 10) / 10;
 }
 
 export async function GET(
@@ -35,165 +44,170 @@ export async function GET(
 
     const { prevFrom, prevTo } = getPreviousPeriod(from, to);
 
-    const { sql } = await import("drizzle-orm");
-
-    // Creator info
+    // Creator info.
     const creatorResult = await db.execute(sql`
       SELECT id, name, avatar_url FROM creators WHERE id = ${id}
     `);
-
     if (!creatorResult.length) {
       return NextResponse.json({ error: "Creator not found" }, { status: 404 });
     }
-
     const creator = creatorResult[0] as unknown as {
       id: string;
       name: string;
       avatar_url: string | null;
     };
 
-    // Current period stats
+    // Per-video delta in [fromISO, toISO], scoped to this creator's videos.
+    const perVideoDelta = (fromISO: string, toISO: string) => sql`
+      WITH
+      creator_videos AS (
+        SELECT v.id, v.platform, v.product_id, v.published_at, v.url
+        FROM videos v
+        WHERE v.creator_id = ${id}
+      ),
+      end_views AS (
+        SELECT DISTINCT ON (vm.video_id) vm.video_id, vm.views
+        FROM video_metrics vm
+        INNER JOIN creator_videos cv ON cv.id = vm.video_id
+        WHERE vm.scraped_at <= ${toISO}
+        ORDER BY vm.video_id, vm.scraped_at DESC
+      ),
+      start_views AS (
+        SELECT DISTINCT ON (vm.video_id) vm.video_id, vm.views
+        FROM video_metrics vm
+        INNER JOIN creator_videos cv ON cv.id = vm.video_id
+        WHERE vm.scraped_at < ${fromISO}
+        ORDER BY vm.video_id, vm.scraped_at DESC
+      )
+      SELECT
+        cv.id AS video_id,
+        cv.platform,
+        cv.product_id,
+        cv.published_at,
+        cv.url,
+        GREATEST(COALESCE(ev.views, 0) - COALESCE(sv.views, 0), 0) AS delta
+      FROM creator_videos cv
+      LEFT JOIN end_views ev ON ev.video_id = cv.id
+      LEFT JOIN start_views sv ON sv.video_id = cv.id
+    `;
+
+    // Current period totals.
     const currentStatsResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
-      )
+      WITH deltas AS (${perVideoDelta(from.toISOString(), to.toISOString())})
       SELECT
-        COALESCE(SUM(lm.views), 0)::bigint AS views,
-        COUNT(DISTINCT v.id)::int AS videos
-      FROM videos v
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      WHERE v.creator_id = ${id}
-        AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
+        COALESCE(SUM(delta), 0)::bigint AS views,
+        COUNT(*) FILTER (WHERE delta > 0)::int AS active_videos,
+        COUNT(*) FILTER (
+          WHERE published_at >= ${from.toISOString()}
+            AND published_at <= ${to.toISOString()}
+        )::int AS new_videos
+      FROM deltas
     `);
 
-    // Previous period views
+    // Previous period views for change calc.
     const prevStatsResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
-      )
-      SELECT
-        COALESCE(SUM(lm.views), 0)::bigint AS views
-      FROM videos v
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      WHERE v.creator_id = ${id}
-        AND v.published_at >= ${prevFrom.toISOString()} AND v.published_at <= ${prevTo.toISOString()}
+      WITH deltas AS (${perVideoDelta(prevFrom.toISOString(), prevTo.toISOString())})
+      SELECT COALESCE(SUM(delta), 0)::bigint AS views FROM deltas
     `);
 
-    // By platform
+    // Delta per platform.
     const byPlatformResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
-      )
+      WITH deltas AS (${perVideoDelta(from.toISOString(), to.toISOString())})
       SELECT
-        v.platform,
-        COALESCE(SUM(lm.views), 0)::bigint AS views,
-        COUNT(DISTINCT v.id)::int AS videos
-      FROM videos v
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      WHERE v.creator_id = ${id}
-        AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
-      GROUP BY v.platform
+        platform,
+        COALESCE(SUM(delta), 0)::bigint AS views,
+        COUNT(*) FILTER (WHERE delta > 0)::int AS videos
+      FROM deltas
+      GROUP BY platform
       ORDER BY views DESC
     `);
 
-    // By product
+    // Delta per product (for the creator).
     const byProductResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
-      )
+      WITH deltas AS (${perVideoDelta(from.toISOString(), to.toISOString())})
       SELECT
         p.id AS product_id,
         p.name AS product_name,
         p.wb_article,
-        COALESCE(SUM(lm.views), 0)::bigint AS views,
-        COUNT(DISTINCT v.id)::int AS videos
-      FROM videos v
-      LEFT JOIN products p ON p.id = v.product_id
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      WHERE v.creator_id = ${id}
-        AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
+        COALESCE(SUM(d.delta), 0)::bigint AS views,
+        COUNT(*) FILTER (WHERE d.delta > 0)::int AS videos
+      FROM deltas d
+      LEFT JOIN products p ON p.id = d.product_id
+      WHERE p.id IS NOT NULL
       GROUP BY p.id, p.name, p.wb_article
       ORDER BY views DESC
     `);
 
-    // By day
+    // Daily delta series for this creator's videos.
     const byDayResult = await db.execute(sql`
-      WITH daily_latest AS (
+      WITH
+      creator_videos AS (SELECT id FROM videos WHERE creator_id = ${id}),
+      baseline AS (
+        SELECT DISTINCT ON (vm.video_id) vm.video_id, vm.views
+        FROM video_metrics vm
+        INNER JOIN creator_videos cv ON cv.id = vm.video_id
+        WHERE vm.scraped_at < ${from.toISOString()}
+        ORDER BY vm.video_id, vm.scraped_at DESC
+      ),
+      daily_latest AS (
         SELECT DISTINCT ON (vm.video_id, DATE(vm.scraped_at AT TIME ZONE 'UTC'))
           vm.video_id,
           DATE(vm.scraped_at AT TIME ZONE 'UTC') AS day,
           vm.views
         FROM video_metrics vm
-        INNER JOIN videos v ON v.id = vm.video_id
-        WHERE v.creator_id = ${id}
-          AND vm.scraped_at >= ${from.toISOString()} AND vm.scraped_at <= ${to.toISOString()}
-          AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
+        INNER JOIN creator_videos cv ON cv.id = vm.video_id
+        WHERE vm.scraped_at >= ${from.toISOString()}
+          AND vm.scraped_at <= ${to.toISOString()}
         ORDER BY vm.video_id, DATE(vm.scraped_at AT TIME ZONE 'UTC'), vm.scraped_at DESC
       ),
       with_prev AS (
         SELECT
-          day,
-          views,
-          LAG(views) OVER (PARTITION BY video_id ORDER BY day) AS prev_views
-        FROM daily_latest
+          dl.video_id,
+          dl.day,
+          dl.views,
+          COALESCE(
+            LAG(dl.views) OVER (PARTITION BY dl.video_id ORDER BY dl.day),
+            bl.views,
+            0
+          ) AS prev_views
+        FROM daily_latest dl
+        LEFT JOIN baseline bl ON bl.video_id = dl.video_id
       )
       SELECT
         day::text AS date,
-        COALESCE(SUM(GREATEST(views - COALESCE(prev_views, 0), 0)), 0)::bigint AS views
+        COALESCE(SUM(GREATEST(views - prev_views, 0)), 0)::bigint AS views
       FROM with_prev
       GROUP BY day
       ORDER BY day ASC
     `);
 
-    // Top videos
+    // Top 10 videos by delta.
     const topVideosResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
-      )
+      WITH deltas AS (${perVideoDelta(from.toISOString(), to.toISOString())})
       SELECT
-        v.id,
-        v.url,
-        v.platform,
-        v.published_at,
-        COALESCE(lm.views, 0)::bigint AS views,
-        p.name AS product_name
-      FROM videos v
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      LEFT JOIN products p ON p.id = v.product_id
-      WHERE v.creator_id = ${id}
-        AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
-      ORDER BY views DESC
+        d.video_id AS id,
+        d.url,
+        d.platform,
+        d.published_at,
+        d.delta::bigint AS views,
+        COALESCE(p.name, '—') AS product_name
+      FROM deltas d
+      LEFT JOIN products p ON p.id = d.product_id
+      WHERE d.delta > 0
+      ORDER BY d.delta DESC
       LIMIT 10
     `);
 
     const statsRow = currentStatsResult[0] as unknown as {
       views: string;
-      videos: number;
+      active_videos: number;
+      new_videos: number;
     };
     const prevStatsRow = prevStatsResult[0] as unknown as { views: string };
 
     const views = Number(statsRow?.views ?? 0);
-    const videos = Number(statsRow?.videos ?? 0);
+    const activeVideos = Number(statsRow?.active_videos ?? 0);
+    const newVideos = Number(statsRow?.new_videos ?? 0);
     const prevViews = Number(prevStatsRow?.views ?? 0);
 
     return NextResponse.json({
@@ -204,8 +218,9 @@ export async function GET(
       },
       stats: {
         views,
-        videos,
-        avgViews: videos > 0 ? Math.round(views / videos) : 0,
+        videos: activeVideos,
+        newVideos,
+        avgViews: activeVideos > 0 ? Math.round(views / activeVideos) : 0,
         viewsChange: calcChange(views, prevViews),
       },
       byPlatform: (byPlatformResult as unknown as Array<{

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 
+/**
+ * Products list — cumulative delta per product, matching /api/dashboard and
+ * /api/creators. For each product: how many views its promoting videos gained
+ * in the selected period, per-platform breakdown of that delta, how many
+ * videos were published in the period.
+ */
 const querySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
@@ -17,49 +24,62 @@ export async function GET(request: NextRequest) {
       ? new Date(params.from + "T00:00:00Z")
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    const { sql } = await import("drizzle-orm");
-
-    // Product totals
-    const productsResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
+    const perVideoDelta = sql`
+      WITH
+      end_views AS (
+        SELECT DISTINCT ON (vm.video_id)
+          vm.video_id, vm.views
+        FROM video_metrics vm
+        WHERE vm.scraped_at <= ${to.toISOString()}
+        ORDER BY vm.video_id, vm.scraped_at DESC
+      ),
+      start_views AS (
+        SELECT DISTINCT ON (vm.video_id)
+          vm.video_id, vm.views
+        FROM video_metrics vm
+        WHERE vm.scraped_at < ${from.toISOString()}
+        ORDER BY vm.video_id, vm.scraped_at DESC
       )
+      SELECT
+        v.id AS video_id,
+        v.product_id,
+        v.platform,
+        GREATEST(COALESCE(ev.views, 0) - COALESCE(sv.views, 0), 0) AS delta
+      FROM videos v
+      LEFT JOIN end_views ev ON ev.video_id = v.id
+      LEFT JOIN start_views sv ON sv.video_id = v.id
+    `;
+
+    // Totals per product.
+    const productsResult = await db.execute(sql`
+      WITH deltas AS (${perVideoDelta})
       SELECT
         p.id AS product_id,
         p.name AS product_name,
         p.wb_article,
-        COALESCE(SUM(lm.views), 0)::bigint AS views,
-        COUNT(DISTINCT v.id)::int AS videos
+        COALESCE(SUM(d.delta), 0)::bigint AS views,
+        COUNT(DISTINCT d.video_id) FILTER (WHERE d.delta > 0)::int AS active_videos,
+        (SELECT COUNT(*) FROM videos v2
+         WHERE v2.product_id = p.id
+           AND v2.published_at >= ${from.toISOString()}
+           AND v2.published_at <= ${to.toISOString()})::int AS new_videos
       FROM products p
-      LEFT JOIN videos v ON v.product_id = p.id
-        AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
+      LEFT JOIN deltas d ON d.product_id = p.id
       GROUP BY p.id, p.name, p.wb_article
       ORDER BY views DESC
     `);
 
-    // Views by platform per product
+    // Platform breakdown per product.
     const byPlatformResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
-      )
+      WITH deltas AS (${perVideoDelta})
       SELECT
-        v.product_id,
-        v.platform,
-        COALESCE(SUM(lm.views), 0)::bigint AS views
-      FROM videos v
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      WHERE v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
-      GROUP BY v.product_id, v.platform
-      ORDER BY v.product_id, views DESC
+        d.product_id,
+        d.platform,
+        COALESCE(SUM(d.delta), 0)::bigint AS views
+      FROM deltas d
+      WHERE d.product_id IS NOT NULL
+      GROUP BY d.product_id, d.platform
+      ORDER BY d.product_id, views DESC
     `);
 
     type ProductRow = {
@@ -67,7 +87,8 @@ export async function GET(request: NextRequest) {
       product_name: string;
       wb_article: string;
       views: string;
-      videos: number;
+      active_videos: number;
+      new_videos: number;
     };
     type PlatformRow = {
       product_id: string;
@@ -91,7 +112,8 @@ export async function GET(request: NextRequest) {
       name: row.product_name,
       wbArticle: row.wb_article,
       views: Number(row.views),
-      videos: Number(row.videos),
+      videos: Number(row.active_videos),
+      newVideos: Number(row.new_videos),
       byPlatform: platformMap.get(row.product_id) ?? [],
     }));
 

@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 
+/**
+ * Creators list — same cumulative delta model as /api/dashboard.
+ *
+ * For every creator we return "views their videos gained during the period"
+ * (not "latest views of videos they published in the period"), per-platform
+ * breakdown of that same delta, and period-over-period change. viewsChange is
+ * null when the previous period has no baseline data.
+ */
 const querySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
@@ -14,9 +23,9 @@ function getPreviousPeriod(from: Date, to: Date): { prevFrom: Date; prevTo: Date
   return { prevFrom, prevTo };
 }
 
-function calcChange(current: number, previous: number): number {
-  if (previous === 0) return current > 0 ? 100 : 0;
-  return Math.round(((current - previous) / previous) * 100 * 100) / 100;
+function calcChange(current: number, previous: number): number | null {
+  if (previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 100 * 10) / 10;
 }
 
 export async function GET(request: NextRequest) {
@@ -31,69 +40,76 @@ export async function GET(request: NextRequest) {
 
     const { prevFrom, prevTo } = getPreviousPeriod(from, to);
 
-    const { sql } = await import("drizzle-orm");
-
-    // Current period: views and videos per creator
-    const currentResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
+    // Per-video delta over [fromISO, toISO]. Shared with dashboard.
+    const perVideoDelta = (fromISO: string, toISO: string) => sql`
+      WITH
+      end_views AS (
+        SELECT DISTINCT ON (vm.video_id)
+          vm.video_id, vm.views
+        FROM video_metrics vm
+        WHERE vm.scraped_at <= ${toISO}
+        ORDER BY vm.video_id, vm.scraped_at DESC
+      ),
+      start_views AS (
+        SELECT DISTINCT ON (vm.video_id)
+          vm.video_id, vm.views
+        FROM video_metrics vm
+        WHERE vm.scraped_at < ${fromISO}
+        ORDER BY vm.video_id, vm.scraped_at DESC
       )
+      SELECT
+        v.id AS video_id,
+        v.creator_id,
+        v.platform,
+        v.published_at,
+        GREATEST(COALESCE(ev.views, 0) - COALESCE(sv.views, 0), 0) AS delta
+      FROM videos v
+      LEFT JOIN end_views ev ON ev.video_id = v.id
+      LEFT JOIN start_views sv ON sv.video_id = v.id
+    `;
+
+    // Current period: delta per creator.
+    const currentResult = await db.execute(sql`
+      WITH deltas AS (${perVideoDelta(from.toISOString(), to.toISOString())})
       SELECT
         c.id AS creator_id,
         c.name AS creator_name,
         c.avatar_url,
-        COALESCE(SUM(lm.views), 0)::bigint AS views,
-        COUNT(DISTINCT v.id)::int AS videos
+        COALESCE(SUM(d.delta), 0)::bigint AS views,
+        COUNT(DISTINCT d.video_id) FILTER (WHERE d.delta > 0)::int AS active_videos,
+        (SELECT COUNT(*) FROM videos v2
+         WHERE v2.creator_id = c.id
+           AND v2.published_at >= ${from.toISOString()}
+           AND v2.published_at <= ${to.toISOString()})::int AS new_videos
       FROM creators c
-      LEFT JOIN videos v ON v.creator_id = c.id
-        AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
+      LEFT JOIN deltas d ON d.creator_id = c.id
       GROUP BY c.id, c.name, c.avatar_url
       ORDER BY views DESC
     `);
 
-    // Previous period: views per creator
+    // Previous period delta per creator.
     const prevResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
-      )
+      WITH deltas AS (${perVideoDelta(prevFrom.toISOString(), prevTo.toISOString())})
       SELECT
         c.id AS creator_id,
-        COALESCE(SUM(lm.views), 0)::bigint AS views
+        COALESCE(SUM(d.delta), 0)::bigint AS views
       FROM creators c
-      LEFT JOIN videos v ON v.creator_id = c.id
-        AND v.published_at >= ${prevFrom.toISOString()} AND v.published_at <= ${prevTo.toISOString()}
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
+      LEFT JOIN deltas d ON d.creator_id = c.id
       GROUP BY c.id
     `);
 
-    // Views by platform per creator
+    // Platform breakdown per creator in the current period.
     const byPlatformResult = await db.execute(sql`
-      WITH latest_metrics AS (
-        SELECT DISTINCT ON (video_id)
-          video_id,
-          views
-        FROM video_metrics
-        ORDER BY video_id, scraped_at DESC
-      )
+      WITH deltas AS (${perVideoDelta(from.toISOString(), to.toISOString())})
       SELECT
-        v.creator_id,
-        v.platform,
-        COALESCE(SUM(lm.views), 0)::bigint AS views,
-        COUNT(DISTINCT v.id)::int AS videos
-      FROM videos v
-      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
-      WHERE v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
-      GROUP BY v.creator_id, v.platform
-      ORDER BY v.creator_id, views DESC
+        d.creator_id,
+        d.platform,
+        COALESCE(SUM(d.delta), 0)::bigint AS views,
+        COUNT(DISTINCT d.video_id) FILTER (WHERE d.delta > 0)::int AS videos
+      FROM deltas d
+      WHERE d.creator_id IS NOT NULL
+      GROUP BY d.creator_id, d.platform
+      ORDER BY d.creator_id, views DESC
     `);
 
     type CurrentRow = {
@@ -101,7 +117,8 @@ export async function GET(request: NextRequest) {
       creator_name: string;
       avatar_url: string | null;
       views: string;
-      videos: number;
+      active_videos: number;
+      new_videos: number;
     };
     type PrevRow = { creator_id: string; views: string };
     type PlatformRow = {
@@ -130,7 +147,8 @@ export async function GET(request: NextRequest) {
 
     const creators = (currentResult as unknown as CurrentRow[]).map((row) => {
       const views = Number(row.views);
-      const videos = Number(row.videos);
+      const activeVideos = Number(row.active_videos);
+      const newVideos = Number(row.new_videos);
       const prevViews = prevMap.get(row.creator_id) ?? 0;
 
       return {
@@ -138,8 +156,9 @@ export async function GET(request: NextRequest) {
         name: row.creator_name,
         avatarUrl: row.avatar_url,
         views,
-        videos,
-        avgViews: videos > 0 ? Math.round(views / videos) : 0,
+        videos: activeVideos,
+        newVideos,
+        avgViews: activeVideos > 0 ? Math.round(views / activeVideos) : 0,
         viewsChange: calcChange(views, prevViews),
         byPlatform: platformMap.get(row.creator_id) ?? [],
       };
