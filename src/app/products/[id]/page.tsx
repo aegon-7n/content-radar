@@ -12,13 +12,32 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { ArrowLeft, Eye, Film, LayoutGrid } from "lucide-react";
+import { ArrowLeft, Eye, Film, Sparkles } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import { StatCardSkeleton, ChartSkeleton } from "@/components/ui/SkeletonCard";
 import { formatViews, formatDate, getPlatformColor, getPlatformLabel } from "@/lib/format";
-import { MOCK_PRODUCT_DETAIL, type ProductDetail, type Platform } from "@/lib/mock-data";
+import { type Platform } from "@/lib/mock-data";
+
+type ProductDetail = {
+  product: { id: string; name: string; wbArticle: string };
+  stats: { views: number; videos: number; newVideos: number };
+  byPlatform: Array<{ platform: string; views: number; videos: number }>;
+  byCreator: Array<{ creatorId: string; creatorName: string; views: number; videos: number }>;
+  videos: Array<{
+    id: string;
+    url: string;
+    platform: string;
+    views: number;
+    likes: number;
+    comments: number;
+    shares: number;
+    saves: number;
+    creatorName: string;
+    publishedAt: string;
+  }>;
+};
 
 const tooltipStyle = {
   backgroundColor: "var(--surface-1)",
@@ -44,20 +63,12 @@ export default function ProductDetailPage() {
     const { from, to } = getPeriodDates(period);
     fetch(`/api/products/${id}?from=${from}&to=${to}`)
       .then((r) => r.json())
-      .then((d) => {
-        if (d.stats) {
-          d.name = d.product?.name ?? d.name;
-          d.wbArticle = d.product?.wbArticle ?? d.wbArticle;
-          d.totalViews = d.stats.views ?? 0;
-          d.totalVideos = d.stats.videos ?? 0;
-        }
-        setData(d);
-      })
-      .catch(() => setData(MOCK_PRODUCT_DETAIL[id] ?? null))
+      .then((d) => setData(d))
+      .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, [id, period]);
 
-  const d = data ?? MOCK_PRODUCT_DETAIL[id];
+  const d = data;
 
   return (
     <div className="p-6 flex flex-col gap-6">
@@ -78,7 +89,7 @@ export default function ProductDetailPage() {
           <div className="w-px h-4" style={{ background: "var(--border-default)" }} />
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
-              {d?.name ?? "Загрузка..."}
+              {d?.product?.name ?? "Загрузка..."}
             </h1>
             {d && (
               <span
@@ -89,7 +100,7 @@ export default function ProductDetailPage() {
                   border: "1px solid var(--border-default)",
                 }}
               >
-                {d.wbArticle}
+                {d.product.wbArticle}
               </span>
             )}
           </div>
@@ -105,21 +116,27 @@ export default function ProductDetailPage() {
       ) : (
         <div className="grid grid-cols-3 gap-4">
           <StatCard
-            title="Просмотры"
-            value={formatViews(d.totalViews)}
+            title="Прирост просмотров"
+            value={formatViews(d.stats.views)}
             icon={<Eye className="w-4 h-4" style={{ color: "var(--accent-primary)" }} />}
+            subtitle="за выбранный период"
+            help="Сколько новых просмотров набрали видео с этим товаром за период."
           />
           <StatCard
-            title="Роликов"
-            value={d.totalVideos}
+            title="Активных роликов"
+            value={d.stats.videos}
             icon={<Film className="w-4 h-4" style={{ color: "#7C3AED" }} />}
+            subtitle="получили рост"
+            mono={false}
+            help="Сколько роликов с этим товаром принесли рост в этом периоде."
           />
           <StatCard
-            title="Платформ"
-            value={d.byPlatform.length}
-            icon={<LayoutGrid className="w-4 h-4" style={{ color: "#059669" }} />}
-            subtitle="активных платформ"
+            title="Новых роликов"
+            value={d.stats.newVideos}
+            icon={<Sparkles className="w-4 h-4" style={{ color: "#059669" }} />}
+            subtitle="опубликовано в периоде"
             mono={false}
+            help="Сколько роликов с этим товаром креаторы опубликовали именно в этом периоде."
           />
         </div>
       )}

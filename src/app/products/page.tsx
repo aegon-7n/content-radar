@@ -7,9 +7,19 @@ import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import { TableSkeleton } from "@/components/ui/SkeletonCard";
 import { formatViews } from "@/lib/format";
-import { MOCK_PRODUCTS, type Product, type Platform } from "@/lib/mock-data";
+import { MOCK_PRODUCTS, type Platform } from "@/lib/mock-data";
 
-type SortKey = "totalViews" | "totalVideos";
+type ProductRow = {
+  id: string;
+  name: string;
+  wbArticle: string;
+  views: number;
+  videos: number;
+  newVideos: number;
+  byPlatform: Array<{ platform: string; views: number }>;
+};
+
+type SortKey = "views" | "videos" | "newVideos";
 type SortDir = "asc" | "desc";
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
@@ -22,9 +32,9 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 export default function ProductsPage() {
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("30d");
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState<SortKey>("totalViews");
+  const [sortKey, setSortKey] = useState<SortKey>("views");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   useEffect(() => {
@@ -33,14 +43,20 @@ export default function ProductsPage() {
     fetch(`/api/products?from=${from}&to=${to}`)
       .then((r) => r.json())
       .then((d) => {
-        const list = d.products ?? d;
-        setProducts(list.map((p: Record<string, unknown>) => ({
-          ...p,
-          totalViews: p.views,
-          totalVideos: p.videos,
-        })));
+        setProducts((d.products ?? []) as ProductRow[]);
       })
-      .catch(() => setProducts(MOCK_PRODUCTS))
+      .catch(() => {
+        const fallback = MOCK_PRODUCTS.map((p) => ({
+          id: p.id,
+          name: p.name,
+          wbArticle: p.wbArticle,
+          views: p.totalViews,
+          videos: p.totalVideos,
+          newVideos: 0,
+          byPlatform: p.byPlatform,
+        }));
+        setProducts(fallback);
+      })
       .finally(() => setLoading(false));
   }, [period]);
 
@@ -60,6 +76,24 @@ export default function ProductsPage() {
     const mul = sortDir === "asc" ? 1 : -1;
     return (a[sortKey] - b[sortKey]) * mul;
   });
+
+  const headers: { key: SortKey; label: string; help: string }[] = [
+    {
+      key: "views",
+      label: "Прирост просмотров",
+      help: "Сколько просмотров набрали видео этого товара за выбранный период",
+    },
+    {
+      key: "videos",
+      label: "Активных роликов",
+      help: "Сколько роликов с этим товаром получили рост в этот период",
+    },
+    {
+      key: "newVideos",
+      label: "Новых",
+      help: "Сколько роликов с этим товаром опубликовано именно в этом периоде",
+    },
+  ];
 
   return (
     <div className="p-6 flex flex-col gap-6">
@@ -92,38 +126,26 @@ export default function ProductsPage() {
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Название</th>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Артикул WB</th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
-                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
-                  onClick={() => handleSort("totalViews")}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="transition-colors"
-                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
-                    >
-                      Просмотры
-                    </span>
-                    <SortIcon active={sortKey === "totalViews"} dir={sortDir} />
-                  </div>
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
-                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
-                  onClick={() => handleSort("totalVideos")}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="transition-colors"
-                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
-                    >
-                      Ролики
-                    </span>
-                    <SortIcon active={sortKey === "totalVideos"} dir={sortDir} />
-                  </div>
-                </th>
+                {headers.map((h) => (
+                  <th
+                    key={h.key}
+                    className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
+                    style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                    onClick={() => handleSort(h.key)}
+                    title={h.help}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="transition-colors"
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                      >
+                        {h.label}
+                      </span>
+                      <SortIcon active={sortKey === h.key} dir={sortDir} />
+                    </div>
+                  </th>
+                ))}
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>По платформам</th>
               </tr>
@@ -156,17 +178,23 @@ export default function ProductsPage() {
                   </td>
                   <td className="px-4 py-3.5">
                     <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
-                      {formatViews(product.totalViews)}
+                      {formatViews(product.views)}
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
                     <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
-                      {product.totalVideos}
+                      {product.videos}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                      {product.newVideos}
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {product.byPlatform
+                        .slice()
                         .sort((a, b) => b.views - a.views)
                         .map((p) => (
                           <div key={p.platform} className="flex items-center gap-1">

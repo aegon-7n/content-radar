@@ -14,13 +14,41 @@ import {
   Bar,
   Cell,
 } from "recharts";
-import { ArrowLeft, Eye, Film, TrendingUp, BarChart2 } from "lucide-react";
+import { ArrowLeft, Eye, Film, TrendingUp, Sparkles } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import { StatCardSkeleton, ChartSkeleton } from "@/components/ui/SkeletonCard";
-import { formatViews, formatDate, formatDateShort, formatPercent, getPlatformColor, getPlatformLabel } from "@/lib/format";
-import { MOCK_CREATOR_DETAIL, type CreatorDetail, type Platform } from "@/lib/mock-data";
+import { formatViews, formatDate, formatDateShort, getPlatformColor, getPlatformLabel } from "@/lib/format";
+import { type Platform } from "@/lib/mock-data";
+
+type CreatorDetail = {
+  creator: { id: string; name: string; avatarUrl: string | null };
+  stats: {
+    views: number;
+    videos: number;
+    newVideos: number;
+    avgViews: number;
+    viewsChange: number | null;
+  };
+  byPlatform: Array<{ platform: string; views: number; videos: number }>;
+  byProduct: Array<{
+    productId: string;
+    productName: string;
+    wbArticle: string;
+    views: number;
+    videos: number;
+  }>;
+  byDay: Array<{ date: string; views: number }>;
+  topVideos: Array<{
+    id: string;
+    url: string;
+    platform: string;
+    views: number;
+    productName: string;
+    publishedAt: string;
+  }>;
+};
 
 const tooltipStyle = {
   backgroundColor: "var(--surface-1)",
@@ -46,22 +74,12 @@ export default function CreatorDetailPage() {
     const { from, to } = getPeriodDates(period);
     fetch(`/api/creators/${id}?from=${from}&to=${to}`)
       .then((r) => r.json())
-      .then((d) => {
-        if (d.stats) {
-          d.name = d.creator?.name ?? d.name;
-          d.totalViews = d.stats.views ?? 0;
-          d.totalVideos = d.stats.videos ?? 0;
-          d.avgViewsPerVideo = d.stats.avgViews ?? 0;
-          d.viewsChange = d.stats.viewsChange ?? 0;
-          d.dailyViews = d.byDay ?? [];
-        }
-        setData(d);
-      })
-      .catch(() => setData(MOCK_CREATOR_DETAIL[id] ?? null))
+      .then((d) => setData(d))
+      .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, [id, period]);
 
-  const d = data ?? MOCK_CREATOR_DETAIL[id];
+  const d = data;
 
   return (
     <div className="p-6 flex flex-col gap-6">
@@ -82,10 +100,10 @@ export default function CreatorDetailPage() {
           <div className="w-px h-4" style={{ background: "var(--border-default)" }} />
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
-              <span className="text-xs font-semibold text-white">{d?.name?.[0] ?? "?"}</span>
+              <span className="text-xs font-semibold text-white">{d?.creator?.name?.[0] ?? "?"}</span>
             </div>
             <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
-              {d?.name ?? "Загрузка..."}
+              {d?.creator?.name ?? "Загрузка..."}
             </h1>
           </div>
         </div>
@@ -100,27 +118,35 @@ export default function CreatorDetailPage() {
       ) : (
         <div className="grid grid-cols-4 gap-4">
           <StatCard
-            title="Просмотры"
-            value={formatViews(d.totalViews)}
-            change={d.viewsChange}
+            title="Прирост просмотров"
+            value={formatViews(d.stats.views)}
+            change={d.stats.viewsChange}
             icon={<Eye className="w-4 h-4" style={{ color: "var(--accent-primary)" }} />}
+            subtitle="за выбранный период"
+            help="Сколько новых просмотров набрали видео этого креатора за выбранный период."
           />
           <StatCard
-            title="Роликов"
-            value={d.totalVideos}
+            title="Активных роликов"
+            value={d.stats.videos}
             icon={<Film className="w-4 h-4" style={{ color: "#7C3AED" }} />}
+            subtitle="получили рост"
+            mono={false}
+            help="Сколько роликов этого креатора принесли хотя бы один новый просмотр в этом периоде."
+          />
+          <StatCard
+            title="Новых роликов"
+            value={d.stats.newVideos}
+            icon={<Sparkles className="w-4 h-4" style={{ color: "#D97706" }} />}
+            subtitle="опубликовано в периоде"
+            mono={false}
+            help="Сколько роликов креатор опубликовал именно в этом периоде."
           />
           <StatCard
             title="Среднее на ролик"
-            value={formatViews(d.avgViewsPerVideo)}
+            value={formatViews(d.stats.avgViews)}
             icon={<TrendingUp className="w-4 h-4" style={{ color: "#059669" }} />}
-          />
-          <StatCard
-            title="% изменение"
-            value={`${d.viewsChange >= 0 ? "+" : ""}${d.viewsChange.toFixed(1)}%`}
-            icon={<BarChart2 className="w-4 h-4" style={{ color: "#D97706" }} />}
-            subtitle="к прошлому периоду"
-            mono={false}
+            subtitle="на один активный ролик"
+            help="Прирост просмотров, делённый на количество активных роликов."
           />
         </div>
       )}
@@ -142,10 +168,10 @@ export default function CreatorDetailPage() {
             }}
           >
             <h2 className="text-sm font-medium mb-5" style={{ color: "var(--text-primary)" }}>
-              Просмотры по дням
+              Прирост просмотров по дням
             </h2>
             <ResponsiveContainer width="100%" height={210}>
-              <LineChart data={d.dailyViews} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <LineChart data={d.byDay} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
                 <XAxis
                   dataKey="date"

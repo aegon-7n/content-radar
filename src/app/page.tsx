@@ -49,10 +49,6 @@ export default function DashboardPage() {
       .then((r) => r.json())
       .then((d) => {
         d.dailyViews = d.byDay ?? [];
-        d.avgViewsPerVideo = d.totalVideos > 0
-          ? Math.round(d.totalViews / d.totalVideos)
-          : 0;
-        d.activePlatforms = (d.byPlatform ?? []).filter((p: { views: number }) => p.views > 0).length;
         setData(d);
         if (d.categories?.length > 0) {
           setAllCategories(d.categories);
@@ -85,7 +81,7 @@ export default function DashboardPage() {
             Дашборд
           </h1>
           <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-            Общая статистика контента
+            Прирост просмотров всех ваших роликов за выбранный период
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -135,22 +131,28 @@ export default function DashboardPage() {
       ) : (
         <div className="grid grid-cols-4 gap-4">
           <StatCard
-            title="Всего просмотров"
+            title="Прирост просмотров"
             value={formatViews(d.totalViews)}
             change={d.viewsChange}
             icon={<Eye className="w-4 h-4" style={{ color: "var(--accent-primary)" }} />}
+            subtitle={`за ${d.period?.days ?? 30} дн.`}
+            help="Сколько новых просмотров набрали все ваши ролики за выбранный период — от первого до последнего дня."
           />
           <StatCard
-            title="Всего роликов"
-            value={d.totalVideos}
-            change={d.videosChange}
+            title="Новых роликов"
+            value={d.newVideos}
+            change={d.newVideosChange}
             icon={<Film className="w-4 h-4" style={{ color: "#7C3AED" }} />}
+            subtitle="опубликовано в периоде"
+            mono={false}
+            help="Сколько роликов креаторы выпустили в этот период (по дате публикации на платформе)."
           />
           <StatCard
             title="Среднее на ролик"
-            value={formatViews(d.avgViewsPerVideo)}
+            value={formatViews(d.avgPerVideo)}
             icon={<TrendingUp className="w-4 h-4" style={{ color: "#059669" }} />}
-            subtitle="просмотров на ролик"
+            subtitle={`на один из ${d.activeVideos} активных`}
+            help="Прирост просмотров, делённый на количество роликов у которых вообще был рост в этом периоде."
           />
           <StatCard
             title="Активных платформ"
@@ -158,6 +160,7 @@ export default function DashboardPage() {
             icon={<LayoutGrid className="w-4 h-4" style={{ color: "#D97706" }} />}
             subtitle="из 5 доступных"
             mono={false}
+            help="Сколько платформ из TikTok/YouTube/Instagram/Likee/Pinterest принесли хотя бы один новый просмотр."
           />
         </div>
       )}

@@ -7,9 +7,20 @@ import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import { TableSkeleton } from "@/components/ui/SkeletonCard";
 import { formatViews, formatPercent } from "@/lib/format";
-import { MOCK_CREATORS, type Creator, type Platform } from "@/lib/mock-data";
+import { MOCK_CREATORS, type Platform } from "@/lib/mock-data";
 
-type SortKey = "totalViews" | "totalVideos" | "avgViewsPerVideo" | "viewsChange";
+type CreatorRow = {
+  id: string;
+  name: string;
+  views: number;
+  videos: number;
+  newVideos: number;
+  avgViews: number;
+  viewsChange: number | null;
+  byPlatform: Array<{ platform: string; views: number; videos: number }>;
+};
+
+type SortKey = "views" | "videos" | "newVideos" | "avgViews" | "viewsChange";
 type SortDir = "asc" | "desc";
 
 function SortIcon({ active, dir }: { col?: string; active: boolean; dir: SortDir }) {
@@ -22,9 +33,9 @@ function SortIcon({ active, dir }: { col?: string; active: boolean; dir: SortDir
 export default function CreatorsPage() {
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("30d");
-  const [creators, setCreators] = useState<Creator[]>([]);
+  const [creators, setCreators] = useState<CreatorRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState<SortKey>("totalViews");
+  const [sortKey, setSortKey] = useState<SortKey>("views");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   useEffect(() => {
@@ -33,15 +44,23 @@ export default function CreatorsPage() {
     fetch(`/api/creators?from=${from}&to=${to}`)
       .then((r) => r.json())
       .then((d) => {
-        const list = d.creators ?? d;
-        setCreators(list.map((c: Record<string, unknown>) => ({
-          ...c,
-          totalViews: c.views,
-          totalVideos: c.videos,
-          avgViewsPerVideo: c.avgViews,
-        })));
+        const list = (d.creators ?? []) as CreatorRow[];
+        setCreators(list);
       })
-      .catch(() => setCreators(MOCK_CREATORS))
+      .catch(() => {
+        // Fallback only for dev when API is down; mock uses old shape.
+        const fallback = MOCK_CREATORS.map((c) => ({
+          id: c.id,
+          name: c.name,
+          views: c.totalViews,
+          videos: c.totalVideos,
+          newVideos: 0,
+          avgViews: c.avgViewsPerVideo,
+          viewsChange: c.viewsChange ?? null,
+          byPlatform: c.byPlatform,
+        }));
+        setCreators(fallback);
+      })
       .finally(() => setLoading(false));
   }, [period]);
 
@@ -56,14 +75,37 @@ export default function CreatorsPage() {
 
   const sorted = [...creators].sort((a, b) => {
     const mul = sortDir === "asc" ? 1 : -1;
-    return (a[sortKey] - b[sortKey]) * mul;
+    const av = a[sortKey] ?? 0;
+    const bv = b[sortKey] ?? 0;
+    return ((av as number) - (bv as number)) * mul;
   });
 
-  const headers: { key: SortKey; label: string }[] = [
-    { key: "totalViews", label: "Просмотры" },
-    { key: "totalVideos", label: "Ролики" },
-    { key: "avgViewsPerVideo", label: "Среднее/ролик" },
-    { key: "viewsChange", label: "% изменение" },
+  const headers: { key: SortKey; label: string; help: string }[] = [
+    {
+      key: "views",
+      label: "Прирост просмотров",
+      help: "Сколько новых просмотров набрали видео этого креатора за выбранный период",
+    },
+    {
+      key: "videos",
+      label: "Активных роликов",
+      help: "Сколько роликов креатора принесли хотя бы один новый просмотр в этом периоде",
+    },
+    {
+      key: "newVideos",
+      label: "Новых",
+      help: "Сколько роликов креатор опубликовал именно в этом периоде",
+    },
+    {
+      key: "avgViews",
+      label: "Среднее/ролик",
+      help: "Прирост просмотров, делённый на активных роликов",
+    },
+    {
+      key: "viewsChange",
+      label: "%",
+      help: "Изменение прироста по сравнению с предыдущим таким же периодом",
+    },
   ];
 
   return (
@@ -105,6 +147,7 @@ export default function CreatorsPage() {
                     className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none group"
                     style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
                     onClick={() => handleSort(h.key)}
+                    title={h.help}
                   >
                     <div className="flex items-center gap-1.5">
                       <span
@@ -148,24 +191,34 @@ export default function CreatorsPage() {
                   </td>
                   <td className="px-4 py-3.5">
                     <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
-                      {formatViews(creator.totalViews)}
+                      {formatViews(creator.views)}
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
                     <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
-                      {creator.totalVideos}
+                      {creator.videos}
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
                     <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
-                      {formatViews(creator.avgViewsPerVideo)}
+                      {creator.newVideos}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                      {formatViews(creator.avgViews)}
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
                     <span
                       className="text-sm font-medium font-mono"
                       style={{
-                        color: creator.viewsChange >= 0 ? "var(--success-text)" : "var(--error-text)",
+                        color:
+                          creator.viewsChange == null
+                            ? "var(--text-disabled)"
+                            : creator.viewsChange >= 0
+                              ? "var(--success-text)"
+                              : "var(--error-text)",
                       }}
                     >
                       {formatPercent(creator.viewsChange)}
