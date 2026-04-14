@@ -10,7 +10,6 @@ import {
   Video,
   Settings,
   Radio,
-  RefreshCw,
 } from "lucide-react";
 
 const navItems = [
@@ -31,16 +30,37 @@ function formatLastSync(iso: string | null): string {
   });
 }
 
+type HealthJob = {
+  name: string;
+  lastRunAt: string | null;
+  lastSuccessAt: string | null;
+  status: string;
+  stale: boolean;
+};
+type HealthPayload = {
+  status: "ok" | "degraded" | "error";
+  lastMetricAt: string | null;
+  jobs: HealthJob[];
+};
+
 export default function Sidebar() {
   const pathname = usePathname();
-  const [lastSync, setLastSync] = useState<string | null>(null);
+  const [health, setHealth] = useState<HealthPayload | null>(null);
 
   useEffect(() => {
-    fetch("/api/last-sync")
-      .then(r => r.json())
-      .then(d => setLastSync(d.lastSync ?? null))
-      .catch(() => {});
+    const load = () =>
+      fetch("/api/health")
+        .then((r) => r.json())
+        .then((d) => setHealth(d))
+        .catch(() => {});
+    load();
+    const t = setInterval(load, 60_000); // refresh every minute
+    return () => clearInterval(t);
   }, []);
+
+  const lastSync = health?.lastMetricAt ?? null;
+  const overallOk = health?.status === "ok";
+  const overallDegraded = health?.status === "degraded";
 
   return (
     <aside
@@ -109,7 +129,7 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Last sync */}
+      {/* Health / last sync */}
       <div
         className="px-3 pb-4 pt-2"
         style={{ borderTop: "1px solid var(--border-default)" }}
@@ -118,10 +138,27 @@ export default function Sidebar() {
           className="flex items-center gap-2 px-2 py-2 rounded-md"
           style={{
             background: "var(--bg-muted)",
-            border: "1px solid var(--border-subtle)",
+            border: `1px solid ${overallDegraded ? "var(--warning-border)" : "var(--border-subtle)"}`,
           }}
+          title={
+            health?.jobs
+              ?.map(
+                (j) =>
+                  `${j.name}: ${j.status}${j.stale ? " (stale)" : ""}`
+              )
+              .join("\n") ?? "Загрузка..."
+          }
         >
-          <RefreshCw className="w-3 h-3 shrink-0" style={{ color: "var(--text-disabled)" }} />
+          <span
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{
+              background: overallOk
+                ? "var(--success-text)"
+                : overallDegraded
+                  ? "var(--warning-text)"
+                  : "var(--text-disabled)",
+            }}
+          />
           <div className="flex flex-col min-w-0">
             <span className="text-[10px]" style={{ color: "var(--text-disabled)" }}>
               Последнее обновление
