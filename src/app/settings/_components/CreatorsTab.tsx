@@ -13,6 +13,7 @@ interface Creator {
   instagramUsername: string | null;
   likeeUsername: string | null;
   likeeUid: string | null;
+  pinterestUsername: string | null;
   videoCount: number;
 }
 
@@ -27,6 +28,7 @@ const EMPTY_FORM = {
   instagramUsername: "",
   likeeUsername: "",
   likeeUid: "",
+  pinterestUsername: "",
 };
 
 const inputClass = "w-full rounded-lg px-3 py-2 text-sm focus:outline-none transition-colors";
@@ -69,6 +71,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
       instagramUsername: c.instagramUsername ?? "",
       likeeUsername: c.likeeUsername ?? "",
       likeeUid: c.likeeUid ?? "",
+      pinterestUsername: c.pinterestUsername ?? "",
     });
     setModalOpen(true);
   }
@@ -91,6 +94,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
           instagramUsername: form.instagramUsername.trim().replace(/^@/, "") || null,
           likeeUsername: form.likeeUsername.trim().replace(/^@/, "") || null,
           likeeUid: form.likeeUid.trim() || null,
+          pinterestUsername: form.pinterestUsername.trim().replace(/^@/, "") || null,
         }),
       });
       const data = await res.json();
@@ -274,6 +278,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
                   help:
                     "Numeric ID, найдите в devtools на странице профиля Likee (Network → запрос videoRecord/getUserVideo, поле uid). Likee не отдаёт username→uid публично.",
                 },
+                { key: "pinterestUsername", label: "Pinterest", placeholder: "username", help: "" },
               ].map(({ key, label, placeholder, help }) => (
                 <div key={key}>
                   <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
