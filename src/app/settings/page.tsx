@@ -28,15 +28,28 @@ export default function SettingsPage() {
   const dismissToast = useCallback(() => setToast(null), []);
 
   return (
-    <div className="p-6 flex flex-col gap-6 min-h-full bg-[#0a0a0a]">
+    <div
+      className="p-6 flex flex-col gap-6 min-h-full"
+      style={{ background: "var(--bg-base)" }}
+    >
       {/* Header */}
       <div>
-        <h1 className="text-xl font-semibold text-white">Настройки</h1>
-        <p className="text-xs text-[#555] mt-0.5">Управление креаторами, товарами и роликами</p>
+        <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+          Настройки
+        </h1>
+        <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+          Управление креаторами, товарами и роликами
+        </p>
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 p-1 bg-[#111111] border border-white/[0.06] rounded-xl w-fit">
+      <div
+        className="flex items-center gap-1 p-1 rounded-xl w-fit"
+        style={{
+          background: "var(--surface-1)",
+          border: "1px solid var(--border-default)",
+        }}
+      >
         {TABS.map((tab) => {
           const active = activeTab === tab.id;
           return (
@@ -45,12 +58,13 @@ export default function SettingsPage() {
               onClick={() => setActiveTab(tab.id)}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all"
               style={{
-                backgroundColor: active ? "#1e1e1e" : "transparent",
-                color: active ? "#fff" : "#666",
-                boxShadow: active ? "0 0 0 1px rgba(255,255,255,0.06)" : "none",
+                background: active ? "var(--surface-3)" : "transparent",
+                color: active ? "var(--text-primary)" : "var(--text-muted)",
               }}
             >
-              <span style={{ color: active ? "#3b82f6" : "#555" }}>{tab.icon}</span>
+              <span style={{ color: active ? "var(--accent-primary)" : "var(--text-disabled)" }}>
+                {tab.icon}
+              </span>
               {tab.label}
             </button>
           );

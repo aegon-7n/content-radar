@@ -124,14 +124,30 @@ export default function ImportTab({ showToast }: ImportTabProps) {
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
       {/* Instruction */}
-      <div className="bg-[#111111] border border-white/[0.06] rounded-xl p-4 text-sm text-[#888] leading-relaxed">
+      <div
+        className="rounded-xl p-4 text-sm leading-relaxed"
+        style={{
+          background: "var(--surface-1)",
+          border: "1px solid var(--border-default)",
+          color: "var(--text-muted)",
+        }}
+      >
         Загрузите CSV файл с роликами.{" "}
-        <span className="text-white">Колонки:</span>{" "}
-        <code className="font-mono text-xs text-blue-400 bg-blue-950/40 px-1.5 py-0.5 rounded">
+        <span style={{ color: "var(--text-primary)" }}>Колонки:</span>{" "}
+        <code
+          className="font-mono text-xs px-1.5 py-0.5 rounded"
+          style={{
+            color: "var(--accent-text)",
+            background: "var(--accent-muted)",
+          }}
+        >
           url, platform, creator, product, published_at
         </code>
-        <div className="mt-2 text-xs text-[#555]">
-          Пример: <span className="font-mono text-[#666]">https://tiktok.com/@polina/video/123,tiktok,Полина,Кошка 248332917,2026-03-15</span>
+        <div className="mt-2 text-xs" style={{ color: "var(--text-disabled)" }}>
+          Пример:{" "}
+          <span className="font-mono" style={{ color: "var(--text-muted)" }}>
+            https://tiktok.com/@polina/video/123,tiktok,Полина,Кошка 248332917,2026-03-15
+          </span>
         </div>
       </div>
 
@@ -143,14 +159,17 @@ export default function ImportTab({ showToast }: ImportTabProps) {
         onDrop={handleDrop}
         className="cursor-pointer rounded-xl border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-3 py-12"
         style={{
-          borderColor: dragging ? "#3b82f6" : "rgba(255,255,255,0.1)",
-          backgroundColor: dragging ? "rgba(59,130,246,0.04)" : "transparent",
+          borderColor: dragging ? "var(--accent-primary)" : "var(--border-strong)",
+          backgroundColor: dragging ? "var(--accent-muted)" : "transparent",
         }}
       >
-        <Upload className="w-8 h-8 text-[#444]" style={{ color: dragging ? "#3b82f6" : undefined }} />
-        <p className="text-sm text-[#666]">
+        <Upload
+          className="w-8 h-8"
+          style={{ color: dragging ? "var(--accent-primary)" : "var(--text-disabled)" }}
+        />
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Перетащите CSV файл или{" "}
-          <span className="text-blue-400 hover:text-blue-300">нажмите для выбора</span>
+          <span style={{ color: "var(--accent-text)" }}>нажмите для выбора</span>
         </p>
         <input
           ref={inputRef}
@@ -163,18 +182,35 @@ export default function ImportTab({ showToast }: ImportTabProps) {
 
       {/* Preview */}
       {fileName && headers.length > 0 && (
-        <div className="bg-[#111111] border border-white/[0.06] rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[#555]" />
-            <span className="text-sm text-white font-medium">{fileName}</span>
-            <span className="text-xs text-[#555] ml-auto">{parsedRows.length} строк</span>
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          <div
+            className="px-4 py-3 flex items-center gap-2"
+            style={{ borderBottom: "1px solid var(--border-default)" }}
+          >
+            <FileText className="w-4 h-4" style={{ color: "var(--text-disabled)" }} />
+            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              {fileName}
+            </span>
+            <span className="text-xs ml-auto" style={{ color: "var(--text-disabled)" }}>
+              {parsedRows.length} строк
+            </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-white/[0.06]">
+                <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                   {headers.map((h) => (
-                    <th key={h} className="text-left px-4 py-2.5 text-xs font-medium text-[#555] whitespace-nowrap">
+                    <th
+                      key={h}
+                      className="text-left px-4 py-2.5 text-xs font-medium uppercase tracking-wide whitespace-nowrap"
+                      style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                    >
                       {h}
                     </th>
                   ))}
@@ -182,9 +218,17 @@ export default function ImportTab({ showToast }: ImportTabProps) {
               </thead>
               <tbody>
                 {preview.map((row, i) => (
-                  <tr key={i} className="border-b border-white/[0.04] last:border-0">
+                  <tr
+                    key={i}
+                    className="last:border-0"
+                    style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                  >
                     {row.map((cell, j) => (
-                      <td key={j} className="px-4 py-2.5 text-xs text-[#888] font-mono whitespace-nowrap max-w-[200px] truncate">
+                      <td
+                        key={j}
+                        className="px-4 py-2.5 text-xs font-mono whitespace-nowrap max-w-[200px] truncate"
+                        style={{ color: "var(--text-muted)" }}
+                      >
                         {cell}
                       </td>
                     ))}
@@ -194,15 +238,30 @@ export default function ImportTab({ showToast }: ImportTabProps) {
             </table>
           </div>
           {parsedRows.length > 5 && (
-            <div className="px-4 py-2 text-xs text-[#555] border-t border-white/[0.04]">
+            <div
+              className="px-4 py-2 text-xs"
+              style={{
+                color: "var(--text-disabled)",
+                borderTop: "1px solid var(--border-subtle)",
+              }}
+            >
               + ещё {parsedRows.length - 5} строк
             </div>
           )}
-          <div className="px-4 py-3 border-t border-white/[0.06] flex justify-end">
+          <div
+            className="px-4 py-3 flex justify-end"
+            style={{ borderTop: "1px solid var(--border-default)" }}
+          >
             <button
               onClick={handleImport}
               disabled={importing}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium rounded-lg transition-colors"
+              className="px-4 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: "var(--accent-primary)",
+                color: "#fff",
+              }}
+              onMouseEnter={(e) => { if (!importing) (e.currentTarget.style.background = "var(--accent-hover)"); }}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "var(--accent-primary)")}
             >
               {importing ? "Импорт..." : "Импортировать"}
             </button>
@@ -212,14 +271,20 @@ export default function ImportTab({ showToast }: ImportTabProps) {
 
       {/* Result */}
       {result && (
-        <div className="bg-[#111111] border border-white/[0.06] rounded-xl p-4 flex flex-col gap-2">
-          <p className="text-sm text-emerald-400 font-medium">
+        <div
+          className="rounded-xl p-4 flex flex-col gap-2"
+          style={{
+            background: "var(--success-bg)",
+            border: "1px solid var(--success-border)",
+          }}
+        >
+          <p className="text-sm font-medium" style={{ color: "var(--success-text)" }}>
             Импортировано: {result.imported} роликов
           </p>
           {result.errors.length > 0 && (
             <ul className="mt-1 flex flex-col gap-1">
               {result.errors.map((err, i) => (
-                <li key={i} className="text-xs text-red-400 font-mono">
+                <li key={i} className="text-xs font-mono" style={{ color: "var(--error-text)" }}>
                   {err}
                 </li>
               ))}

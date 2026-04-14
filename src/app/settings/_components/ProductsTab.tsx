@@ -20,6 +20,12 @@ interface ProductsTabProps {
 
 const EMPTY_FORM = { name: "", wbArticle: "", category: "" };
 
+const inputStyle = {
+  background: "var(--surface-2)",
+  border: "1px solid var(--border-default)",
+  color: "var(--text-primary)",
+};
+
 export default function ProductsTab({ showToast }: ProductsTabProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +42,6 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
       const data = await res.json();
       const prods: Product[] = data.products ?? [];
       setProducts(prods);
-      // Collect unique categories from existing products
       const cats = Array.from(new Set(prods.map((p) => p.category).filter(Boolean) as string[])).sort();
       setCategories(cats);
     } catch {
@@ -111,36 +116,63 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Блок товаров требующих проверки */}
+      {/* Needs review block */}
       {needsReview.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <AlertCircle className="w-4 h-4 text-amber-400" />
-            <h2 className="text-sm font-medium text-amber-400">
+            <AlertCircle className="w-4 h-4" style={{ color: "var(--warning-text)" }} />
+            <h2 className="text-sm font-medium" style={{ color: "var(--warning-text)" }}>
               Требуют проверки — {needsReview.length}
             </h2>
           </div>
-          <p className="text-xs text-[#555] mb-3">
+          <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
             Эти товары найдены автоматически по артикулу из описания ролика. Добавь название.
           </p>
-          <div className="bg-[#111111] border border-amber-500/20 rounded-xl overflow-hidden">
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{
+              background: "var(--surface-1)",
+              border: "1px solid var(--warning-border)",
+            }}
+          >
             <table className="w-full">
               <thead>
-                <tr className="border-b border-white/[0.06]">
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-[#555]">Артикул WB</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-[#555]">Роликов</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-medium text-[#555]">Действие</th>
+                <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
+                  {["Артикул WB", "Роликов", "Действие"].map((h, i) => (
+                    <th
+                      key={h}
+                      className={`px-4 py-2.5 text-xs font-medium uppercase tracking-wide ${i === 2 ? "text-right" : "text-left"}`}
+                      style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {needsReview.map((p) => (
-                  <tr key={p.id} className="border-b border-white/[0.04] last:border-0">
-                    <td className="px-4 py-3 font-mono text-sm text-amber-300">{p.wbArticle}</td>
-                    <td className="px-4 py-3 text-sm font-mono text-[#888]">{p.videoCount}</td>
+                  <tr
+                    key={p.id}
+                    className="last:border-0"
+                    style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                  >
+                    <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--warning-text)" }}>
+                      {p.wbArticle}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-mono" style={{ color: "var(--text-muted)" }}>
+                      {p.videoCount}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => openEdit(p)}
-                        className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs rounded-lg transition-colors"
+                        className="px-3 py-1 text-xs rounded-lg transition-colors"
+                        style={{
+                          background: "var(--warning-bg)",
+                          color: "var(--warning-text)",
+                          border: "1px solid var(--warning-border)",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
+                        onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
                       >
                         Добавить название
                       </button>
@@ -153,59 +185,107 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
         </div>
       )}
 
-      {/* Обычный список товаров */}
+      {/* Normal products list */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium text-[#888]">
+          <h2 className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>
             {loading ? "..." : `${normal.length} товаров`}
           </h2>
           <button
             onClick={openAdd}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+            style={{
+              background: "var(--accent-primary)",
+              color: "#fff",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--accent-hover)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--accent-primary)")}
           >
             <Plus className="w-3.5 h-3.5" />
             Добавить товар
           </button>
         </div>
 
-        <div className="bg-[#111111] border border-white/[0.06] rounded-xl overflow-hidden">
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
           {loading ? (
-            <div className="px-4 py-8 text-center text-sm text-[#555]">Загрузка...</div>
+            <div className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+              Загрузка...
+            </div>
           ) : normal.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-[#555]">Нет товаров</div>
+            <div className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+              Нет товаров
+            </div>
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="border-b border-white/[0.06]">
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-[#555]">Название</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-[#555]">Артикул WB</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-[#555]">Категория</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-[#555]">Роликов</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-medium text-[#555]">Действия</th>
+                <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
+                  {["Название", "Артикул WB", "Категория", "Роликов", "Действия"].map((h, i) => (
+                    <th
+                      key={h}
+                      className={`px-4 py-2.5 text-xs font-medium uppercase tracking-wide ${i === 4 ? "text-right" : "text-left"}`}
+                      style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {normal.map((p) => (
-                  <tr key={p.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
-                    <td className="px-4 py-3 text-sm text-white">{p.name}</td>
-                    <td className="px-4 py-3 text-sm font-mono text-[#888]">{p.wbArticle}</td>
-                    <td className="px-4 py-3 text-sm text-[#666]">
-                      {p.category ? (
-                        <span className="px-1.5 py-0.5 bg-white/[0.05] rounded text-xs">{p.category}</span>
-                      ) : <span className="text-[#333]">—</span>}
+                  <tr
+                    key={p.id}
+                    className="last:border-0 transition-colors"
+                    style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <td className="px-4 py-3 text-sm" style={{ color: "var(--text-primary)" }}>
+                      {p.name}
                     </td>
-                    <td className="px-4 py-3 text-sm font-mono text-[#888]">{p.videoCount}</td>
+                    <td className="px-4 py-3 text-sm font-mono" style={{ color: "var(--text-muted)" }}>
+                      {p.wbArticle}
+                    </td>
+                    <td className="px-4 py-3 text-sm" style={{ color: "var(--text-muted)" }}>
+                      {p.category ? (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-xs"
+                          style={{
+                            background: "var(--neutral-bg)",
+                            color: "var(--neutral-text)",
+                          }}
+                        >
+                          {p.category}
+                        </span>
+                      ) : (
+                        <span style={{ color: "var(--text-disabled)" }}>—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-mono" style={{ color: "var(--text-muted)" }}>
+                      {p.videoCount}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => openEdit(p)}
-                          className="p-1.5 text-[#555] hover:text-blue-400 transition-colors rounded"
+                          className="p-1.5 rounded transition-colors"
+                          style={{ color: "var(--text-disabled)" }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent-primary)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-disabled)")}
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDelete(p)}
-                          className="p-1.5 text-[#555] hover:text-red-400 transition-colors rounded"
+                          className="p-1.5 rounded transition-colors"
+                          style={{ color: "var(--text-disabled)" }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--error-text)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-disabled)")}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -226,14 +306,23 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
       >
         <div className="flex flex-col gap-4">
           {editing?.needsReview ? (
-            <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-              <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span className="text-xs text-amber-300">Артикул <span className="font-mono">{editing.wbArticle}</span> — найден автоматически</span>
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-lg"
+              style={{
+                background: "var(--warning-bg)",
+                border: "1px solid var(--warning-border)",
+              }}
+            >
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--warning-text)" }} />
+              <span className="text-xs" style={{ color: "var(--warning-text)" }}>
+                Артикул <span className="font-mono">{editing.wbArticle}</span> — найден автоматически
+              </span>
             </div>
           ) : null}
+
           <div>
-            <label className="block text-xs text-[#888] mb-1.5">
-              Название <span className="text-red-400">*</span>
+            <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
+              Название <span style={{ color: "var(--error-text)" }}>*</span>
             </label>
             <input
               type="text"
@@ -241,13 +330,15 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="Кошка"
               autoFocus
-              className="w-full bg-[#1a1a1a] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[#444] focus:outline-none focus:border-blue-500/50 transition-colors"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none transition-colors"
+              style={inputStyle}
             />
           </div>
+
           {!editing?.needsReview && (
             <div>
-              <label className="block text-xs text-[#888] mb-1.5">
-                Артикул WB <span className="text-red-400">*</span>
+              <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
+                Артикул WB <span style={{ color: "var(--error-text)" }}>*</span>
               </label>
               <input
                 type="text"
@@ -255,35 +346,50 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
                 value={form.wbArticle}
                 onChange={(e) => setForm((f) => ({ ...f, wbArticle: e.target.value.replace(/\D/g, "") }))}
                 placeholder="248332917"
-                className="w-full bg-[#1a1a1a] border border-white/[0.08] rounded-lg px-3 py-2 text-sm font-mono text-white placeholder:text-[#444] focus:outline-none focus:border-blue-500/50 transition-colors"
+                className="w-full rounded-lg px-3 py-2 text-sm font-mono focus:outline-none transition-colors"
+                style={inputStyle}
               />
             </div>
           )}
+
           <div>
-            <label className="block text-xs text-[#888] mb-1.5">Категория</label>
+            <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
+              Категория
+            </label>
             <input
               type="text"
               list="category-suggestions"
               value={form.category}
               onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
               placeholder="Игрушки, Техника, Уход…"
-              className="w-full bg-[#1a1a1a] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[#444] focus:outline-none focus:border-blue-500/50 transition-colors"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none transition-colors"
+              style={inputStyle}
             />
             <datalist id="category-suggestions">
               {categories.map((c) => <option key={c} value={c} />)}
             </datalist>
           </div>
+
           <div className="flex items-center justify-end gap-2 pt-1">
             <button
               onClick={() => setModalOpen(false)}
-              className="px-3 py-1.5 text-xs text-[#888] hover:text-white transition-colors"
+              className="px-3 py-1.5 text-xs transition-colors"
+              style={{ color: "var(--text-muted)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
             >
               Отмена
             </button>
             <button
               onClick={handleSave}
               disabled={saving || !form.name.trim()}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium rounded-lg transition-colors"
+              className="px-4 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: "var(--accent-primary)",
+                color: "#fff",
+              }}
+              onMouseEnter={(e) => { if (!saving && form.name.trim()) (e.currentTarget.style.background = "var(--accent-hover)"); }}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "var(--accent-primary)")}
             >
               {saving ? "Сохранение..." : "Сохранить"}
             </button>

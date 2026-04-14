@@ -10,6 +10,8 @@ interface Creator {
   name: string;
   tiktokUsername: string | null;
   youtubeChannelId: string | null;
+  instagramUsername: string | null;
+  likeeUsername: string | null;
   videoCount: number;
 }
 
@@ -17,7 +19,9 @@ interface CreatorsTabProps {
   showToast: (msg: string, type: ToastState["type"]) => void;
 }
 
-const EMPTY_FORM = { name: "", tiktokUsername: "", youtubeChannelId: "" };
+const EMPTY_FORM = { name: "", tiktokUsername: "", youtubeChannelId: "", instagramUsername: "", likeeUsername: "" };
+
+const inputClass = "w-full rounded-lg px-3 py-2 text-sm focus:outline-none transition-colors";
 
 export default function CreatorsTab({ showToast }: CreatorsTabProps) {
   const [creators, setCreators] = useState<Creator[]>([]);
@@ -54,6 +58,8 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
       name: c.name,
       tiktokUsername: c.tiktokUsername ?? "",
       youtubeChannelId: c.youtubeChannelId ?? "",
+      instagramUsername: c.instagramUsername ?? "",
+      likeeUsername: c.likeeUsername ?? "",
     });
     setModalOpen(true);
   }
@@ -73,6 +79,8 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
           name: form.name.trim(),
           tiktokUsername: form.tiktokUsername.trim().replace(/^@/, "") || null,
           youtubeChannelId: form.youtubeChannelId.trim() || null,
+          instagramUsername: form.instagramUsername.trim().replace(/^@/, "") || null,
+          likeeUsername: form.likeeUsername.trim().replace(/^@/, "") || null,
         }),
       });
       const data = await res.json();
@@ -109,58 +117,100 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-medium text-[#888]">
+        <h2 className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>
           {loading ? "..." : `${creators.length} креаторов`}
         </h2>
         <button
           onClick={openAdd}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+          style={{
+            background: "var(--accent-primary)",
+            color: "#fff",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--accent-hover)")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "var(--accent-primary)")}
         >
           <Plus className="w-3.5 h-3.5" />
           Добавить креатора
         </button>
       </div>
 
-      <div className="bg-[#111111] border border-white/[0.06] rounded-xl overflow-hidden">
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{
+          background: "var(--surface-1)",
+          border: "1px solid var(--border-default)",
+        }}
+      >
         {loading ? (
-          <div className="px-4 py-8 text-center text-sm text-[#555]">Загрузка...</div>
+          <div className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+            Загрузка...
+          </div>
         ) : creators.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-[#555]">Нет креаторов</div>
+          <div className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+            Нет креаторов
+          </div>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/[0.06]">
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-[#555]">Имя</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-[#555]">TikTok</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-[#555]">YouTube</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-[#555]">Роликов</th>
-                <th className="text-right px-4 py-2.5 text-xs font-medium text-[#555]">Действия</th>
+              <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
+                {["Имя", "TikTok", "YouTube", "Instagram", "Likee", "Роликов", "Действия"].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`px-4 py-2.5 text-xs font-medium uppercase tracking-wide ${i === 6 ? "text-right" : "text-left"}`}
+                    style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {creators.map((c) => (
-                <tr key={c.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
-                  <td className="px-4 py-3 text-sm text-white">{c.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#555]">
-                    {c.tiktokUsername ? `@${c.tiktokUsername}` : <span className="text-[#333]">—</span>}
+                <tr
+                  key={c.id}
+                  className="last:border-0 transition-colors"
+                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <td className="px-4 py-3 text-sm" style={{ color: "var(--text-primary)" }}>
+                    {c.name}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#555]">
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                    {c.tiktokUsername ? `@${c.tiktokUsername}` : <span style={{ color: "var(--text-disabled)" }}>—</span>}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
                     {c.youtubeChannelId ? (
-                      <span className="truncate block max-w-[140px]">{c.youtubeChannelId}</span>
-                    ) : <span className="text-[#333]">—</span>}
+                      <span className="truncate block max-w-[120px]">{c.youtubeChannelId}</span>
+                    ) : <span style={{ color: "var(--text-disabled)" }}>—</span>}
                   </td>
-                  <td className="px-4 py-3 text-sm font-mono text-[#888]">{c.videoCount}</td>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                    {c.instagramUsername ? `@${c.instagramUsername}` : <span style={{ color: "var(--text-disabled)" }}>—</span>}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                    {c.likeeUsername ? `@${c.likeeUsername}` : <span style={{ color: "var(--text-disabled)" }}>—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-mono" style={{ color: "var(--text-muted)" }}>
+                    {c.videoCount}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => openEdit(c)}
-                        className="p-1.5 text-[#555] hover:text-blue-400 transition-colors rounded"
+                        className="p-1.5 rounded transition-colors"
+                        style={{ color: "var(--text-disabled)" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent-primary)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-disabled)")}
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(c)}
-                        className="p-1.5 text-[#555] hover:text-red-400 transition-colors rounded"
+                        className="p-1.5 rounded transition-colors"
+                        style={{ color: "var(--text-disabled)" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--error-text)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-disabled)")}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -180,55 +230,75 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
       >
         <div className="flex flex-col gap-4">
           <div>
-            <label className="block text-xs text-[#888] mb-1.5">
-              Имя <span className="text-red-400">*</span>
+            <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
+              Имя <span style={{ color: "var(--error-text)" }}>*</span>
             </label>
             <input
               type="text"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="Имя креатора"
-              className="w-full bg-[#1a1a1a] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[#444] focus:outline-none focus:border-blue-500/50 transition-colors"
+              className={inputClass}
+              style={{
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
+              }}
             />
           </div>
 
-          <div className="border-t border-white/[0.06] pt-4">
-            <p className="text-xs text-[#555] mb-3">Аккаунты для авто-обнаружения роликов</p>
+          <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "1rem" }}>
+            <p className="text-xs mb-3" style={{ color: "var(--text-disabled)" }}>
+              Аккаунты для авто-обнаружения роликов
+            </p>
             <div className="flex flex-col gap-3">
-              <div>
-                <label className="block text-xs text-[#888] mb-1.5">TikTok</label>
-                <input
-                  type="text"
-                  value={form.tiktokUsername}
-                  onChange={(e) => setForm((f) => ({ ...f, tiktokUsername: e.target.value }))}
-                  placeholder="@username"
-                  className="w-full bg-[#1a1a1a] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[#444] focus:outline-none focus:border-blue-500/50 transition-colors font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-[#888] mb-1.5">YouTube</label>
-                <input
-                  type="text"
-                  value={form.youtubeChannelId}
-                  onChange={(e) => setForm((f) => ({ ...f, youtubeChannelId: e.target.value }))}
-                  placeholder="@username"
-                  className="w-full bg-[#1a1a1a] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[#444] focus:outline-none focus:border-blue-500/50 transition-colors font-mono"
-                />
-              </div>
+              {[
+                { key: "tiktokUsername", label: "TikTok" },
+                { key: "youtubeChannelId", label: "YouTube" },
+                { key: "instagramUsername", label: "Instagram" },
+                { key: "likeeUsername", label: "Likee" },
+              ].map(({ key, label }) => (
+                <div key={key}>
+                  <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
+                    {label}
+                  </label>
+                  <input
+                    type="text"
+                    value={form[key as keyof typeof form]}
+                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                    placeholder="@username"
+                    className={`${inputClass} font-mono`}
+                    style={{
+                      background: "var(--surface-2)",
+                      border: "1px solid var(--border-default)",
+                      color: "var(--text-primary)",
+                    }}
+                  />
+                </div>
+              ))}
             </div>
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <button
               onClick={() => setModalOpen(false)}
-              className="px-3 py-1.5 text-xs text-[#888] hover:text-white transition-colors"
+              className="px-3 py-1.5 text-xs transition-colors"
+              style={{ color: "var(--text-muted)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
             >
               Отмена
             </button>
             <button
               onClick={handleSave}
               disabled={saving || !form.name.trim()}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium rounded-lg transition-colors"
+              className="px-4 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: "var(--accent-primary)",
+                color: "#fff",
+              }}
+              onMouseEnter={(e) => { if (!saving && form.name.trim()) (e.currentTarget.style.background = "var(--accent-hover)"); }}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "var(--accent-primary)")}
             >
               {saving ? "Сохранение..." : "Сохранить"}
             </button>
