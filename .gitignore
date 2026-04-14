@@ -32,3 +32,16 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python
+scraper/venv
+__pycache__/
+*.pyc
+
+# Playwright MCP local output
+.playwright-mcp/
+/*.png
+
+# OS
+.DS_Store
+Thumbs.db
