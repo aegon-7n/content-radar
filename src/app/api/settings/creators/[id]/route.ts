@@ -9,6 +9,8 @@ const patchCreatorSchema = z.object({
   avatarUrl: z.string().url("Некорректный URL аватара").optional().or(z.literal("")).optional(),
   tiktokUsername: z.string().optional().or(z.literal("")),
   youtubeChannelId: z.string().optional().or(z.literal("")),
+  instagramUsername: z.string().optional().or(z.literal("")),
+  likeeUsername: z.string().optional().or(z.literal("")),
 });
 
 export async function PATCH(
@@ -43,6 +45,12 @@ export async function PATCH(
     }
     if (parsed.data.youtubeChannelId !== undefined) {
       updates.youtubeChannelId = parsed.data.youtubeChannelId === "" ? null : parsed.data.youtubeChannelId;
+    }
+    if (parsed.data.instagramUsername !== undefined) {
+      updates.instagramUsername = parsed.data.instagramUsername === "" ? null : parsed.data.instagramUsername;
+    }
+    if (parsed.data.likeeUsername !== undefined) {
+      updates.likeeUsername = parsed.data.likeeUsername === "" ? null : parsed.data.likeeUsername;
     }
 
     if (Object.keys(updates).length === 0) {
