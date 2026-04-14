@@ -12,6 +12,7 @@ interface Creator {
   youtubeChannelId: string | null;
   instagramUsername: string | null;
   likeeUsername: string | null;
+  likeeUid: string | null;
   videoCount: number;
 }
 
@@ -19,7 +20,14 @@ interface CreatorsTabProps {
   showToast: (msg: string, type: ToastState["type"]) => void;
 }
 
-const EMPTY_FORM = { name: "", tiktokUsername: "", youtubeChannelId: "", instagramUsername: "", likeeUsername: "" };
+const EMPTY_FORM = {
+  name: "",
+  tiktokUsername: "",
+  youtubeChannelId: "",
+  instagramUsername: "",
+  likeeUsername: "",
+  likeeUid: "",
+};
 
 const inputClass = "w-full rounded-lg px-3 py-2 text-sm focus:outline-none transition-colors";
 
@@ -60,6 +68,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
       youtubeChannelId: c.youtubeChannelId ?? "",
       instagramUsername: c.instagramUsername ?? "",
       likeeUsername: c.likeeUsername ?? "",
+      likeeUid: c.likeeUid ?? "",
     });
     setModalOpen(true);
   }
@@ -81,6 +90,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
           youtubeChannelId: form.youtubeChannelId.trim() || null,
           instagramUsername: form.instagramUsername.trim().replace(/^@/, "") || null,
           likeeUsername: form.likeeUsername.trim().replace(/^@/, "") || null,
+          likeeUid: form.likeeUid.trim() || null,
         }),
       });
       const data = await res.json();
@@ -253,11 +263,18 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
             </p>
             <div className="flex flex-col gap-3">
               {[
-                { key: "tiktokUsername", label: "TikTok" },
-                { key: "youtubeChannelId", label: "YouTube" },
-                { key: "instagramUsername", label: "Instagram" },
-                { key: "likeeUsername", label: "Likee" },
-              ].map(({ key, label }) => (
+                { key: "tiktokUsername", label: "TikTok", placeholder: "@username", help: "" },
+                { key: "youtubeChannelId", label: "YouTube", placeholder: "@handle или UCxxx...", help: "" },
+                { key: "instagramUsername", label: "Instagram", placeholder: "@username", help: "" },
+                { key: "likeeUsername", label: "Likee", placeholder: "@username", help: "" },
+                {
+                  key: "likeeUid",
+                  label: "Likee UID",
+                  placeholder: "1234567890",
+                  help:
+                    "Numeric ID, найдите в devtools на странице профиля Likee (Network → запрос videoRecord/getUserVideo, поле uid). Likee не отдаёт username→uid публично.",
+                },
+              ].map(({ key, label, placeholder, help }) => (
                 <div key={key}>
                   <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
                     {label}
@@ -266,7 +283,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
                     type="text"
                     value={form[key as keyof typeof form]}
                     onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                    placeholder="@username"
+                    placeholder={placeholder}
                     className={`${inputClass} font-mono`}
                     style={{
                       background: "var(--surface-2)",
@@ -274,6 +291,11 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
                       color: "var(--text-primary)",
                     }}
                   />
+                  {help && (
+                    <p className="text-[10px] mt-1" style={{ color: "var(--text-disabled)" }}>
+                      {help}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

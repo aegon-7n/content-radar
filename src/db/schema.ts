@@ -36,6 +36,10 @@ export const creators = pgTable("creators", {
   youtubeChannelId: text("youtube_channel_id"),
   instagramUsername: text("instagram_username"),
   likeeUsername: text("likee_username"),
+  // Likee has no public username→uid lookup that survives their bot
+  // protection. The seller pastes the numeric uid manually from devtools
+  // and we use it directly in fetch_likee_videos.
+  likeeUid: text("likee_uid"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

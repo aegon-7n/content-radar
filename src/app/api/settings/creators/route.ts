@@ -22,6 +22,7 @@ const createCreatorSchema = z.object({
   youtubeChannelId: z.string().optional().or(z.literal("")),
   instagramUsername: z.string().optional().or(z.literal("")),
   likeeUsername: z.string().optional().or(z.literal("")),
+  likeeUid: z.string().optional().or(z.literal("")),
 });
 
 export async function GET() {
@@ -35,12 +36,13 @@ export async function GET() {
         youtubeChannelId: creators.youtubeChannelId,
         instagramUsername: creators.instagramUsername,
         likeeUsername: creators.likeeUsername,
+        likeeUid: creators.likeeUid,
         createdAt: creators.createdAt,
         videoCount: count(videos.id),
       })
       .from(creators)
       .leftJoin(videos, eq(videos.creatorId, creators.id))
-      .groupBy(creators.id, creators.name, creators.avatarUrl, creators.tiktokUsername, creators.youtubeChannelId, creators.instagramUsername, creators.likeeUsername, creators.createdAt)
+      .groupBy(creators.id, creators.name, creators.avatarUrl, creators.tiktokUsername, creators.youtubeChannelId, creators.instagramUsername, creators.likeeUsername, creators.likeeUid, creators.createdAt)
       .orderBy(creators.name);
 
     return NextResponse.json({ creators: result });
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = await getDefaultUserId();
-    const { name, avatarUrl, tiktokUsername, youtubeChannelId, instagramUsername, likeeUsername } = parsed.data;
+    const { name, avatarUrl, tiktokUsername, youtubeChannelId, instagramUsername, likeeUsername, likeeUid } = parsed.data;
 
     const [creator] = await db
       .insert(creators)
@@ -75,6 +77,7 @@ export async function POST(request: NextRequest) {
         youtubeChannelId: youtubeChannelId || null,
         instagramUsername: instagramUsername || null,
         likeeUsername: likeeUsername || null,
+        likeeUid: likeeUid || null,
       })
       .returning();
 

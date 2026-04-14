@@ -60,12 +60,18 @@ def _conn():
 
 def get_creators(cur) -> list[dict]:
     cur.execute("""
-        SELECT id, user_id, name, tiktok_username, youtube_channel_id, instagram_username, likee_username
+        SELECT id, user_id, name,
+               tiktok_username,
+               youtube_channel_id,
+               instagram_username,
+               likee_username,
+               likee_uid
         FROM creators
         WHERE tiktok_username IS NOT NULL
            OR youtube_channel_id IS NOT NULL
            OR instagram_username IS NOT NULL
            OR likee_username IS NOT NULL
+           OR likee_uid IS NOT NULL
     """)
     return [dict(r) for r in cur.fetchall()]
 
@@ -409,30 +415,27 @@ def get_likee_uid(username: str) -> Optional[str]:
     return None
 
 
-def fetch_likee_videos(username: str, since: datetime) -> list[dict]:
+def fetch_likee_videos(username: str, since: datetime, manual_uid: Optional[str] = None) -> list[dict]:
     """
     Возвращает список {'url', 'description', 'published_at'} за последние LOOKBACK_HOURS.
 
-    Статус API Likee (апрель 2025+):
-      - /official-user/userApi/getUserInfoByNickName → редирект на /404, пустое тело
-      - api.like-video.com/likee-activity-flow-micro/videoRecord/getUserVideo → HTTP 404
-      - Оба API эндпоинта фактически мертвы.
-
-    Текущая стратегия: пробуем uid-lookup через страницу профиля (fallback в get_likee_uid),
-    затем пробуем /official-user/videoApi/getUserVideo на основном домене.
-    Если всё недоступно — логируем предупреждение (не ошибку) и возвращаем пустой список.
-    Скрапер метрик существующих видео (likee.py) по-прежнему работает через yt-dlp.
+    Likee страница профиля — это пустой SPA с fingerprint protection,
+    программно вытащить uid по nickname сейчас невозможно. Поэтому если у
+    креатора задан `likee_uid` в БД (вводится клиентом вручную через
+    настройки) — используем его напрямую и пропускаем stage uid-lookup.
+    Если только username — пытаемся резолвить (скорее всего не получится)
+    и логируем понятное предупреждение что нужно ввести uid руками.
     """
     clean = username.strip().lstrip("@")
     results = []
 
     try:
-        # Шаг 1: получаем uid
-        uid = get_likee_uid(clean)
+        uid = manual_uid or get_likee_uid(clean)
         if not uid:
             logger.warning(
-                "Likee @%s: не удалось получить uid — getUserInfoByNickName недоступен, "
-                "страница профиля uid не содержит. Auto-discover для Likee пропущен.",
+                "Likee @%s: не удалось получить uid автоматически. "
+                "Откройте настройки креатора и введите Likee UID вручную "
+                "(найти можно в devtools на странице профиля).",
                 clean,
             )
             return []
@@ -732,8 +735,12 @@ def main():
                 v["platform"] = "instagram"
             candidate_videos.extend(vids)
 
-        if creator["likee_username"]:
-            vids = fetch_likee_videos(creator["likee_username"], since)
+        if creator["likee_username"] or creator.get("likee_uid"):
+            vids = fetch_likee_videos(
+                creator["likee_username"] or "",
+                since,
+                manual_uid=creator.get("likee_uid"),
+            )
             for v in vids:
                 v["platform"] = "likee"
             candidate_videos.extend(vids)
