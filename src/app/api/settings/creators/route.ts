@@ -22,7 +22,6 @@ const createCreatorSchema = z.object({
   youtubeChannelId: z.string().optional().or(z.literal("")),
   instagramUsername: z.string().optional().or(z.literal("")),
   likeeUsername: z.string().optional().or(z.literal("")),
-  likeeUid: z.string().optional().or(z.literal("")),
   pinterestUsername: z.string().optional().or(z.literal("")),
 });
 
@@ -37,7 +36,6 @@ export async function GET() {
         youtubeChannelId: creators.youtubeChannelId,
         instagramUsername: creators.instagramUsername,
         likeeUsername: creators.likeeUsername,
-        likeeUid: creators.likeeUid,
         pinterestUsername: creators.pinterestUsername,
         createdAt: creators.createdAt,
         videoCount: count(videos.id),
@@ -52,7 +50,6 @@ export async function GET() {
         creators.youtubeChannelId,
         creators.instagramUsername,
         creators.likeeUsername,
-        creators.likeeUid,
         creators.pinterestUsername,
         creators.createdAt,
       )
@@ -85,7 +82,6 @@ export async function POST(request: NextRequest) {
       youtubeChannelId,
       instagramUsername,
       likeeUsername,
-      likeeUid,
       pinterestUsername,
     } = parsed.data;
 
@@ -99,7 +95,6 @@ export async function POST(request: NextRequest) {
         youtubeChannelId: youtubeChannelId || null,
         instagramUsername: instagramUsername || null,
         likeeUsername: likeeUsername || null,
-        likeeUid: likeeUid || null,
         pinterestUsername: pinterestUsername || null,
       })
       .returning();

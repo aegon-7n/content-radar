@@ -12,7 +12,6 @@ interface Creator {
   youtubeChannelId: string | null;
   instagramUsername: string | null;
   likeeUsername: string | null;
-  likeeUid: string | null;
   pinterestUsername: string | null;
   videoCount: number;
 }
@@ -27,7 +26,6 @@ const EMPTY_FORM = {
   youtubeChannelId: "",
   instagramUsername: "",
   likeeUsername: "",
-  likeeUid: "",
   pinterestUsername: "",
 };
 
@@ -70,7 +68,6 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
       youtubeChannelId: c.youtubeChannelId ?? "",
       instagramUsername: c.instagramUsername ?? "",
       likeeUsername: c.likeeUsername ?? "",
-      likeeUid: c.likeeUid ?? "",
       pinterestUsername: c.pinterestUsername ?? "",
     });
     setModalOpen(true);
@@ -93,7 +90,6 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
           youtubeChannelId: form.youtubeChannelId.trim() || null,
           instagramUsername: form.instagramUsername.trim().replace(/^@/, "") || null,
           likeeUsername: form.likeeUsername.trim().replace(/^@/, "") || null,
-          likeeUid: form.likeeUid.trim() || null,
           pinterestUsername: form.pinterestUsername.trim().replace(/^@/, "") || null,
         }),
       });
@@ -270,13 +266,11 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
                 { key: "tiktokUsername", label: "TikTok", placeholder: "@username", help: "" },
                 { key: "youtubeChannelId", label: "YouTube", placeholder: "@handle или UCxxx...", help: "" },
                 { key: "instagramUsername", label: "Instagram", placeholder: "@username", help: "" },
-                { key: "likeeUsername", label: "Likee", placeholder: "@username", help: "" },
                 {
-                  key: "likeeUid",
-                  label: "Likee UID",
-                  placeholder: "1234567890",
-                  help:
-                    "Numeric ID, найдите в devtools на странице профиля Likee (Network → запрос videoRecord/getUserVideo, поле uid). Likee не отдаёт username→uid публично.",
+                  key: "likeeUsername",
+                  label: "Likee",
+                  placeholder: "@username",
+                  help: "Для Likee авто-обнаружения сейчас нет. Ссылки на ролики добавляйте вручную через вкладку «Ролики».",
                 },
                 { key: "pinterestUsername", label: "Pinterest", placeholder: "username", help: "" },
               ].map(({ key, label, placeholder, help }) => (

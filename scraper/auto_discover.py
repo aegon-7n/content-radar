@@ -75,20 +75,21 @@ def _conn():
 
 
 def get_creators(cur) -> list[dict]:
+    # Note: Likee is intentionally missing from discovery. Likee's web is
+    # fully blocked behind anti-bot (every URL → redirect to /), and the
+    # only way to hit their internal API is by numeric uid which the
+    # platform does not expose to end users. Manual URL add via the
+    # Videos tab is the supported flow for Likee; see docs/likee-research.md.
     cur.execute("""
         SELECT id, user_id, name,
                tiktok_username,
                youtube_channel_id,
                instagram_username,
-               likee_username,
-               likee_uid,
                pinterest_username
         FROM creators
         WHERE tiktok_username IS NOT NULL
            OR youtube_channel_id IS NOT NULL
            OR instagram_username IS NOT NULL
-           OR likee_username IS NOT NULL
-           OR likee_uid IS NOT NULL
            OR pinterest_username IS NOT NULL
     """)
     return [dict(r) for r in cur.fetchall()]
@@ -360,169 +361,6 @@ def fetch_youtube_videos(channel_id: str, since: datetime) -> list[dict]:
     )
     return results
 
-
-# ---------------------------------------------------------------------------
-# Likee — список видео через неофициальный API
-# ---------------------------------------------------------------------------
-
-_LIKEE_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Content-Type": "application/json",
-    "Origin": "https://likee.video",
-    "Referer": "https://likee.video/",
-}
-
-
-def get_likee_uid(username: str) -> Optional[str]:
-    """
-    Получает uid пользователя Likee по никнейму.
-
-    Стратегия:
-      1. POST /official-user/userApi/getUserInfoByNickName (исторический эндпоинт)
-         — может работать, если отдаёт 200 с JSON; иначе fallback.
-      2. Скрейп страницы профиля https://likee.video/@{username} —
-         Likee встраивает uid в window.__INITIAL_STATE__ или JSON-LD.
-
-    Примечание: /official-user/userApi/getUserInfoByNickName начиная с 2025-Q4
-    редиректит на /404 и возвращает пустое тело — для этого случая используем fallback.
-    """
-    clean = username.strip().lstrip("@")
-
-    # Попытка 1: официальный (unoffficial) API
-    try:
-        resp = requests.post(
-            "https://likee.video/official-user/userApi/getUserInfoByNickName",
-            json={"nickName": clean},
-            headers=_LIKEE_HEADERS,
-            timeout=_DEFAULT_TIMEOUT,
-            allow_redirects=False,  # не следуем за редиректом на /404
-        )
-        if resp.ok and resp.content:
-            data = resp.json()
-            uid = (data.get("data") or {}).get("user", {}).get("uid")
-            if uid:
-                logger.debug("Likee uid для @%s найден через API: %s", clean, uid)
-                return str(uid)
-    except Exception as e:
-        logger.debug("Likee getUserInfoByNickName error для @%s: %s", clean, e)
-
-    # Попытка 2: парсим страницу профиля
-    try:
-        page_resp = requests.get(
-            f"https://likee.video/@{clean}",
-            headers={**_LIKEE_HEADERS, "Accept": "text/html"},
-            timeout=_DEFAULT_TIMEOUT,
-        )
-        if page_resp.ok:
-            html = page_resp.text
-            # Ищем uid в window.__INITIAL_STATE__
-            m = re.search(r'"uid"\s*:\s*"?(\d{5,})"?', html)
-            if m:
-                uid = m.group(1)
-                logger.debug("Likee uid для @%s найден в странице профиля: %s", clean, uid)
-                return uid
-            # Ищем ownerId или userId как числа
-            m = re.search(r'"(?:ownerId|userId|creatorId)"\s*:\s*"?(\d{5,})"?', html)
-            if m:
-                uid = m.group(1)
-                logger.debug("Likee ownerId/userId для @%s найден в странице: %s", clean, uid)
-                return uid
-    except Exception as e:
-        logger.debug("Likee page scrape error для @%s: %s", clean, e)
-
-    return None
-
-
-def fetch_likee_videos(username: str, since: datetime, manual_uid: Optional[str] = None) -> list[dict]:
-    """
-    Возвращает список {'url', 'description', 'published_at'} за последние LOOKBACK_HOURS.
-
-    Likee страница профиля — это пустой SPA с fingerprint protection,
-    программно вытащить uid по nickname сейчас невозможно. Поэтому если у
-    креатора задан `likee_uid` в БД (вводится клиентом вручную через
-    настройки) — используем его напрямую и пропускаем stage uid-lookup.
-    Если только username — пытаемся резолвить (скорее всего не получится)
-    и логируем понятное предупреждение что нужно ввести uid руками.
-    """
-    clean = username.strip().lstrip("@")
-    results = []
-
-    try:
-        uid = manual_uid or get_likee_uid(clean)
-        if not uid:
-            logger.warning(
-                "Likee @%s: не удалось получить uid автоматически. "
-                "Откройте настройки креатора и введите Likee UID вручную "
-                "(найти можно в devtools на странице профиля).",
-                clean,
-            )
-            return []
-
-        # Шаг 2: пробуем получить видео через официальный unofficial API
-        # (оба исторических пути могут быть мертвы — обрабатываем оба случая)
-        video_endpoints = [
-            (
-                "https://likee.video/official-user/videoApi/getUserVideo",
-                {"uid": uid, "count": 30, "lastId": "0", "tabType": 0},
-            ),
-            (
-                "https://api.like-video.com/likee-activity-flow-micro/videoRecord/getUserVideo",
-                {"uid": uid, "count": 30, "lastId": "0", "tabType": 0},
-            ),
-        ]
-        videos_list = []
-        for endpoint, payload in video_endpoints:
-            try:
-                resp = requests.post(
-                    endpoint,
-                    json=payload,
-                    headers=_LIKEE_HEADERS,
-                    timeout=_DEFAULT_TIMEOUT,
-                )
-                if not resp.ok or not resp.content:
-                    continue
-                data = resp.json()
-                candidate = (data.get("data") or {}).get("videoList") or []
-                if candidate:
-                    videos_list = candidate
-                    logger.debug("Likee @%s: видео получены через %s", clean, endpoint)
-                    break
-            except Exception:
-                continue
-
-        if not videos_list:
-            logger.warning(
-                "Likee @%s: uid=%s получен, но API видео недоступен. "
-                "Список новых видео пустой — ролики обнаружены не будут.",
-                clean, uid,
-            )
-            return []
-
-        for item in videos_list:
-            ts = item.get("postTime") or item.get("createTime") or 0
-            published_at = datetime.fromtimestamp(int(ts), tz=timezone.utc)
-
-            if published_at < since:
-                continue
-
-            post_id = item.get("postId") or item.get("videoId")
-            if not post_id:
-                continue
-            url = f"https://likee.video/@{clean}/video/{post_id}"
-
-            desc = item.get("msgText") or item.get("title") or ""
-
-            results.append({
-                "url": url,
-                "description": desc,
-                "published_at": published_at,
-            })
-
-    except Exception as e:
-        logger.error("Ошибка при запросе Likee API для @%s: %s", clean, e)
-
-    logger.info("Likee @%s: найдено %d видео за последние %dч", clean, len(results), LOOKBACK_HOURS)
-    return results
 
 
 # ---------------------------------------------------------------------------
@@ -908,16 +746,6 @@ def main():
             vids = fetch_instagram_videos(creator["instagram_username"], since)
             for v in vids:
                 v["platform"] = "instagram"
-            candidate_videos.extend(vids)
-
-        if creator["likee_username"] or creator.get("likee_uid"):
-            vids = fetch_likee_videos(
-                creator["likee_username"] or "",
-                since,
-                manual_uid=creator.get("likee_uid"),
-            )
-            for v in vids:
-                v["platform"] = "likee"
             candidate_videos.extend(vids)
 
         if creator.get("pinterest_username"):
