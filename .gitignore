@@ -48,3 +48,4 @@ Thumbs.db
 
 # Claude Code local state
 .claude/scheduled_tasks.lock
+scraper/scrapers/__pycache__/
