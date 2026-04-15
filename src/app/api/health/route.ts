@@ -56,18 +56,52 @@ export async function GET() {
 
     // "Stale" = more than 25 hours since last run (a single missed daily cron).
     const STALE_MS = 25 * 60 * 60 * 1000;
+    // Same threshold as scraper/run_daily.py: a partial run with < 20% fail
+    // rate is treated as effectively healthy. This matches reality — a
+    // couple of permanent ru_cross_border_block TikTok videos are not an
+    // incident we want to page on every single night.
+    const PARTIAL_FAIL_RATE_OK = 0.20;
     const now = Date.now();
+
+    /**
+     * Parse "ok=237 fail=1 skipped=0" style message. Returns failRate
+     * (0..1) if both numbers can be extracted, otherwise null.
+     */
+    function extractFailRate(msg: string | null): number | null {
+      if (!msg) return null;
+      const ok = /ok=(\d+)/.exec(msg);
+      const fail = /fail=(\d+)/.exec(msg);
+      if (!ok || !fail) return null;
+      const okN = Number(ok[1]);
+      const failN = Number(fail[1]);
+      const total = okN + failN;
+      if (total === 0) return null;
+      return failN / total;
+    }
 
     const knownJobs = ["auto_discover", "run_daily", "audit"] as const;
     const jobs = knownJobs.map((name) => {
       const row = jobsMap[name];
       const lastRun = row?.last_run_at ? new Date(row.last_run_at) : null;
       const stale = !lastRun || now - lastRun.getTime() > STALE_MS;
+      const rawStatus = row?.last_status ?? "unknown";
+
+      // Effective status — same as raw unless it's "partial" with a
+      // fail rate below threshold, in which case we promote to "ok".
+      let effectiveStatus = rawStatus;
+      if (rawStatus === "partial") {
+        const rate = extractFailRate(row?.last_message ?? null);
+        if (rate !== null && rate < PARTIAL_FAIL_RATE_OK) {
+          effectiveStatus = "ok";
+        }
+      }
+
       return {
         name,
         lastRunAt: row?.last_run_at ?? null,
         lastSuccessAt: row?.last_success_at ?? null,
-        status: row?.last_status ?? "unknown",
+        status: effectiveStatus,
+        rawStatus, // kept for debugging; UI can use `status`.
         message: row?.last_message ?? null,
         stale,
       };
