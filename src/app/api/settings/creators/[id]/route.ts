@@ -10,7 +10,6 @@ const patchCreatorSchema = z.object({
   tiktokUsername: z.string().optional().or(z.literal("")),
   youtubeChannelId: z.string().optional().or(z.literal("")),
   instagramUsername: z.string().optional().or(z.literal("")),
-  likeeUsername: z.string().optional().or(z.literal("")),
   pinterestUsername: z.string().optional().or(z.literal("")),
 });
 
@@ -49,9 +48,6 @@ export async function PATCH(
     }
     if (parsed.data.instagramUsername !== undefined) {
       updates.instagramUsername = parsed.data.instagramUsername === "" ? null : parsed.data.instagramUsername;
-    }
-    if (parsed.data.likeeUsername !== undefined) {
-      updates.likeeUsername = parsed.data.likeeUsername === "" ? null : parsed.data.likeeUsername;
     }
     if (parsed.data.pinterestUsername !== undefined) {
       updates.pinterestUsername = parsed.data.pinterestUsername === "" ? null : parsed.data.pinterestUsername;

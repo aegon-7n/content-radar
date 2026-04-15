@@ -35,12 +35,10 @@ export const creators = pgTable("creators", {
   tiktokUsername: text("tiktok_username"),
   youtubeChannelId: text("youtube_channel_id"),
   instagramUsername: text("instagram_username"),
-  likeeUsername: text("likee_username"),
-  // Likee has no public username→uid lookup that survives their bot
-  // protection. The seller pastes the numeric uid manually from devtools
-  // and we use it directly in fetch_likee_videos.
-  likeeUid: text("likee_uid"),
   pinterestUsername: text("pinterest_username"),
+  // Note: Likee discovery was intentionally removed in 2026-04 — see
+  // docs/likee-research.md. Manual Likee URL add through Settings →
+  // Videos still works and metrics still flow via the Apify actor.
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

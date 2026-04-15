@@ -11,7 +11,6 @@ interface Creator {
   tiktokUsername: string | null;
   youtubeChannelId: string | null;
   instagramUsername: string | null;
-  likeeUsername: string | null;
   pinterestUsername: string | null;
   videoCount: number;
 }
@@ -25,7 +24,6 @@ const EMPTY_FORM = {
   tiktokUsername: "",
   youtubeChannelId: "",
   instagramUsername: "",
-  likeeUsername: "",
   pinterestUsername: "",
 };
 
@@ -67,7 +65,6 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
       tiktokUsername: c.tiktokUsername ?? "",
       youtubeChannelId: c.youtubeChannelId ?? "",
       instagramUsername: c.instagramUsername ?? "",
-      likeeUsername: c.likeeUsername ?? "",
       pinterestUsername: c.pinterestUsername ?? "",
     });
     setModalOpen(true);
@@ -89,7 +86,6 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
           tiktokUsername: form.tiktokUsername.trim().replace(/^@/, "") || null,
           youtubeChannelId: form.youtubeChannelId.trim() || null,
           instagramUsername: form.instagramUsername.trim().replace(/^@/, "") || null,
-          likeeUsername: form.likeeUsername.trim().replace(/^@/, "") || null,
           pinterestUsername: form.pinterestUsername.trim().replace(/^@/, "") || null,
         }),
       });
@@ -164,7 +160,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
           <table className="w-full">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
-                {["Имя", "TikTok", "YouTube", "Instagram", "Likee", "Роликов", "Действия"].map((h, i) => (
+                {["Имя", "TikTok", "YouTube", "Instagram", "Pinterest", "Роликов", "Действия"].map((h, i) => (
                   <th
                     key={h}
                     className={`px-4 py-2.5 text-xs font-medium uppercase tracking-wide ${i === 6 ? "text-right" : "text-left"}`}
@@ -199,7 +195,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
                     {c.instagramUsername ? `@${c.instagramUsername}` : <span style={{ color: "var(--text-disabled)" }}>—</span>}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
-                    {c.likeeUsername ? `@${c.likeeUsername}` : <span style={{ color: "var(--text-disabled)" }}>—</span>}
+                    {c.pinterestUsername ? `@${c.pinterestUsername}` : <span style={{ color: "var(--text-disabled)" }}>—</span>}
                   </td>
                   <td className="px-4 py-3 text-sm font-mono" style={{ color: "var(--text-muted)" }}>
                     {c.videoCount}
@@ -266,12 +262,6 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
                 { key: "tiktokUsername", label: "TikTok", placeholder: "@username", help: "" },
                 { key: "youtubeChannelId", label: "YouTube", placeholder: "@handle или UCxxx...", help: "" },
                 { key: "instagramUsername", label: "Instagram", placeholder: "@username", help: "" },
-                {
-                  key: "likeeUsername",
-                  label: "Likee",
-                  placeholder: "@username",
-                  help: "Для Likee авто-обнаружения сейчас нет. Ссылки на ролики добавляйте вручную через вкладку «Ролики».",
-                },
                 { key: "pinterestUsername", label: "Pinterest", placeholder: "username", help: "" },
               ].map(({ key, label, placeholder, help }) => (
                 <div key={key}>
