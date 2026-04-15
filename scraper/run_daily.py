@@ -1,11 +1,25 @@
 """
 Ежедневный скрапер — запускается кроном.
 Собирает метрики для видео моложе SCRAPE_HORIZON_DAYS (по умолчанию 90 дней).
+
+Exit code policy:
+  0  — status='ok' OR status='partial' with fail_rate < FAIL_RATE_THRESHOLD.
+       "partial" with a small number of permanent-failed videos is expected
+       behaviour (e.g. TikTok ru_cross_border_block) and should NOT page us.
+  1  — status='partial' with fail_rate ≥ FAIL_RATE_THRESHOLD, or status='fail'.
+       Signals a real incident — vendor outage, credential expired, etc.
+       Cron wires this to the Telegram notifier.
 """
 import sys
 import os
 import logging
 from datetime import datetime, timezone, timedelta
+
+# Trigger Telegram alert when more than this fraction of videos fail.
+FAIL_RATE_THRESHOLD = 0.20
+# Minimum total to consider fail_rate meaningful — below this a single
+# failure skews percentages and we don't want to spam.
+FAIL_RATE_MIN_TOTAL = 10
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -98,8 +112,27 @@ def main():
     conn.commit()
     cur.close()
     conn.close()
-    logger.info("Done. ok=%d fail=%d skipped=%d", ok, fail, skipped)
+    logger.info("Done. ok=%d fail=%d skipped=%d status=%s", ok, fail, skipped, status)
+
+    # Decide whether to alert.
+    total = ok + fail
+    if status == "fail":
+        logger.error("run_daily: catastrophic failure (all %d videos failed)", fail)
+        return 1
+    if status == "partial" and total >= FAIL_RATE_MIN_TOTAL:
+        fail_rate = fail / total
+        if fail_rate >= FAIL_RATE_THRESHOLD:
+            logger.error(
+                "run_daily: fail rate %.1f%% >= %.0f%% threshold (ok=%d fail=%d)",
+                fail_rate * 100, FAIL_RATE_THRESHOLD * 100, ok, fail,
+            )
+            return 1
+        logger.info(
+            "run_daily: fail rate %.1f%% below %.0f%% threshold, treating as OK",
+            fail_rate * 100, FAIL_RATE_THRESHOLD * 100,
+        )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)

@@ -801,4 +801,33 @@ if __name__ == "__main__":
                         help=f"Hours to look back (default: {LOOKBACK_HOURS})")
     args, _ = parser.parse_known_args()
     LOOKBACK_HOURS = args.lookback
-    main()
+
+    # Wrap main so any unexpected exception (DB down, API crash, etc.) is
+    # logged AND escalates to a non-zero exit code. The cron wires exit != 0
+    # to notify-telegram.sh, so we get an alert instead of silently dying.
+    try:
+        main()
+        sys.exit(0)
+    except Exception as exc:
+        logger.exception("auto_discover: unhandled exception: %s", exc)
+        # Best-effort state update so the health endpoint shows fail.
+        try:
+            conn = _conn()
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO scraper_state (job_name, last_run_at, last_success_at, last_status, last_message)
+                VALUES ('auto_discover', NOW(), NULL, 'fail', %s)
+                ON CONFLICT (job_name) DO UPDATE SET
+                  last_run_at = EXCLUDED.last_run_at,
+                  last_status = EXCLUDED.last_status,
+                  last_message = EXCLUDED.last_message
+                """,
+                (f"{type(exc).__name__}: {str(exc)[:400]}",),
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception:
+            pass
+        sys.exit(1)
