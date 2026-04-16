@@ -238,16 +238,16 @@ export default function DashboardPage() {
                 Нет данных
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <div className="shrink-0" style={{ width: 200, height: 200, overflow: "visible" }}>
+              <div className="flex flex-col items-center gap-4">
+                <div style={{ width: 180, height: 180, overflow: "visible" }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                    <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                       <Pie
                         data={donutData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={52}
-                        outerRadius={78}
+                        innerRadius={48}
+                        outerRadius={72}
                         paddingAngle={3}
                         dataKey="value"
                         strokeWidth={0}
@@ -265,17 +265,17 @@ export default function DashboardPage() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="flex-1 flex flex-col gap-2.5">
+                <div className="w-full flex flex-wrap justify-center gap-x-4 gap-y-1.5">
                   {donutData.map((p) => (
-                    <div key={p.platform} className="flex items-center gap-2">
+                    <div key={p.platform} className="flex items-center gap-1.5">
                       <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-                      <span className="text-xs flex-1" style={{ color: "var(--text-muted)" }}>
+                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                         {p.name}
                       </span>
                       <span className="font-mono text-xs" style={{ color: "var(--text-primary)" }}>
                         {formatViews(p.value)}
                       </span>
-                      <span className="font-mono text-[11px] w-8 text-right" style={{ color: "var(--text-disabled)" }}>
+                      <span className="font-mono text-[11px]" style={{ color: "var(--text-disabled)" }}>
                         {totalDonut > 0 ? `${Math.round((p.value / totalDonut) * 100)}%` : ""}
                       </span>
                     </div>

@@ -85,7 +85,7 @@ export default function StatCard({
               {isPositive ? "↑" : "↓"}
             </span>
             <span style={{ color: isPositive ? "var(--success-text)" : "var(--error-text)" }}>
-              {formatPercent(change as number)} к прошлому периоду
+              {formatPercent(change as number)}
             </span>
           </div>
         ) : (
