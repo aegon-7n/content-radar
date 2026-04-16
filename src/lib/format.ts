@@ -28,16 +28,6 @@ export function formatDateShort(iso: string): string {
 
 export function formatPercent(n: number | undefined | null): string {
   if (n == null || isNaN(n)) return "—";
-  // Very large changes: show "в N раз" instead of a cryptic "+1990%"
-  if (n >= 300) {
-    const factor = (1 + n / 100);
-    return `в ${factor < 10 ? factor.toFixed(1) : Math.round(factor)} раз больше`;
-  }
-  if (n <= -75) {
-    const factor = 1 / (1 + n / 100);
-    if (!isFinite(factor)) return "—";
-    return `в ${factor < 10 ? factor.toFixed(1) : Math.round(factor)} раз меньше`;
-  }
   const sign = n >= 0 ? "+" : "";
   return `${sign}${n.toFixed(1)}%`;
 }
