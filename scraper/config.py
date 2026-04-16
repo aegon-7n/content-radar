@@ -21,6 +21,12 @@ TIKAPI_KEY: str = os.getenv("TIKAPI_KEY", "")
 # HikerAPI — Instagram scraping
 HIKERAPI_KEY: str = os.getenv("HIKERAPI_KEY", "")
 
+# SOCKS5 proxy for platforms that geo-block Russian IPs (TikTok).
+# Format: socks5://host:port (e.g. socks5://127.0.0.1:1080)
+# Set up via eu-proxy.service (SSH tunnel to EU VPS).
+SOCKS_PROXY: str = os.getenv("SOCKS_PROXY", "")
+PROXY_DICT: dict = {"http": SOCKS_PROXY, "https": SOCKS_PROXY} if SOCKS_PROXY else {}
+
 # Сколько дней собирать метрики после публикации (старые ролики не трогаем)
 SCRAPE_HORIZON_DAYS: int = int(os.getenv("SCRAPE_HORIZON_DAYS", "90"))
 

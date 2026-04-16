@@ -78,6 +78,7 @@ class TikTokScraper(BaseScraper):
                     "Accept": "application/json",
                 },
                 timeout=20,
+                proxies=config.PROXY_DICT or None,
             )
 
             if resp.status_code == 429:
@@ -132,7 +133,7 @@ class TikTokScraper(BaseScraper):
 
     def _scrape_http(self, video_id: str, url: str) -> Optional[VideoMetric]:
         try:
-            resp = requests.get(url, headers=_BROWSER_HEADERS, timeout=15)
+            resp = requests.get(url, headers=_BROWSER_HEADERS, timeout=15, proxies=config.PROXY_DICT or None)
             resp.raise_for_status()
         except requests.RequestException as exc:
             logger.debug("tiktok HTTP request failed url=%s: %s", url, exc)
