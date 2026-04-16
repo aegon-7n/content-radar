@@ -181,7 +181,7 @@ export async function GET(
       ORDER BY day ASC
     `);
 
-    // Top 10 videos by delta.
+    // All videos with delta (no limit — frontend paginates client-side).
     const topVideosResult = await db.execute(sql`
       WITH deltas AS (${perVideoDelta(from.toISOString(), to.toISOString())})
       SELECT
@@ -193,9 +193,7 @@ export async function GET(
         COALESCE(p.name, '—') AS product_name
       FROM deltas d
       LEFT JOIN products p ON p.id = d.product_id
-      WHERE d.delta > 0
       ORDER BY d.delta DESC
-      LIMIT 10
     `);
 
     const statsRow = currentStatsResult[0] as unknown as {

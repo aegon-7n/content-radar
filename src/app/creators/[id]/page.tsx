@@ -89,6 +89,9 @@ export default function CreatorDetailPage() {
   const [videoPlatform, setVideoPlatform] = useState("");
   const [videoSortKey, setVideoSortKey] = useState<VideoSortKey>("views");
   const [videoSortDir, setVideoSortDir] = useState<SortDir>("desc");
+  const [videoPage, setVideoPage] = useState(1);
+  const [videoPerPage, setVideoPerPage] = useState(10);
+  const PAGE_OPTIONS = [10, 20, 50] as const;
 
   useEffect(() => {
     setLoading(true);
@@ -142,9 +145,15 @@ export default function CreatorDetailPage() {
     return result;
   }, [data, videoSearch, videoPlatform, videoSortKey, videoSortDir]);
 
+  const totalFilteredVideos = filteredVideos.length;
+  const totalVideoPages = Math.max(1, Math.ceil(totalFilteredVideos / videoPerPage));
+  const paginatedVideos = filteredVideos.slice((videoPage - 1) * videoPerPage, videoPage * videoPerPage);
+
+  // Reset page when filters change
   const hasVideoFilters = videoSearch !== "" || videoPlatform !== "";
 
   function handleVideoSort(key: VideoSortKey) {
+    setVideoPage(1);
     if (videoSortKey === key) {
       setVideoSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -455,9 +464,9 @@ export default function CreatorDetailPage() {
             style={{ borderBottom: "1px solid var(--border-default)" }}
           >
             <h2 className="text-sm font-medium shrink-0" style={{ color: "var(--text-primary)" }}>
-              Топ роликов
+              Все ролики
               <span className="ml-2 font-mono text-xs" style={{ color: "var(--text-disabled)" }}>
-                {filteredVideos.length}
+                {totalFilteredVideos}
               </span>
             </h2>
             <div className="flex items-center gap-2">
@@ -470,14 +479,14 @@ export default function CreatorDetailPage() {
                   type="text"
                   placeholder="Поиск по URL, товару..."
                   value={videoSearch}
-                  onChange={(e) => setVideoSearch(e.target.value)}
+                  onChange={(e) => { setVideoSearch(e.target.value); setVideoPage(1); }}
                   className="pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
                   style={{ ...inputBase, width: "200px" }}
                 />
               </div>
               <select
                 value={videoPlatform}
-                onChange={(e) => setVideoPlatform(e.target.value)}
+                onChange={(e) => { setVideoPlatform(e.target.value); setVideoPage(1); }}
                 className="px-2.5 py-1.5 rounded-lg text-xs focus:outline-none appearance-none cursor-pointer"
                 style={inputBase}
               >
@@ -561,14 +570,14 @@ export default function CreatorDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredVideos.length === 0 ? (
+              {paginatedVideos.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
                     Ролики не найдены
                   </td>
                 </tr>
               ) : (
-                filteredVideos.map((v) => (
+                paginatedVideos.map((v) => (
                   <tr
                     key={v.id}
                     className="last:border-0 transition-colors"
@@ -606,6 +615,58 @@ export default function CreatorDetailPage() {
               )}
             </tbody>
           </table>
+
+          {/* Pagination */}
+          {totalFilteredVideos > 0 && (
+            <div
+              className="flex items-center justify-between px-5 py-3"
+              style={{ borderTop: "1px solid var(--border-default)" }}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xs" style={{ color: "var(--text-disabled)" }}>
+                  Показывать по
+                </span>
+                {PAGE_OPTIONS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => { setVideoPerPage(n); setVideoPage(1); }}
+                    className="px-2 py-0.5 rounded text-xs transition-colors"
+                    style={{
+                      background: videoPerPage === n ? "var(--accent-muted)" : "transparent",
+                      color: videoPerPage === n ? "var(--accent-primary)" : "var(--text-muted)",
+                      fontWeight: videoPerPage === n ? 600 : 400,
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono" style={{ color: "var(--text-disabled)" }}>
+                  {(videoPage - 1) * videoPerPage + 1}–{Math.min(videoPage * videoPerPage, totalFilteredVideos)} из {totalFilteredVideos}
+                </span>
+                <button
+                  type="button"
+                  disabled={videoPage <= 1}
+                  onClick={() => setVideoPage((p) => p - 1)}
+                  className="px-2 py-0.5 rounded text-xs transition-colors disabled:opacity-30"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  disabled={videoPage >= totalVideoPages}
+                  onClick={() => setVideoPage((p) => p + 1)}
+                  className="px-2 py-0.5 rounded text-xs transition-colors disabled:opacity-30"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
