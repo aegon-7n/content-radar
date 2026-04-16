@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { ToastState } from "./Toast";
 
@@ -36,6 +36,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
   const [editing, setEditing] = useState<Creator | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,6 +52,17 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
   }, [showToast]);
 
   useEffect(() => { load(); }, [load]);
+
+  const filteredCreators = useMemo(() => {
+    if (!search) return creators;
+    const q = search.toLowerCase();
+    return creators.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.tiktokUsername ?? "").toLowerCase().includes(q) ||
+        (c.instagramUsername ?? "").toLowerCase().includes(q)
+    );
+  }, [creators, search]);
 
   function openAdd() {
     setEditing(null);
@@ -122,10 +134,31 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>
-          {loading ? "..." : `${creators.length} креаторов`}
-        </h2>
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-medium shrink-0" style={{ color: "var(--text-muted)" }}>
+            {loading ? "..." : `${filteredCreators.length} из ${creators.length} креаторов`}
+          </h2>
+          <div className="relative">
+            <Search
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
+              style={{ color: "var(--text-disabled)" }}
+            />
+            <input
+              type="text"
+              placeholder="Поиск..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
+              style={{
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
+                width: "160px",
+              }}
+            />
+          </div>
+        </div>
         <button
           onClick={openAdd}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
@@ -172,7 +205,13 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
               </tr>
             </thead>
             <tbody>
-              {creators.map((c) => (
+              {filteredCreators.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                    Креаторы не найдены
+                  </td>
+                </tr>
+              ) : filteredCreators.map((c) => (
                 <tr
                   key={c.id}
                   className="last:border-0 transition-colors"

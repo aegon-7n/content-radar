@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, AlertCircle } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Plus, Pencil, Trash2, AlertCircle, Search } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { ToastState } from "./Toast";
 
@@ -34,6 +34,7 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [categories, setCategories] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,6 +115,17 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
   const needsReview = products.filter((p) => p.needsReview);
   const normal = products.filter((p) => !p.needsReview);
 
+  const filteredNormal = useMemo(() => {
+    if (!search) return normal;
+    const q = search.toLowerCase();
+    return normal.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.wbArticle.includes(q) ||
+        (p.category ?? "").toLowerCase().includes(q)
+    );
+  }, [normal, search]);
+
   return (
     <div className="flex flex-col gap-6">
       {/* Needs review block */}
@@ -187,10 +199,31 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
 
       {/* Normal products list */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>
-            {loading ? "..." : `${normal.length} товаров`}
-          </h2>
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-medium shrink-0" style={{ color: "var(--text-muted)" }}>
+              {loading ? "..." : `${filteredNormal.length} из ${normal.length} товаров`}
+            </h2>
+            <div className="relative">
+              <Search
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
+                style={{ color: "var(--text-disabled)" }}
+              />
+              <input
+                type="text"
+                placeholder="Поиск..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
+                style={{
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-primary)",
+                  width: "160px",
+                }}
+              />
+            </div>
+          </div>
           <button
             onClick={openAdd}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
@@ -237,7 +270,13 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
                 </tr>
               </thead>
               <tbody>
-                {normal.map((p) => (
+                {filteredNormal.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                      Товары не найдены
+                    </td>
+                  </tr>
+                ) : filteredNormal.map((p) => (
                   <tr
                     key={p.id}
                     className="last:border-0 transition-colors"

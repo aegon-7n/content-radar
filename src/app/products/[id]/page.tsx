@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   BarChart,
@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { ArrowLeft, Eye, Film, Sparkles } from "lucide-react";
+import { ArrowLeft, Eye, Film, Sparkles, Search, X } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
@@ -39,12 +39,23 @@ type ProductDetail = {
   }>;
 };
 
+const PLATFORMS = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
+
+type VideoSortKey = "views" | "likes" | "publishedAt";
+type SortDir = "asc" | "desc";
+
 const tooltipStyle = {
   backgroundColor: "var(--surface-1)",
   border: "1px solid var(--border-default)",
   borderRadius: "8px",
   color: "var(--text-primary)",
   fontSize: "12px",
+};
+
+const inputBase = {
+  background: "var(--surface-2)",
+  border: "1px solid var(--border-default)",
+  color: "var(--text-primary)",
 };
 
 export default function ProductDetailPage() {
@@ -58,6 +69,15 @@ export default function ProductDetailPage() {
   const [data, setData] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Creator table search
+  const [creatorSearch, setCreatorSearch] = useState("");
+
+  // Videos table filters
+  const [videoSearch, setVideoSearch] = useState("");
+  const [videoPlatform, setVideoPlatform] = useState("");
+  const [videoSortKey, setVideoSortKey] = useState<VideoSortKey>("views");
+  const [videoSortDir, setVideoSortDir] = useState<SortDir>("desc");
+
   useEffect(() => {
     setLoading(true);
     const { from, to } = getPeriodDates(period);
@@ -67,6 +87,50 @@ export default function ProductDetailPage() {
       .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, [id, period]);
+
+  const filteredCreators = useMemo(() => {
+    if (!data) return [];
+    let result = [...data.byCreator];
+    if (creatorSearch) {
+      const q = creatorSearch.toLowerCase();
+      result = result.filter((c) => c.creatorName.toLowerCase().includes(q));
+    }
+    return result;
+  }, [data, creatorSearch]);
+
+  const filteredVideos = useMemo(() => {
+    if (!data) return [];
+    let result = [...data.videos];
+    if (videoSearch) {
+      const q = videoSearch.toLowerCase();
+      result = result.filter(
+        (v) =>
+          v.url.toLowerCase().includes(q) ||
+          v.creatorName.toLowerCase().includes(q)
+      );
+    }
+    if (videoPlatform) {
+      result = result.filter((v) => v.platform === videoPlatform);
+    }
+    result.sort((a, b) => {
+      const mul = videoSortDir === "asc" ? 1 : -1;
+      if (videoSortKey === "views") return (a.views - b.views) * mul;
+      if (videoSortKey === "likes") return (a.likes - b.likes) * mul;
+      return (new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime()) * mul;
+    });
+    return result;
+  }, [data, videoSearch, videoPlatform, videoSortKey, videoSortDir]);
+
+  const hasVideoFilters = videoSearch !== "" || videoPlatform !== "";
+
+  function handleVideoSort(key: VideoSortKey) {
+    if (videoSortKey === key) {
+      setVideoSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setVideoSortKey(key);
+      setVideoSortDir("desc");
+    }
+  }
 
   const d = data;
 
@@ -202,10 +266,30 @@ export default function ProductDetailPage() {
             border: "1px solid var(--border-default)",
           }}
         >
-          <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border-default)" }}>
-            <h2 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          <div
+            className="px-5 py-4 flex items-center justify-between gap-3"
+            style={{ borderBottom: "1px solid var(--border-default)" }}
+          >
+            <h2 className="text-sm font-medium shrink-0" style={{ color: "var(--text-primary)" }}>
               По креаторам
+              <span className="ml-2 font-mono text-xs" style={{ color: "var(--text-disabled)" }}>
+                {filteredCreators.length}
+              </span>
             </h2>
+            <div className="relative">
+              <Search
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
+                style={{ color: "var(--text-disabled)" }}
+              />
+              <input
+                type="text"
+                placeholder="Поиск креатора..."
+                value={creatorSearch}
+                onChange={(e) => setCreatorSearch(e.target.value)}
+                className="pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
+                style={{ ...inputBase, width: "180px" }}
+              />
+            </div>
           </div>
           <table className="w-full">
             <thead>
@@ -219,32 +303,40 @@ export default function ProductDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {d.byCreator.map((c) => (
-                <tr
-                  key={c.creatorName}
-                  className="last:border-0 transition-colors"
-                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
-                        <span className="text-[9px] font-semibold text-white">{c.creatorName[0]}</span>
-                      </div>
-                      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-                        {c.creatorName}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
-                    {formatViews(c.views)}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
-                    {c.videos}
+              {filteredCreators.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                    Креаторы не найдены
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredCreators.map((c) => (
+                  <tr
+                    key={c.creatorName}
+                    className="last:border-0 transition-colors"
+                    style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
+                          <span className="text-[9px] font-semibold text-white">{c.creatorName[0]}</span>
+                        </div>
+                        <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+                          {c.creatorName}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                      {formatViews(c.views)}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                      {c.videos}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -259,10 +351,60 @@ export default function ProductDetailPage() {
             border: "1px solid var(--border-default)",
           }}
         >
-          <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border-default)" }}>
-            <h2 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          <div
+            className="px-5 py-4 flex items-center justify-between gap-3"
+            style={{ borderBottom: "1px solid var(--border-default)" }}
+          >
+            <h2 className="text-sm font-medium shrink-0" style={{ color: "var(--text-primary)" }}>
               Все ролики
+              <span className="ml-2 font-mono text-xs" style={{ color: "var(--text-disabled)" }}>
+                {filteredVideos.length}
+              </span>
             </h2>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
+                  style={{ color: "var(--text-disabled)" }}
+                />
+                <input
+                  type="text"
+                  placeholder="Поиск по URL, автору..."
+                  value={videoSearch}
+                  onChange={(e) => setVideoSearch(e.target.value)}
+                  className="pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
+                  style={{ ...inputBase, width: "200px" }}
+                />
+              </div>
+              <select
+                value={videoPlatform}
+                onChange={(e) => setVideoPlatform(e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg text-xs focus:outline-none appearance-none cursor-pointer"
+                style={inputBase}
+              >
+                <option value="">Все платформы</option>
+                {PLATFORMS.map((p) => (
+                  <option key={p} value={p}>{getPlatformLabel(p)}</option>
+                ))}
+              </select>
+              {hasVideoFilters && (
+                <button
+                  type="button"
+                  onClick={() => { setVideoSearch(""); setVideoPlatform(""); }}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs border transition-colors"
+                  style={{
+                    borderColor: "var(--border-default)",
+                    color: "var(--text-muted)",
+                    background: "var(--bg-muted)",
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--text-primary)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--text-muted)"; }}
+                >
+                  <X className="w-3 h-3" />
+                  Сбросить
+                </button>
+              )}
+            </div>
           </div>
           <table className="w-full">
             <thead>
@@ -271,55 +413,99 @@ export default function ProductDetailPage() {
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Платформа</th>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Ссылка</th>
-                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
-                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Просмотры</th>
-                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
-                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Лайки</th>
-                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
-                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Дата</th>
+                <th
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                  onClick={() => handleVideoSort("views")}
+                >
+                  <div className="flex items-center gap-1">
+                    Просмотры
+                    {videoSortKey === "views" && (
+                      <span style={{ color: "var(--accent-primary)" }}>
+                        {videoSortDir === "asc" ? "↑" : "↓"}
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                  onClick={() => handleVideoSort("likes")}
+                >
+                  <div className="flex items-center gap-1">
+                    Лайки
+                    {videoSortKey === "likes" && (
+                      <span style={{ color: "var(--accent-primary)" }}>
+                        {videoSortDir === "asc" ? "↑" : "↓"}
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                  onClick={() => handleVideoSort("publishedAt")}
+                >
+                  <div className="flex items-center gap-1">
+                    Дата
+                    {videoSortKey === "publishedAt" && (
+                      <span style={{ color: "var(--accent-primary)" }}>
+                        {videoSortDir === "asc" ? "↑" : "↓"}
+                      </span>
+                    )}
+                  </div>
+                </th>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Автор</th>
               </tr>
             </thead>
             <tbody>
-              {d.videos.map((v) => (
-                <tr
-                  key={v.id}
-                  className="last:border-0 transition-colors"
-                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <td className="px-4 py-3">
-                    <PlatformBadge platform={v.platform as Platform} size="sm" />
-                  </td>
-                  <td className="px-4 py-3">
-                    <a
-                      href={v.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs transition-colors"
-                      style={{ color: "var(--text-muted)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
-                    >
-                      {v.url.replace(/^https?:\/\//, "").slice(0, 40)}…
-                    </a>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
-                    {formatViews(v.views)}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
-                    {formatViews(v.likes)}
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: "var(--text-disabled)" }}>
-                    {formatDate(v.publishedAt)}
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
-                    {v.creatorName}
+              {filteredVideos.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                    Ролики не найдены
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredVideos.map((v) => (
+                  <tr
+                    key={v.id}
+                    className="last:border-0 transition-colors"
+                    style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <td className="px-4 py-3">
+                      <PlatformBadge platform={v.platform as Platform} size="sm" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <a
+                        href={v.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs transition-colors"
+                        style={{ color: "var(--text-muted)" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                      >
+                        {v.url.replace(/^https?:\/\//, "").slice(0, 40)}…
+                      </a>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
+                      {formatViews(v.views)}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                      {formatViews(v.likes)}
+                    </td>
+                    <td className="px-4 py-3 text-xs" style={{ color: "var(--text-disabled)" }}>
+                      {formatDate(v.publishedAt)}
+                    </td>
+                    <td className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
+                      {v.creatorName}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
