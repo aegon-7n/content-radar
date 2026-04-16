@@ -77,7 +77,8 @@ jobs:
 
           # Build and restart
           $SSH 'cd /root/content-radar && \
-            npm ci --omit=dev && \
+            npm ci && \
+            rm -rf .next && \
             npm run build && \
             pm2 restart content-radar --update-env'
 
