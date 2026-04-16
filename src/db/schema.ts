@@ -72,6 +72,9 @@ export const videos = pgTable("videos", {
   platform: platformEnum("platform").notNull(),
   url: text("url").notNull(),
   publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+  // Consecutive failed scrape nights. Reset to 0 on each successful scrape.
+  // When >= 3, run_daily skips the video and UI shows "недоступно".
+  failStreak: integer("fail_streak").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

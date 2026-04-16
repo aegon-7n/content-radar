@@ -43,17 +43,27 @@ def main():
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
 
-    # Только видео моложе SCRAPE_HORIZON_DAYS — старые не трогаем
+    # Только видео моложе SCRAPE_HORIZON_DAYS — старые не трогаем.
+    # Видео с fail_streak >= 3 считаются permanently_unavailable —
+    # пропускаем их чтобы не тратить API quota каждую ночь.
+    MAX_FAIL_STREAK = 3
     horizon = datetime.now(tz=timezone.utc) - timedelta(days=SCRAPE_HORIZON_DAYS)
 
     cur.execute(
-        "SELECT id, platform, url FROM videos WHERE published_at >= %s ORDER BY created_at",
-        (horizon,)
+        "SELECT id, platform, url FROM videos WHERE published_at >= %s AND fail_streak < %s ORDER BY created_at",
+        (horizon, MAX_FAIL_STREAK),
     )
     videos = cur.fetchall()
+
+    # Count permanently unavailable for logging.
+    cur.execute(
+        "SELECT COUNT(*) FROM videos WHERE published_at >= %s AND fail_streak >= %s",
+        (horizon, MAX_FAIL_STREAK),
+    )
+    perm_unavail = cur.fetchone()[0]
     logger.info(
-        "Found %d videos to scrape (published within last %d days)",
-        len(videos), SCRAPE_HORIZON_DAYS
+        "Found %d videos to scrape (published within last %d days, %d permanently unavailable skipped)",
+        len(videos), SCRAPE_HORIZON_DAYS, perm_unavail,
     )
 
     scrapers = {
@@ -84,9 +94,14 @@ def main():
                 """,
                 (video_id, m.views or 0, m.likes or 0, m.comments or 0, m.shares or 0, m.saves or 0),
             )
+            # Reset fail streak on success.
+            cur.execute("UPDATE videos SET fail_streak = 0 WHERE id = %s AND fail_streak > 0", (video_id,))
             logger.info("OK platform=%s video_id=%s views=%s", platform, video_id, m.views)
             ok += 1
         else:
+            # Increment fail streak. After MAX_FAIL_STREAK consecutive
+            # failures the video will be skipped on subsequent runs.
+            cur.execute("UPDATE videos SET fail_streak = fail_streak + 1 WHERE id = %s", (video_id,))
             logger.warning("FAIL platform=%s video_id=%s url=%s", platform, video_id, url)
             fail += 1
 
