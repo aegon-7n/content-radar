@@ -52,6 +52,7 @@ type CreatorDetail = {
 
 const PLATFORMS = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
 
+type VideoSortKey = "views" | "publishedAt";
 type SortDir = "asc" | "desc";
 
 const tooltipStyle = {
@@ -86,6 +87,7 @@ export default function CreatorDetailPage() {
   // Videos table filters
   const [videoSearch, setVideoSearch] = useState("");
   const [videoPlatform, setVideoPlatform] = useState("");
+  const [videoSortKey, setVideoSortKey] = useState<VideoSortKey>("views");
   const [videoSortDir, setVideoSortDir] = useState<SortDir>("desc");
 
   useEffect(() => {
@@ -132,12 +134,24 @@ export default function CreatorDetailPage() {
     }
     result.sort((a, b) => {
       const mul = videoSortDir === "asc" ? 1 : -1;
+      if (videoSortKey === "publishedAt") {
+        return (new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime()) * mul;
+      }
       return (a.views - b.views) * mul;
     });
     return result;
-  }, [data, videoSearch, videoPlatform, videoSortDir]);
+  }, [data, videoSearch, videoPlatform, videoSortKey, videoSortDir]);
 
   const hasVideoFilters = videoSearch !== "" || videoPlatform !== "";
+
+  function handleVideoSort(key: VideoSortKey) {
+    if (videoSortKey === key) {
+      setVideoSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setVideoSortKey(key);
+      setVideoSortDir("desc");
+    }
+  }
 
   const d = data;
 
@@ -474,15 +488,16 @@ export default function CreatorDetailPage() {
               </select>
               <button
                 type="button"
-                onClick={() => setVideoSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                onClick={() => handleVideoSort(videoSortKey === "views" ? "publishedAt" : "views")}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border transition-colors"
                 style={{
                   borderColor: "var(--border-default)",
                   color: "var(--text-muted)",
                   background: "transparent",
                 }}
+                title="Переключить сортировку"
               >
-                Просмотры
+                {videoSortKey === "views" ? "Просмотры" : "Дата"}
                 <span style={{ color: "var(--accent-primary)", fontSize: "10px" }}>
                   {videoSortDir === "asc" ? "↑" : "↓"}
                 </span>
@@ -516,19 +531,33 @@ export default function CreatorDetailPage() {
                 <th
                   className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
-                  onClick={() => setVideoSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                  onClick={() => handleVideoSort("views")}
                 >
                   <div className="flex items-center gap-1">
                     Просмотры
-                    <span style={{ color: "var(--accent-primary)" }}>
-                      {videoSortDir === "asc" ? "↑" : "↓"}
-                    </span>
+                    {videoSortKey === "views" && (
+                      <span style={{ color: "var(--accent-primary)" }}>
+                        {videoSortDir === "asc" ? "↑" : "↓"}
+                      </span>
+                    )}
                   </div>
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Товар</th>
-                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
-                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Дата</th>
+                <th
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                  onClick={() => handleVideoSort("publishedAt")}
+                >
+                  <div className="flex items-center gap-1">
+                    Дата
+                    {videoSortKey === "publishedAt" && (
+                      <span style={{ color: "var(--accent-primary)" }}>
+                        {videoSortDir === "asc" ? "↑" : "↓"}
+                      </span>
+                    )}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
