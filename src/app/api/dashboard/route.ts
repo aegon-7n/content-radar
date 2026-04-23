@@ -195,17 +195,28 @@ export async function GET(request: NextRequest) {
 
     // Top 5 videos by delta in the period.
     const topVideosResult = await db.execute(sql`
-      WITH deltas AS (${perVideoDelta(from.toISOString(), to.toISOString())})
+      WITH deltas AS (${perVideoDelta(from.toISOString(), to.toISOString())}),
+      latest_metrics AS (
+        SELECT DISTINCT ON (video_id)
+          video_id,
+          likes,
+          comments
+        FROM video_metrics
+        ORDER BY video_id, scraped_at DESC
+      )
       SELECT
         v.id,
         v.url,
         v.platform,
         v.published_at,
         d.delta::bigint AS views,
+        COALESCE(lm.likes, 0)::int AS likes,
+        COALESCE(lm.comments, 0)::int AS comments,
         COALESCE(c.name, '—') AS creator_name,
         COALESCE(p.name, '—') AS product_name
       FROM deltas d
       INNER JOIN videos v ON v.id = d.video_id
+      LEFT JOIN latest_metrics lm ON lm.video_id = v.id
       LEFT JOIN creators c ON c.id = v.creator_id
       LEFT JOIN products p ON p.id = v.product_id
       WHERE d.delta > 0
@@ -274,6 +285,8 @@ export async function GET(request: NextRequest) {
         url: string;
         platform: string;
         views: string;
+        likes: number;
+        comments: number;
         creator_name: string;
         product_name: string;
         published_at: string;
@@ -282,6 +295,8 @@ export async function GET(request: NextRequest) {
         url: row.url,
         platform: row.platform,
         views: Number(row.views),
+        likes: Number(row.likes),
+        comments: Number(row.comments),
         creatorName: row.creator_name,
         productName: row.product_name,
         publishedAt: new Date(row.published_at).toISOString(),

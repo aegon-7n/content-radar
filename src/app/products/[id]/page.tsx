@@ -17,7 +17,7 @@ import StatCard from "@/components/ui/StatCard";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import { StatCardSkeleton, ChartSkeleton } from "@/components/ui/SkeletonCard";
-import { formatViews, formatDate, getPlatformColor, getPlatformLabel } from "@/lib/format";
+import { formatViews, formatDate, formatER, getPlatformColor, getPlatformLabel } from "@/lib/format";
 import { type Platform } from "@/lib/mock-data";
 
 type ProductDetail = {
@@ -41,7 +41,7 @@ type ProductDetail = {
 
 const PLATFORMS = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
 
-type VideoSortKey = "views" | "likes" | "publishedAt";
+type VideoSortKey = "views" | "likes" | "comments" | "er" | "publishedAt";
 type SortDir = "asc" | "desc";
 
 const tooltipStyle = {
@@ -116,6 +116,12 @@ export default function ProductDetailPage() {
       const mul = videoSortDir === "asc" ? 1 : -1;
       if (videoSortKey === "views") return (a.views - b.views) * mul;
       if (videoSortKey === "likes") return (a.likes - b.likes) * mul;
+      if (videoSortKey === "comments") return (a.comments - b.comments) * mul;
+      if (videoSortKey === "er") {
+        const erA = a.views > 0 ? (a.likes + a.comments) / a.views : 0;
+        const erB = b.views > 0 ? (b.likes + b.comments) / b.views : 0;
+        return (erA - erB) * mul;
+      }
       return (new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime()) * mul;
     });
     return result;
@@ -444,6 +450,35 @@ export default function ProductDetailPage() {
                 <th
                   className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                  onClick={() => handleVideoSort("comments")}
+                >
+                  <div className="flex items-center gap-1">
+                    Комменты
+                    {videoSortKey === "comments" && (
+                      <span style={{ color: "var(--accent-primary)" }}>
+                        {videoSortDir === "asc" ? "↑" : "↓"}
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                  onClick={() => handleVideoSort("er")}
+                  title="Engagement Rate = (лайки + комменты) / просмотры"
+                >
+                  <div className="flex items-center gap-1">
+                    ER%
+                    {videoSortKey === "er" && (
+                      <span style={{ color: "var(--accent-primary)" }}>
+                        {videoSortDir === "asc" ? "↑" : "↓"}
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
                   onClick={() => handleVideoSort("publishedAt")}
                 >
                   <div className="flex items-center gap-1">
@@ -462,7 +497,7 @@ export default function ProductDetailPage() {
             <tbody>
               {filteredVideos.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
                     Ролики не найдены
                   </td>
                 </tr>
@@ -496,6 +531,12 @@ export default function ProductDetailPage() {
                     </td>
                     <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
                       {formatViews(v.likes)}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                      {formatViews(v.comments)}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                      {formatER(v.views, v.likes, v.comments)}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "var(--text-disabled)" }}>
                       {formatDate(v.publishedAt)}

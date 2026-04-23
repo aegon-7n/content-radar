@@ -54,6 +54,12 @@ export function getPlatformColor(platform: string): string {
   }
 }
 
+export function formatER(views: number, likes: number, comments: number): string {
+  if (!views || views === 0) return "—";
+  const er = ((likes + comments) / views) * 100;
+  return `${er.toFixed(2)}%`;
+}
+
 export function getPlatformLabel(platform: string): string {
   switch (platform.toLowerCase()) {
     case "tiktok":

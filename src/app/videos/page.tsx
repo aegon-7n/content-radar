@@ -5,7 +5,7 @@ import { Search, X, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import { TableSkeleton } from "@/components/ui/SkeletonCard";
-import { formatViews, formatDate, getPlatformLabel } from "@/lib/format";
+import { formatViews, formatDate, formatER, getPlatformLabel } from "@/lib/format";
 import { MOCK_VIDEOS, type Video, type Platform } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -238,6 +238,15 @@ export default function VideosPage() {
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Лайки</th>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Комменты</th>
+                <th
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                  title="Engagement Rate = (лайки + комменты) / просмотры"
+                >
+                  ER%
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Автор</th>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Товар</th>
@@ -266,7 +275,7 @@ export default function VideosPage() {
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
                     Ролики не найдены
                   </td>
                 </tr>
@@ -304,6 +313,16 @@ export default function VideosPage() {
                     <td className="px-4 py-3">
                       <span className="font-mono text-xs" style={{ color: "var(--text-muted)" }}>
                         {formatViews(v.likes)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                        {formatViews(v.comments)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                        {formatER(v.views, v.likes, v.comments)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>

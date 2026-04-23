@@ -183,15 +183,26 @@ export async function GET(
 
     // All videos with delta (no limit — frontend paginates client-side).
     const topVideosResult = await db.execute(sql`
-      WITH deltas AS (${perVideoDelta(from.toISOString(), to.toISOString())})
+      WITH deltas AS (${perVideoDelta(from.toISOString(), to.toISOString())}),
+      latest_metrics AS (
+        SELECT DISTINCT ON (video_id)
+          video_id,
+          likes,
+          comments
+        FROM video_metrics
+        ORDER BY video_id, scraped_at DESC
+      )
       SELECT
         d.video_id AS id,
         d.url,
         d.platform,
         d.published_at,
         d.delta::bigint AS views,
+        COALESCE(lm.likes, 0)::int AS likes,
+        COALESCE(lm.comments, 0)::int AS comments,
         COALESCE(p.name, '—') AS product_name
       FROM deltas d
+      LEFT JOIN latest_metrics lm ON lm.video_id = d.video_id
       LEFT JOIN products p ON p.id = d.product_id
       ORDER BY d.delta DESC
     `);
@@ -254,6 +265,8 @@ export async function GET(
         url: string;
         platform: string;
         views: string;
+        likes: number;
+        comments: number;
         product_name: string;
         published_at: string;
       }>).map((row) => ({
@@ -261,6 +274,8 @@ export async function GET(
         url: row.url,
         platform: row.platform,
         views: Number(row.views),
+        likes: Number(row.likes),
+        comments: Number(row.comments),
         productName: row.product_name,
         publishedAt: new Date(row.published_at).toISOString(),
       })),

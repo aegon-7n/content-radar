@@ -18,7 +18,7 @@ import StatCard from "@/components/ui/StatCard";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import { StatCardSkeleton, ChartSkeleton } from "@/components/ui/SkeletonCard";
-import { formatViews, formatDate, formatDateShort, getPlatformColor, getPlatformLabel } from "@/lib/format";
+import { formatViews, formatDate, formatDateShort, formatER, getPlatformColor, getPlatformLabel } from "@/lib/format";
 import { MOCK_DASHBOARD, type DashboardData, type Platform } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -322,9 +322,18 @@ export default function DashboardPage() {
                       {v.creatorName}
                     </span>
                   </div>
-                  <span className="font-mono text-xs shrink-0" style={{ color: "var(--text-primary)" }}>
-                    {formatViews(v.views)}
-                  </span>
+                  <div className="flex flex-col items-end gap-0.5 shrink-0">
+                    <span className="font-mono text-xs" style={{ color: "var(--text-primary)" }}>
+                      {formatViews(v.views)}
+                    </span>
+                    <span
+                      className="font-mono text-[10px]"
+                      style={{ color: "var(--text-disabled)" }}
+                      title="Engagement Rate = (лайки + комменты) / просмотры"
+                    >
+                      {formatER(v.views, v.likes ?? 0, v.comments ?? 0)}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>

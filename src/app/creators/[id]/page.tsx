@@ -19,7 +19,7 @@ import StatCard from "@/components/ui/StatCard";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import { StatCardSkeleton, ChartSkeleton } from "@/components/ui/SkeletonCard";
-import { formatViews, formatDate, formatDateShort, getPlatformColor, getPlatformLabel } from "@/lib/format";
+import { formatViews, formatDate, formatDateShort, formatER, getPlatformColor, getPlatformLabel } from "@/lib/format";
 import { type Platform } from "@/lib/mock-data";
 
 type CreatorDetail = {
@@ -45,6 +45,8 @@ type CreatorDetail = {
     url: string;
     platform: string;
     views: number;
+    likes: number;
+    comments: number;
     productName: string;
     publishedAt: string;
   }>;
@@ -52,7 +54,7 @@ type CreatorDetail = {
 
 const PLATFORMS = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
 
-type VideoSortKey = "views" | "publishedAt";
+type VideoSortKey = "views" | "publishedAt" | "er";
 type SortDir = "asc" | "desc";
 
 const tooltipStyle = {
@@ -139,6 +141,11 @@ export default function CreatorDetailPage() {
       const mul = videoSortDir === "asc" ? 1 : -1;
       if (videoSortKey === "publishedAt") {
         return (new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime()) * mul;
+      }
+      if (videoSortKey === "er") {
+        const erA = a.views > 0 ? (a.likes + a.comments) / a.views : 0;
+        const erB = b.views > 0 ? (b.likes + b.comments) / b.views : 0;
+        return (erA - erB) * mul;
       }
       return (a.views - b.views) * mul;
     });
@@ -552,6 +559,23 @@ export default function CreatorDetailPage() {
                   </div>
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Комменты</th>
+                <th
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
+                  style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
+                  onClick={() => handleVideoSort("er")}
+                  title="Engagement Rate = (лайки + комменты) / просмотры"
+                >
+                  <div className="flex items-center gap-1">
+                    ER%
+                    {videoSortKey === "er" && (
+                      <span style={{ color: "var(--accent-primary)" }}>
+                        {videoSortDir === "asc" ? "↑" : "↓"}
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
                   style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>Товар</th>
                 <th
                   className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none"
@@ -572,7 +596,7 @@ export default function CreatorDetailPage() {
             <tbody>
               {paginatedVideos.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
                     Ролики не найдены
                   </td>
                 </tr>
@@ -603,6 +627,12 @@ export default function CreatorDetailPage() {
                     </td>
                     <td className="px-4 py-3 font-mono text-sm" style={{ color: "var(--text-primary)" }}>
                       {formatViews(v.views)}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                      {formatViews(v.comments)}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                      {formatER(v.views, v.likes, v.comments)}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
                       {v.productName}
