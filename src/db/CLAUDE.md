@@ -1,0 +1,59 @@
+# src/db/ — Drizzle-схема и подключение к PostgreSQL
+
+`schema.ts` — единственный источник правды для структуры БД. И TypeScript-код, и Python-скрейпер ходят в одни и те же таблицы; колонки нужно держать синхронно.
+
+## Таблицы
+
+```
+users (1) ─── (N) creators
+              creators (1) ──┐
+                              ├─→ videos (N) ──→ video_metrics (M)
+              products (1) ──┘
+                                    видео ↓
+                              fail_streak ≥ 3 → "недоступно"
+
+scraper_state    — отдельная таблица для метаданных трёх крон-джобов.
+```
+
+**`users`** — single-tenant пока что. Один админ, всё остальное FK на этого юзера.
+
+**`creators`** — имя + handles на каждой платформе (`tiktok_username`, `youtube_channel_id`, `instagram_username`, `pinterest_username`). Заполнен handle → `auto_discover` пойдёт за роликами этой платформы.
+- Likee handle тут **намеренно нет** — discovery невозможен (см. [docs/likee-research.md](../../docs/likee-research.md)). Likee ролики добавляются вручную через `/settings` → Videos.
+
+**`products`** — товар на Wildberries. `wb_article` — артикул, `needs_review = 1` означает что товар создан автоматически из артикула в описании ролика (`auto_discover`) и менеджер должен поставить нормальное имя.
+
+**`videos`** — конкретный ролик. Связь `1 ролик = 1 креатор + 1 товар + 1 платформа`. URL ролика — уникальная сущность (используется для дедупликации в `auto_discover`).
+- **`fail_streak`** инкрементится при каждой неудачной попытке скрейпинга подряд, обнуляется при успехе. `>= 3` → ролик пропускается всеми будущими прогонами `run_daily`, в UI показывается тегом "недоступно". Это защищает от траты квоты API на удалённые/приватные ролики.
+
+**`video_metrics`** — снимок метрик. **Append-only**: каждый успешный скрейп добавляет новую строку с `scraped_at`. Не UPDATE, не UPSERT — иначе сломается аналитика динамики. Все агрегаты считаются как разница между `MAX(views) WHERE scraped_at <= to` и `MAX(views) WHERE scraped_at <= from` для каждого ролика.
+
+**`scraper_state`** — одна строка на джоб (`'auto_discover'`, `'run_daily'`, `'audit'`). Хранит `last_success_at`, `last_run_at`, `last_status`, `last_message`. Используется:
+- скрейпером — для self-healing lookback (`compute_lookback_hours`),
+- API `/api/health` — для светофора в UI и health-check'ов.
+
+## Платформенный enum
+
+```ts
+platformEnum = ["tiktok", "youtube", "instagram", "likee", "pinterest"]
+```
+
+Любое добавление платформы — это: миграция enum + новый scraper в `scraper/scrapers/` + UI-цвет в `lib/format.ts:getPlatformColor` + лейбл в `getPlatformLabel`. Не меньше четырёх мест.
+
+## Файлы
+
+- `schema.ts` — определения таблиц + inferred-типы (`User`, `Creator`, `Product`, `Video`, `VideoMetric`, `ScraperState`, `Platform`).
+- `index.ts` — drizzle-клиент (используется в API-роутах).
+- `seed.ts` — реальные данные клиента (3 креатора, ~13 товаров с артикулами WB). Запускается через `npm run db:seed`.
+
+## Правила
+
+- **Все timestamps `withTimezone: true`** и хранятся в UTC. Форматирование локали — на UI.
+- **`video_metrics` append-only.** Никогда не делать `UPDATE views = ...`. Если нужно «исправить» прошлый снимок — добавь новый.
+- **Внешние ключи строго `notNull()`** для `userId`/`creatorId`/`productId`. Сирот в проекте быть не должно.
+- **`bigint` для views** — у TikTok бывают ролики >2.1 млрд просмотров (out of int32 range). Лайки/комменты `int` — границу не трогали.
+- **Миграции через `drizzle-kit`.** Локально используется `db:push` (применяет изменения схемы напрямую без файла миграции — ок для single-dev), на проде — `db:generate` + `db:migrate`.
+- **Аналитика динамики** ("% к прошлой неделе") — оконные функции `LAG()` или подзапрос с двумя `MAX(scraped_at)`. См. реализацию delta-модели в `app/api/dashboard/route.ts`.
+
+## Контракт со скрейпером
+
+Python-код в `scraper/db.py` пишет напрямую в `video_metrics` через `psycopg2`. Колонки и их типы должны **совпадать с тем, что видит drizzle**. Если меняешь схему — пройдись по `scraper/db.py`, `scraper/run_daily.py`, `scraper/auto_discover.py`, `scraper/audit.py` и проверь все INSERT/UPDATE-запросы. CI на это не ловит — драйвер просто упадёт в проде.
