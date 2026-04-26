@@ -4,6 +4,9 @@
 > [scraper/CLAUDE.md](scraper/CLAUDE.md) — крон-джобы, провайдеры API, стоимость.
 > [src/CLAUDE.md](src/CLAUDE.md) — Next.js, маршруты, паттерны UI.
 > [src/db/CLAUDE.md](src/db/CLAUDE.md) — Drizzle-схема и контракт со скрейпером.
+> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — высокоуровневая схема системы.
+> [docs/OPERATIONS.md](docs/OPERATIONS.md) — runbook: cron, мониторинг, восстановление.
+> [docs/ONBOARDING.md](docs/ONBOARDING.md) — что прочитать в первый день и какие нужны доступы.
 > [docs/backlog.md](docs/backlog.md) — приоритетный список задач.
 
 ## Миссия
@@ -123,6 +126,26 @@ TELEGRAM_CHAT_ID=...
 - Server Components где возможно, `"use client"` только при необходимости (стейт, эффекты, навигация).
 - Числа форматируем через `lib/format.ts` (`formatViews`, `formatNumber`, ...).
 
+## Документация — обязательное правило
+
+**Каждый PR, меняющий поведение / архитектуру / операционку системы, в том же дифе обновляет соответствующую документацию.**
+
+Это правило, без которого вся переданная агентам база протухнет за пару месяцев. Конкретно:
+
+| Меняешь | Обязательно обновить |
+|---|---|
+| схему БД (`src/db/schema.ts`) | [src/db/CLAUDE.md](src/db/CLAUDE.md) + [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (если задело модель данных) |
+| провайдер скрейпера / цены / новый эндпоинт | [scraper/CLAUDE.md](scraper/CLAUDE.md) + [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (таблица провайдеров) |
+| крон-расписание / алерты / процедуру восстановления | [docs/OPERATIONS.md](docs/OPERATIONS.md) |
+| env-переменную (новую, удалённую, переименованную) | [.env.example](.env.example) + комментарий зачем нужна |
+| маршрут / API-эндпоинт | [src/CLAUDE.md](src/CLAUDE.md) |
+| фундаментальное архитектурное решение | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), при сложном решении — отдельный ADR в `docs/decisions/` |
+| правило/паттерн, отличающийся от текущего | nested CLAUDE.md соответствующей папки |
+
+`code-reviewer` проверяет это в чеклисте. PR без обновления — `NEEDS FIXES`.
+
+Если правка совсем мелкая и ничего из вышеперечисленного не задевает (баг-фикс одной функции, опечатка, локальный рефакторинг) — документацию трогать не нужно. Здравый смысл.
+
 ## Известные планы
 
-См. [docs/backlog.md](docs/backlog.md). Главное в очереди: CI/CD деплой, обработка `permanently_unavailable` в UI, multi-tenancy (когда придёт второй клиент).
+См. [docs/backlog.md](docs/backlog.md). Главное в очереди: CI/CD деплой, обработка `permanently_unavailable` в UI, multi-tenancy (когда придёт второй клиент), вынос секретов из `scripts/setup-cron.sh`.

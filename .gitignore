@@ -19,6 +19,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Local logs (scraper writes here, not for the repo)
+*.log
+scraper/scraper.log
+
 # Local env files
 .env
 .env.local
