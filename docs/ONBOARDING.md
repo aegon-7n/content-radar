@@ -25,9 +25,8 @@
 - [ ] PostgreSQL локально (`brew install postgresql@16` на macOS).
 
 **Для прод-операций:**
-- [ ] SSH-ключ или пароль root к VPS, на котором живёт скрейпер и БД (адрес у владельца).
-- [ ] Vercel: invite в команду (фронт деплоится туда). https://vercel.com.
-- [ ] GitHub: collaborator на репо.
+- [ ] SSH-ключ или пароль root к VPS — на нём крутится **всё**: фронт (PM2), Postgres, и cron-скрейпер.
+- [ ] GitHub: collaborator на репо + доступ к Settings → Secrets and variables → Actions (там `DEPLOY_HOST` и `DEPLOY_SSH_KEY` для CI-деплоя).
 
 **Дашборды провайдеров (для контроля расходов):**
 - [ ] HikerAPI — https://hikerapi.com (логин владельца).
@@ -138,7 +137,8 @@ python -m scraper.auto_discover     # поиск новых роликов
 
 ## Где смотреть, если что-то пошло не так
 
-- **Прод не отвечает** → Vercel logs, [docs/OPERATIONS.md → Vercel-деплой упал](OPERATIONS.md#vercel-деплой-упал).
+- **Прод не отвечает** → SSH на VPS → `pm2 logs content-radar`, [docs/OPERATIONS.md → Фронт на проде вернул 500](OPERATIONS.md#фронт-на-проде-вернул-500).
+- **GitHub Actions упал на push** → [docs/OPERATIONS.md → GitHub Actions деплой упал](OPERATIONS.md#github-actions-деплой-упал).
 - **Метрики не обновляются** → SSH на VPS, `tail /var/log/content-radar/daily.log`, [docs/OPERATIONS.md → метрики старше суток](OPERATIONS.md#метрики-на-ui-старше-суток).
 - **Резко вырос счёт за API** → дашборд провайдера, потом [scraper/CLAUDE.md → известные ловушки](../scraper/CLAUDE.md#известные-ловушки).
 - **Telegram-алерт пришёл** → читай его текст; в нём указан какой джоб упал и снизу — последние строки лога.
@@ -155,7 +155,7 @@ python -m scraper.auto_discover     # поиск новых роликов
 - [ ] Локально поднял фронт и зашёл в дашборд.
 - [ ] Прогнал скрейпер локально (`--dry-run`).
 - [ ] Зашёл в дашборды HikerAPI / TikAPI / Apify, увидел текущий расход.
-- [ ] Залогинился по SSH на VPS, посмотрел логи трёх крон-джобов.
+- [ ] Залогинился по SSH на VPS, посмотрел `pm2 status` (фронт) и логи трёх крон-джобов в `/var/log/content-radar/`.
 - [ ] Проверил `/api/health` на проде — все джобы зелёные.
 - [ ] Нашёл свой первый таск в `docs/backlog.md`.
 

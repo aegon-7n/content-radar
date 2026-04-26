@@ -10,33 +10,38 @@
 │                              │                                       │
 │                              ▼ HTTPS                                 │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  Vercel (фронт + API)                                        │    │
-│  │  ────────────────────                                        │    │
-│  │  Next.js 14 App Router                                       │    │
-│  │  • Server Components + клиентские страницы                   │    │
-│  │  • API-роуты под app/api/*                                   │    │
-│  │  • NextAuth (CredentialsProvider, JWT)                       │    │
-│  │  • Drizzle ORM                                                │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                              │                                       │
-│                              ▼ TCP/SSL                               │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  PostgreSQL (на VPS, доступ через SSL)                       │    │
-│  │  Таблицы: users, creators, products, videos, video_metrics,  │    │
-│  │           scraper_state                                       │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                              ▲                                       │
-│                              │ psycopg2                              │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  VPS (Ubuntu, root)                                          │    │
-│  │  ───────────────────                                          │    │
+│  │  Production VPS (Ubuntu, root) — ЕДИНСТВЕННЫЙ хост           │    │
+│  │  ─────────────────────────────────────────────────────       │    │
 │  │  /root/content-radar/                                         │    │
-│  │  ├── scraper/  Python-скрейпер (cron-driven)                  │    │
-│  │  ├── scripts/  setup-cron.sh, notify-telegram.sh              │    │
-│  │  └── /etc/cron.d/content-radar — три ночных джоба             │    │
 │  │                                                                │    │
-│  │  SSH-туннель → EU VPS (socks5://127.0.0.1:1080)               │    │
-│  │  для обхода ru_cross_border_block у TikTok                    │    │
+│  │  ┌────────────────────────────────────────────────────────┐  │    │
+│  │  │  Next.js 14 App Router (под управлением PM2)            │  │    │
+│  │  │  • Server Components + клиентские страницы              │  │    │
+│  │  │  • API-роуты под app/api/*                              │  │    │
+│  │  │  • NextAuth (CredentialsProvider, JWT)                  │  │    │
+│  │  │  • Drizzle ORM → localhost:5432                         │  │    │
+│  │  │  Команды: pm2 status, pm2 logs content-radar,           │  │    │
+│  │  │           pm2 restart content-radar --update-env        │  │    │
+│  │  └────────────────────────────────────────────────────────┘  │    │
+│  │                              │                                │    │
+│  │                              ▼ Unix socket / TCP localhost   │    │
+│  │  ┌────────────────────────────────────────────────────────┐  │    │
+│  │  │  PostgreSQL                                             │  │    │
+│  │  │  Таблицы: users, creators, products, videos,            │  │    │
+│  │  │           video_metrics, scraper_state                  │  │    │
+│  │  └────────────────────────────────────────────────────────┘  │    │
+│  │                              ▲                                │    │
+│  │                              │ psycopg2                       │    │
+│  │  ┌────────────────────────────────────────────────────────┐  │    │
+│  │  │  Python-скрейпер (cron в /etc/cron.d/content-radar)     │  │    │
+│  │  │  • 00:00 МСК — auto_discover (новые ролики)             │  │    │
+│  │  │  • 00:10 МСК — run_daily     (метрики)                  │  │    │
+│  │  │  • 01:00 МСК — audit         (сверка)                   │  │    │
+│  │  │  Логи: /var/log/content-radar/{discover,daily,audit}.log│  │    │
+│  │  └────────────────────────────────────────────────────────┘  │    │
+│  │                              │                                │    │
+│  │       SSH-туннель ──────────►│ socks5://127.0.0.1:1080        │    │
+│  │       к EU-VPS (для TikTok)                                   │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                              │                                       │
 │                              ▼ HTTPS                                 │
@@ -49,6 +54,9 @@
 │  │  • Pinterest HTML  (бесплатно, парсинг страницы)              │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────────────┘
+
+Деплой: GitHub Actions [.github/workflows/ci.yml] на push в main →
+  rsync кода → npm ci && npm run build → pm2 restart content-radar.
 ```
 
 ## Модель данных
@@ -77,7 +85,7 @@ scraper_state — три строки на три крон-джоба, для se
                               с тем, что у нас в БД                        при расхождении
 
 в течение дня:
-  Браузер → Vercel /api/dashboard ── агрегация delta-модели ──→ JSON
+  Браузер → VPS (PM2/Next.js) /api/dashboard ── агрегация delta-модели ──→ JSON
                                        ────────────────────
                                        не текущий views, а
                                        (views_at(to) - views_at(from))
@@ -102,8 +110,8 @@ delta(video) = MAX(views) WHERE scraped_at <= to
 
 | Сервис | Назначение | Стоимость | Ссылка |
 |---|---|---|---|
-| Vercel | Хостинг фронта + API | $20/мес Pro (если нужно) или free | https://vercel.com |
-| VPS (DigitalOcean/Hetzner) | Скрейпер + Postgres | ~$10-20/мес | (адрес — у владельца) |
+| VPS (DigitalOcean/Hetzner/etc) | Всё: фронт (PM2), Postgres, скрейпер | ~$10-20/мес | (адрес — у владельца) |
+| GitHub Actions | CI + деплой через SSH/rsync | бесплатно для публичных / квота private | https://github.com/aegon-7n/content-radar/actions |
 | TikAPI.io | TikTok метрики | ~$99/мес за 50K req | https://tikapi.io |
 | YouTube Data API v3 | YouTube метрики | бесплатно, 10K units/день | https://console.cloud.google.com |
 | HikerAPI | Instagram метрики | ~$0.0006-0.003/req | https://hikerapi.com |

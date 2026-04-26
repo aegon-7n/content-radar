@@ -4,13 +4,17 @@
 
 ## Прод-инфраструктура
 
+Всё крутится на одном VPS: фронт (PM2), Postgres, и cron-скрейпер.
+
 | Компонент | Где | Доступ |
 |---|---|---|
-| Фронт + API | Vercel | панель vercel.com (владелец проекта добавляет коллабораторов) |
-| База данных | PostgreSQL на VPS | `DATABASE_URL` из `.env.local` |
-| Скрейпер | VPS, `/root/content-radar` | SSH-ключ + sudo |
+| Фронт + API | VPS, через PM2 (`pm2 status content-radar`) | SSH + `pm2 logs content-radar` |
+| База данных | PostgreSQL на том же VPS, `localhost:5432` | `DATABASE_URL` из `/root/content-radar/.env.local` |
+| Скрейпер | VPS, `/root/content-radar/scraper/` | SSH-ключ + sudo |
 | Cron | `/etc/cron.d/content-radar` | управляется через `scripts/setup-cron.sh` |
-| Логи | `/var/log/content-radar/` | SSH + `tail -f` |
+| Логи скрейпера | `/var/log/content-radar/` | SSH + `tail -f` |
+| Логи фронта | `pm2 logs content-radar` | SSH |
+| Деплой | GitHub Actions → rsync → `pm2 restart` | [.github/workflows/ci.yml](../.github/workflows/ci.yml) + secrets `DEPLOY_HOST`, `DEPLOY_SSH_KEY` |
 | Алерты | Telegram-бот | токен в `TELEGRAM_BOT_TOKEN` |
 
 ## Cron-расписание (МСК)
@@ -89,10 +93,19 @@ tail -f /var/log/content-radar/audit.log     # сверка
 3. Если да и расход аномальный → читай [scraper/CLAUDE.md](../scraper/CLAUDE.md) раздел «Известные ловушки».
 4. Вре́менный fix: уменьшить `SCRAPE_HORIZON_DAYS` через env (например, 14 вместо 30).
 
-### «Vercel-деплой упал»
-1. `vercel logs` или панель Vercel → Deployments.
-2. Чаще всего — TypeScript-ошибка после правок в `src/`. Локально: `npm run build` чтобы воспроизвести.
-3. Если БД недоступна с Vercel — проверь `DATABASE_URL` в Environment Variables Vercel.
+### «GitHub Actions деплой упал»
+1. github.com/aegon-7n/content-radar/actions → последний run на `main`.
+2. Какая job упала?
+   - **`build`** — TypeScript-ошибка или Next.js build provoked. Локально: `npm run build` чтобы воспроизвести.
+   - **`python`** — синтаксическая ошибка в `scraper/`. Локально: `python -m compileall scraper`.
+   - **`deploy`** — SSH/rsync не дотянулся до VPS. Проверь GitHub Secrets `DEPLOY_HOST` и `DEPLOY_SSH_KEY`, и что VPS поднят.
+3. Если build на VPS провалился, но Actions показал успех — SSH на VPS, `pm2 logs content-radar --lines 100`.
+
+### «Фронт на проде вернул 500»
+1. SSH на VPS → `pm2 logs content-radar --err --lines 100`.
+2. `pm2 status` — процесс жив? Если в `errored` — `pm2 restart content-radar --update-env`.
+3. Если БД недоступна — `sudo systemctl status postgresql`, затем `psql -U contentradar -d content_radar -c "SELECT 1"`.
+4. Если нужны новые env-переменные после правки `/root/content-radar/.env.local` — обязательно `pm2 restart content-radar --update-env` (без `--update-env` процесс не перечитает env).
 
 ### «404 на /api/health после изменения схемы»
 1. Локальная схема разошлась с прод-БД. На проде запусти `npm run db:push` (для single-dev) или `db:migrate` (с миграциями).
@@ -119,7 +132,7 @@ tail -f /var/log/content-radar/audit.log     # сверка
 
 1. Создать новый VPS (Ubuntu 22+).
 2. `git clone https://github.com/aegon-7n/content-radar.git /root/content-radar`.
-3. Установить системные зависимости: `apt install python3-venv postgresql nginx` (если фронт тоже на VPS).
+3. Установить системные зависимости: `apt install python3-venv postgresql nginx nodejs npm`. Установить `pm2` глобально: `npm install -g pm2`.
 4. Создать БД: `sudo -u postgres createuser contentradar`, `createdb content_radar`.
 5. Применить схему: `cd /root/content-radar && npm install && npm run db:push`.
 6. Восстановить данные из бэкапа (если есть) → `psql -U contentradar -d content_radar < dump.sql`.
@@ -127,22 +140,41 @@ tail -f /var/log/content-radar/audit.log     # сверка
 8. Поднять Python venv: `cd scraper && python3 -m venv venv && venv/bin/pip install -r requirements.txt`.
 9. Настроить cron: `bash scripts/setup-cron.sh` (предварительно отредактировав ключи).
 10. Поднять SSH-туннель к EU-VPS для TikTok-прокси (см. [scraper/CLAUDE.md](../scraper/CLAUDE.md)).
-11. Проверить: `python -m scraper.run_daily` — должен сделать прогон без ошибок.
+11. Запустить фронт под PM2: `cd /root/content-radar && npm run build && pm2 start npm --name content-radar -- start && pm2 save`.
+12. Обновить `DEPLOY_HOST` (новый IP) в GitHub Secrets, добавить публичный SSH-ключ нового VPS на старый авторизованный, чтобы CI снова мог деплоить.
+13. Проверить: `python -m scraper.run_daily` — должен сделать прогон без ошибок. `curl localhost:3000/api/health` — должен вернуть JSON со статусом.
 
 ## Деплой фронта
 
-Сейчас Vercel автоматически деплоит каждый push в `main`. CI ([.github/workflows/](../.github/)) проверяет TypeScript и Next.js build.
+GitHub Actions ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) на каждый push в `main`:
 
-Откатить:
-- В панели Vercel → Deployments → найти предыдущий рабочий → Promote to Production.
-- Или `git revert` нужный коммит → push.
+1. **`build`** — `npm ci` + `npm run build` (typecheck + Next.js production build).
+2. **`python`** — `pip install -r scraper/requirements.txt` + `python -m compileall scraper`.
+3. **`deploy`** (только на push в `main`) — `rsync` кода на VPS → `npm ci && npm run build && pm2 restart content-radar`.
+
+**GitHub Secrets**, которые должны быть выставлены:
+- `DEPLOY_HOST` — IP/домен VPS.
+- `DEPLOY_SSH_KEY` — приватный SSH-ключ root-пользователя VPS.
+
+Откатить деплой:
+- `git revert <bad-commit>` → push в `main` → новый автоматический деплой с откатом.
+- Или вручную на VPS: `cd /root/content-radar && git checkout <previous-good-sha> && npm ci && npm run build && pm2 restart content-radar`.
+
+## Восстановить .env.local на VPS
+
+После SSH на VPS — он лежит в `/root/content-radar/.env.local`. После правки **обязательно**:
+```bash
+pm2 restart content-radar --update-env
+```
+Без `--update-env` процесс не перечитает переменные.
 
 ## Контакты владельца провайдеров
 
 Эти аккаунты привязаны к учётной записи владельца проекта (email/телефон). При передаче управления:
 - Hiker, TikAPI, Apify — добавить нового агента/команду как member или передать пароль.
 - Google Cloud (YouTube API) — добавить через IAM.
-- Vercel — invite в team.
+- VPS — передать SSH-ключ или сменить root-пароль.
+- GitHub Secrets (`DEPLOY_HOST`, `DEPLOY_SSH_KEY`) — обновить если меняется хост или ключ.
 - VPS-провайдер — поделиться SSH-ключом или передать root-пароль (потом сменить).
 - Telegram-бот — поделиться токеном.
 

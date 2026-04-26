@@ -34,15 +34,17 @@
 ## Архитектура
 
 ```
-[cron МСК]                          [Vercel]
+[cron МСК на VPS]                            [тот же VPS]
   00:00  scraper.auto_discover  ──┐
-  00:10  scraper.run_daily      ──┼──→  PostgreSQL (Supabase)  ←──  Next.js (API routes + UI)
-  01:00  scraper.audit          ──┘                                       │
-                                                                          ↓
-                                                                       Браузер
+  00:10  scraper.run_daily      ──┼──→  PostgreSQL  ←──  Next.js (API + UI), запущен PM2
+  01:00  scraper.audit          ──┘          │                    │
+                                              └────── localhost ───┘
+                                                                          │
+                                                                          ▼
+                                                                       Браузер (HTTPS)
 ```
 
-Cron живёт на отдельном VPS (`/root/content-radar`), фронт — на Vercel. Расписание — [scripts/setup-cron.sh](scripts/setup-cron.sh).
+Всё крутится на одном VPS (`/root/content-radar`): фронт через PM2 (`pm2 status content-radar`), Postgres локально, скрейпер по cron. Деплой — GitHub Actions [.github/workflows/ci.yml](.github/workflows/ci.yml): rsync + `npm run build` + `pm2 restart`. Расписание cron — [scripts/setup-cron.sh](scripts/setup-cron.sh).
 
 ## Стек
 
@@ -51,9 +53,9 @@ Cron живёт на отдельном VPS (`/root/content-radar`), фронт 
 | Frontend | Next.js 14 App Router, React 18, TypeScript strict, Tailwind, Recharts, Geist Sans/Mono |
 | API | Next.js API Routes, Zod-валидация |
 | Auth | NextAuth (CredentialsProvider, JWT, single admin) |
-| База | PostgreSQL (Supabase prod / локальный postgres dev) + Drizzle ORM |
+| База | PostgreSQL (на прод-VPS / локальный postgres в деве) + Drizzle ORM |
 | Скрейпер | Python 3.11+, `requests`, `psycopg2`, `yt-dlp` (fallback). Cron по `setup-cron.sh`. |
-| Деплой | Vercel (фронт) + VPS (скрейпер). CI: GitHub Actions ([.github/](.github/)). |
+| Деплой | Один VPS на всё: фронт (PM2) + Postgres + cron-скрейпер. GitHub Actions делает rsync + `pm2 restart` ([.github/workflows/ci.yml](.github/workflows/ci.yml)). |
 
 ## Тёмные углы / что важно знать
 

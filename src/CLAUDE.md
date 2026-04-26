@@ -78,7 +78,7 @@ types/       глобальные .d.ts
 
 ```bash
 npm run dev               # локально на :3000
-npm run build             # прод-сборка (Vercel запускает это)
+npm run build             # прод-сборка (CI запускает это перед rsync на VPS)
 npm run lint              # next lint
 npm run db:push           # синк схемы → БД (drizzle-kit push)
 npm run db:generate       # генерация SQL-миграции
