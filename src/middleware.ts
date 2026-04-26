@@ -12,7 +12,7 @@ export default withAuth(
     pages: {
       signIn: "/login",
     },
-    secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production",
+    secret: process.env.NEXTAUTH_SECRET,
   }
 );
 

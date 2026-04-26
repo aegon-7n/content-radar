@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { execFile } from "child_process";
 import path from "path";
 
-const SCRAPE_SECRET = process.env.SCRAPE_SECRET ?? "dev-secret";
+function getScrapeSecret(): string {
+  const secret = process.env.SCRAPE_SECRET;
+  if (!secret) {
+    throw new Error("SCRAPE_SECRET env variable is required");
+  }
+  return secret;
+}
 
 const VALID_PLATFORMS = new Set([
   "all",
@@ -15,7 +21,7 @@ const VALID_PLATFORMS = new Set([
 
 export async function POST(request: NextRequest) {
   const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${SCRAPE_SECRET}`) {
+  if (auth !== `Bearer ${getScrapeSecret()}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

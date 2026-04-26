@@ -12,8 +12,10 @@ const handler = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const adminEmail    = process.env.ADMIN_EMAIL    ?? "admin@content-radar.ru";
-        const adminPassword = process.env.ADMIN_PASSWORD ?? "admin123";
+        const adminEmail    = process.env.ADMIN_EMAIL;
+        const adminPassword = process.env.ADMIN_PASSWORD;
+
+        if (!adminEmail || !adminPassword) return null;
 
         if (
           credentials.email    === adminEmail &&
@@ -44,7 +46,7 @@ const handler = NextAuth({
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production",
+  secret: process.env.NEXTAUTH_SECRET,
 });
 
 export { handler as GET, handler as POST };
