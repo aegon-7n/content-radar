@@ -191,35 +191,27 @@ def instagram_count(username: Optional[str]) -> Optional[int] | str:
         if not user_id:
             return "no pk"
 
+        # Single page is enough for a 30-day counter — no creator publishes
+        # >50 Reels/month, and we only need an approximate gap signal.
+        # Pagination here used to dominate HikerAPI cost.
         items: list[dict] = []
-        cursor = None
-        for _ in range(5):
-            params = {"user_id": user_id, "count": 50}
-            if cursor:
-                params["max_id"] = cursor
-            r = requests.get(
-                "https://api.hikerapi.com/v1/user/clips/chunk",
-                params=params,
-                headers={"x-access-key": HIKERAPI_KEY},
-                timeout=TIMEOUT,
-            )
-            if not r.ok:
-                return f"clips {r.status_code}"
-            data = r.json()
-            if isinstance(data, list):
-                for entry in data:
-                    if isinstance(entry, list):
-                        items.extend(entry)
-                    elif isinstance(entry, dict):
-                        items.append(entry)
-                break
-            elif isinstance(data, dict):
-                items.extend(data.get("items", []) or data.get("clips", []) or [])
-                cursor = data.get("next_max_id") or data.get("end_cursor")
-                if not cursor:
-                    break
-            else:
-                break
+        r = requests.get(
+            "https://api.hikerapi.com/v1/user/clips/chunk",
+            params={"user_id": user_id, "count": 50},
+            headers={"x-access-key": HIKERAPI_KEY},
+            timeout=TIMEOUT,
+        )
+        if not r.ok:
+            return f"clips {r.status_code}"
+        data = r.json()
+        if isinstance(data, list):
+            for entry in data:
+                if isinstance(entry, list):
+                    items.extend(entry)
+                elif isinstance(entry, dict):
+                    items.append(entry)
+        elif isinstance(data, dict):
+            items.extend(data.get("items", []) or data.get("clips", []) or [])
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
         recent = 0

@@ -27,8 +27,10 @@ HIKERAPI_KEY: str = os.getenv("HIKERAPI_KEY", "")
 SOCKS_PROXY: str = os.getenv("SOCKS_PROXY", "")
 PROXY_DICT: dict = {"http": SOCKS_PROXY, "https": SOCKS_PROXY} if SOCKS_PROXY else {}
 
-# Сколько дней собирать метрики после публикации (старые ролики не трогаем)
-SCRAPE_HORIZON_DAYS: int = int(os.getenv("SCRAPE_HORIZON_DAYS", "90"))
+# Сколько дней собирать метрики после публикации (старые ролики не трогаем).
+# Снижено с 90 до 30: после месяца ролики почти не растут по просмотрам,
+# а ежедневные перепроверки 60+ дней истории — главная статья расхода HikerAPI.
+SCRAPE_HORIZON_DAYS: int = int(os.getenv("SCRAPE_HORIZON_DAYS", "30"))
 
 # Задержка между запросами к одной платформе (секунды)
 REQUEST_DELAY: float = float(os.getenv("SCRAPER_DELAY", "2.0"))

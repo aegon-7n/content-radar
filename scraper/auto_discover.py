@@ -430,6 +430,19 @@ def _parse_instagram_item(item: dict) -> Optional[dict]:
     return {"url": url, "description": desc, "published_at": published_at}
 
 
+def _oldest_published_at(items: list[dict]) -> Optional[datetime]:
+    """Минимальный published_at в страничке Reels. None если ни один не парсится."""
+    oldest: Optional[datetime] = None
+    for it in items:
+        parsed = _parse_instagram_item(it)
+        if not parsed:
+            continue
+        ts = parsed["published_at"]
+        if oldest is None or ts < oldest:
+            oldest = ts
+    return oldest
+
+
 def fetch_instagram_videos(username: str, since: datetime) -> list[dict]:
     """
     Возвращает список {'url', 'description', 'published_at'} за последние LOOKBACK_HOURS.
@@ -468,7 +481,7 @@ def fetch_instagram_videos(username: str, since: datetime) -> list[dict]:
         try:
             # Основной эндпоинт — chunks, пагинируем по next_max_id
             next_max_id = None
-            for _page in range(5):  # max 5 страниц (~250 роликов)
+            for _page in range(5):  # safety cap: 250 роликов / креатор / прогон
                 params: dict = {"user_id": user_id, "amount": 50}
                 if next_max_id:
                     params["max_id"] = next_max_id
@@ -492,6 +505,13 @@ def fetch_instagram_videos(username: str, since: datetime) -> list[dict]:
                     clips_items.extend(page_items)
                     next_max_id = chunk.get("next_max_id")
                     if not next_max_id or not page_items:
+                        break
+                    # Early exit: фид Instagram отсортирован от новых к старым.
+                    # Если самый старый ролик на странице уже за пределами окна
+                    # `since`, следующая страница точно тоже — ломаемся, чтобы
+                    # не платить HikerAPI за заведомо ненужные данные.
+                    oldest = _oldest_published_at(page_items)
+                    if oldest is not None and oldest < since:
                         break
         except Exception as e:
             logger.debug("Instagram /user/clips/chunk error для @%s: %s", clean_username, e)
