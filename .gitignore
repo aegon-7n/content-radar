@@ -54,3 +54,7 @@ Thumbs.db
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
 scraper/scrapers/__pycache__/
+
+# Hand-off credentials (must never be committed)
+CREDENTIALS.md
+HANDOFF.md
