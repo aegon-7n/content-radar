@@ -2,23 +2,32 @@
 # Устанавливает cron-задачи для content-radar на сервере.
 # Запускать от root: bash /root/content-radar/scripts/setup-cron.sh
 
-set -e
+set -eu
 
 APP_DIR="/root/content-radar"
 PYTHON="$APP_DIR/scraper/venv/bin/python"
 LOG_DIR="/var/log/content-radar"
+ENV_FILE="$APP_DIR/.env.scraper"
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "ERROR: $ENV_FILE not found. Copy .env.scraper.example and fill in real values." >&2
+  exit 1
+fi
+
+set -a
+# shellcheck source=/dev/null
+source "$ENV_FILE"
+set +a
 
 mkdir -p "$LOG_DIR"
 
-DB_URL="postgresql://contentradar:cr_prod_2026@localhost:5432/content_radar"
-TT_KEY="45S3c2EI26r9woJu0ZQewPxzNV7rzZVF0CXWVa6miZiEzVJm"
-YT_KEY="AIzaSyCs9Yhmttwp38Yx4KEv08hFYHdJWtQtH5Q"
-HK_KEY="xlgysyjfstkzigwlvhegs8kd6745tv1m"
+DB_URL="${DATABASE_URL:?DATABASE_URL is required in $ENV_FILE}"
+TT_KEY="${TIKAPI_KEY:?TIKAPI_KEY is required in $ENV_FILE}"
+YT_KEY="${YOUTUBE_API_KEY:?YOUTUBE_API_KEY is required in $ENV_FILE}"
+HK_KEY="${HIKERAPI_KEY:?HIKERAPI_KEY is required in $ENV_FILE}"
 AP_TOKEN="${APIFY_TOKEN:-}"
-SOCKS="socks5://127.0.0.1:1080"
+SOCKS="${SOCKS_PROXY:-socks5://127.0.0.1:1080}"
 
-# Telegram alerting. Fill both vars to enable push notifications on audit
-# failures / scraper errors. Leave empty to fall back to log-only signal.
 TG_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 TG_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 

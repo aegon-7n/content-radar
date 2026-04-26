@@ -113,12 +113,14 @@ tail -f /var/log/content-radar/audit.log     # сверка
 
 ## Ротация секретов
 
-Сейчас **API-ключи лежат в `scripts/setup-cron.sh`** в открытом виде, и они уже видны в git history. Это значит при передаче проекта новым агентам нужно:
+Cron-секреты хранятся в `/root/content-radar/.env.scraper` (gitignored). Скрипт `setup-cron.sh` читает их оттуда при генерации crontab.
+
+При ротации ключей:
 
 1. **Получить новые ключи** в HikerAPI / TikAPI / YouTube API console / Apify (revoke старые).
-2. **Обновить `.env.local` локально** и `.env` на VPS.
-3. **Обновить `scripts/setup-cron.sh`** — но лучше переписать его так, чтобы он читал ключи из `/root/content-radar/.env`, а не хардкодил их. Это отдельный таск из бэклога.
-4. **Очистить git history** через `git filter-repo` или `BFG Repo Cleaner` если хочется убрать старые ключи из истории. Но проще — революки старых ключей; история становится бесполезной.
+2. **Обновить `.env.scraper`** на VPS, затем перегенерировать cron: `bash scripts/setup-cron.sh`.
+3. **Обновить `.env.local`** если фронт тоже использует ключ.
+4. **Git history содержит старые ключи** (до этого фикса они были захардкожены). Революкайте старые ключи — это надёжнее, чем чистка истории.
 
 ## Бэкапы
 
@@ -138,7 +140,7 @@ tail -f /var/log/content-radar/audit.log     # сверка
 6. Восстановить данные из бэкапа (если есть) → `psql -U contentradar -d content_radar < dump.sql`.
 7. Создать `.env.local` для фронта и `.env` для скрейпера. Заполнить все ключи.
 8. Поднять Python venv: `cd scraper && python3 -m venv venv && venv/bin/pip install -r requirements.txt`.
-9. Настроить cron: `bash scripts/setup-cron.sh` (предварительно отредактировав ключи).
+9. Создать `.env.scraper` из `.env.scraper.example`, заполнить ключи. Настроить cron: `bash scripts/setup-cron.sh`.
 10. Поднять SSH-туннель к EU-VPS для TikTok-прокси (см. [scraper/CLAUDE.md](../scraper/CLAUDE.md)).
 11. Запустить фронт под PM2: `cd /root/content-radar && npm run build && pm2 start npm --name content-radar -- start && pm2 save`.
 12. Обновить `DEPLOY_HOST` (новый IP) в GitHub Secrets, добавить публичный SSH-ключ нового VPS на старый авторизованный, чтобы CI снова мог деплоить.

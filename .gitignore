@@ -58,3 +58,6 @@ scraper/scrapers/__pycache__/
 # Hand-off credentials (must never be committed)
 CREDENTIALS.md
 HANDOFF.md
+
+# Scraper secrets for cron (setup-cron.sh sources this file)
+.env.scraper
