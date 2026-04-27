@@ -269,7 +269,7 @@ export default function CreatorDetailPage() {
                   tick={{ fill: "var(--text-disabled)", fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
-                  interval="preserveStartEnd"
+                  interval={d.byDay.length <= 14 ? 0 : Math.ceil(d.byDay.length / 10) - 1}
                 />
                 <YAxis
                   tickFormatter={formatViews}
