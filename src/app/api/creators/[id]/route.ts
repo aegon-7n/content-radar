@@ -172,13 +172,28 @@ export async function GET(
           ) AS prev_views
         FROM daily_latest dl
         LEFT JOIN baseline bl ON bl.video_id = dl.video_id
+      ),
+      actual_days AS (
+        SELECT
+          day::text AS date,
+          COALESCE(SUM(GREATEST(views - prev_views, 0)), 0)::bigint AS views
+        FROM with_prev
+        GROUP BY day
+      ),
+      all_days AS (
+        SELECT d::date::text AS date
+        FROM generate_series(
+          ${from.toISOString()}::date,
+          ${to.toISOString()}::date,
+          '1 day'::interval
+        ) d
       )
       SELECT
-        day::text AS date,
-        COALESCE(SUM(GREATEST(views - prev_views, 0)), 0)::bigint AS views
-      FROM with_prev
-      GROUP BY day
-      ORDER BY day ASC
+        ad.date,
+        COALESCE(act.views, 0)::bigint AS views
+      FROM all_days ad
+      LEFT JOIN actual_days act ON act.date = ad.date
+      ORDER BY ad.date ASC
     `);
 
     // All videos with delta (no limit — frontend paginates client-side).
