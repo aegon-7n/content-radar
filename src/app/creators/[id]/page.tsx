@@ -36,6 +36,7 @@ type CreatorDetail = {
     productId: string;
     productName: string;
     wbArticle: string;
+    platform: string;
     views: number;
     videos: number;
   }>;
@@ -84,6 +85,7 @@ export default function CreatorDetailPage() {
 
   // Products table filters
   const [productSearch, setProductSearch] = useState("");
+  const [productPlatform, setProductPlatform] = useState("");
   const [productSortDir, setProductSortDir] = useState<SortDir>("desc");
 
   // Videos table filters
@@ -105,23 +107,56 @@ export default function CreatorDetailPage() {
       .finally(() => setLoading(false));
   }, [id, period]);
 
+  // API возвращает byProduct в виде (product, platform) пар. На клиенте
+  // сначала фильтруем по платформе, затем сворачиваем в одну строку на товар.
   const filteredProducts = useMemo(() => {
     if (!data) return [];
-    let result = [...data.byProduct];
+
+    let rows = data.byProduct;
+    if (productPlatform) rows = rows.filter((r) => r.platform === productPlatform);
+
+    const grouped = new Map<
+      string,
+      { productId: string; productName: string; wbArticle: string; views: number; videos: number }
+    >();
+    for (const r of rows) {
+      const ex = grouped.get(r.productId);
+      if (ex) {
+        ex.views += r.views;
+        ex.videos += r.videos;
+      } else {
+        grouped.set(r.productId, {
+          productId: r.productId,
+          productName: r.productName,
+          wbArticle: r.wbArticle,
+          views: r.views,
+          videos: r.videos,
+        });
+      }
+    }
+    let result = Array.from(grouped.values());
+
     if (productSearch) {
       const q = productSearch.toLowerCase();
       result = result.filter(
-        (p) =>
-          p.productName.toLowerCase().includes(q) ||
-          p.wbArticle.includes(q)
+        (p) => p.productName.toLowerCase().includes(q) || p.wbArticle.includes(q)
       );
     }
+
     result.sort((a, b) => {
       const mul = productSortDir === "asc" ? 1 : -1;
       return (a.views - b.views) * mul;
     });
     return result;
-  }, [data, productSearch, productSortDir]);
+  }, [data, productSearch, productPlatform, productSortDir]);
+
+  // Платформы, по которым у этого креатора есть товары — для dropdown.
+  const productPlatforms = useMemo(() => {
+    if (!data) return [] as string[];
+    const set = new Set<string>();
+    for (const r of data.byProduct) set.add(r.platform);
+    return Array.from(set);
+  }, [data]);
 
   const filteredVideos = useMemo(() => {
     if (!data) return [];
@@ -380,6 +415,17 @@ export default function CreatorDetailPage() {
                   style={{ ...inputBase, width: "180px" }}
                 />
               </div>
+              <select
+                value={productPlatform}
+                onChange={(e) => setProductPlatform(e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg text-xs focus:outline-none appearance-none cursor-pointer"
+                style={inputBase}
+              >
+                <option value="">Все платформы</option>
+                {productPlatforms.map((p) => (
+                  <option key={p} value={p}>{getPlatformLabel(p)}</option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={() => setProductSortDir((d) => (d === "asc" ? "desc" : "asc"))}

@@ -122,19 +122,22 @@ export async function GET(
       ORDER BY views DESC
     `);
 
-    // Delta per product (for the creator).
+    // Delta per (product, platform) so the client can filter the products
+    // table by platform without a refetch. Client folds rows back into
+    // per-product totals based on the active platform filter.
     const byProductResult = await db.execute(sql`
       WITH deltas AS (${perVideoDelta(from.toISOString(), to.toISOString())})
       SELECT
         p.id AS product_id,
         p.name AS product_name,
         p.wb_article,
+        d.platform,
         COALESCE(SUM(d.delta), 0)::bigint AS views,
         COUNT(*) FILTER (WHERE d.delta > 0)::int AS videos
       FROM deltas d
       LEFT JOIN products p ON p.id = d.product_id
       WHERE p.id IS NOT NULL
-      GROUP BY p.id, p.name, p.wb_article
+      GROUP BY p.id, p.name, p.wb_article, d.platform
       ORDER BY views DESC
     `);
 
@@ -245,12 +248,14 @@ export async function GET(
         product_id: string;
         product_name: string;
         wb_article: string;
+        platform: string;
         views: string;
         videos: number;
       }>).map((row) => ({
         productId: row.product_id,
         productName: row.product_name,
         wbArticle: row.wb_article,
+        platform: row.platform,
         views: Number(row.views),
         videos: Number(row.videos),
       })),
