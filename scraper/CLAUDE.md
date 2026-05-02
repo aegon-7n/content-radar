@@ -7,7 +7,7 @@
 | Время | Скрипт | Что делает | Запись в БД |
 |---|---|---|---|
 | 00:00 | `auto_discover.py` | По username/channel_id креатора находит **новые** ролики за `LOOKBACK_HOURS` (мин 7д, макс 30д, self-healing). Извлекает артикул WB из описания (5+ цифр подряд). Если артикул новый — создаёт `products` с `needs_review=1`. | INSERT в `videos` |
-| 00:10 | `run_daily.py` | Для каждого ролика моложе `SCRAPE_HORIZON_DAYS` (по умолчанию **30**) и с `fail_streak < 3` запрашивает свежие метрики. На неудаче инкрементит `fail_streak`, на успехе сбрасывает. | INSERT в `video_metrics` |
+| 00:10 | `run_daily.py` | Для каждого ролика моложе `SCRAPE_HORIZON_DAYS` (по умолчанию **30**) и с `fail_streak < 3` запрашивает свежие метрики. **Adaptive cadence**: ролики ≤ `FRESH_DAYS` (по умолчанию 14) скрейпим каждый день; старше — раз в `STALE_GAP_DAYS + 1` дней (по умолчанию каждые 3 дня). На неудаче инкрементит `fail_streak`, на успехе сбрасывает. | INSERT в `video_metrics` |
 | 01:00 | `audit.py` | Сверяет «сколько роликов реально опубликовано за 30д на платформе» vs «сколько у нас в БД». При расхождении ≥1 → exit 1 → Telegram-алерт. | UPDATE `scraper_state` |
 
 Все три пишут результат в таблицу `scraper_state` (`job_name` PK), оттуда читает `/api/health`. Расписание зашито в [scripts/setup-cron.sh](../scripts/setup-cron.sh).
