@@ -42,6 +42,13 @@ types/       глобальные .d.ts
 **Внутренний триггер**
 - `scrape` — POST с `Authorization: Bearer ${SCRAPE_SECRET}`. Спавнит Python-subprocess в `scraper/`. Поддерживает `?async=true` (202 + фоновый запуск) или блокирующий режим. Не выставлять наружу без токена.
 
+**Публичный приём заявок (без NextAuth-сессии)**
+- `waitlist` — POST с `Authorization: Bearer ${WAITLIST_INGEST_SECRET}`. Принимает заявки с лендинга (`content-radar-landing` на Vercel). Поток: Zod-валидация → in-memory rate limit (5 req/min/IP) → INSERT в `waitlist_signups` → Resend email пользователю + Telegram-уведомление админу. Если `RESEND_API_KEY` или Telegram env не заданы — пропускает соответствующий шаг с `console.warn`, не падает. Путь `/api/waitlist` уже исключён из NextAuth-middleware (regex `(?!api|...)` в `middleware.ts` покрывает весь `/api`).
+
+## Маршруты `/admin/`
+
+- **`/admin/waitlist`** — Server Component за NextAuth (middleware защищает всё кроме `/api` и `/login`). Таблица заявок с фильтром по статусу (`?status=new|contacted|onboarded|rejected`), сортировка `created_at DESC`, лимит 100. Смена статуса — Server Action `updateStatus` (form + hidden id + select). Счётчики «Всего / Новых» в шапке. Ссылка в боковом меню под «Настройки».
+
 ## Паттерны
 
 **Server vs client.** Корневой `layout.tsx` — server. Большинство страниц-листов и дашборд — `"use client"`, т.к. нужны `useState` для периода/сортировки и `useEffect` для запросов. `Header`/`Sidebar`/`AppShell` — тоже клиентские (нужен `usePathname`). API-роуты, естественно, server.

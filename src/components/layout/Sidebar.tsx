@@ -10,6 +10,7 @@ import {
   Video,
   Settings,
   Radio,
+  Inbox,
 } from "lucide-react";
 
 const navItems = [
@@ -18,6 +19,7 @@ const navItems = [
   { href: "/products", label: "Товары", icon: Package },
   { href: "/videos", label: "Ролики", icon: Video },
   { href: "/settings", label: "Настройки", icon: Settings },
+  { href: "/admin/waitlist", label: "Waitlist", icon: Inbox },
 ];
 
 function formatLastSync(iso: string | null): string {

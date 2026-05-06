@@ -13,6 +13,7 @@ users (1) ─── (N) creators
                               fail_streak ≥ 3 → "недоступно"
 
 scraper_state    — отдельная таблица для метаданных трёх крон-джобов.
+waitlist_signups — лиды с публичного лендинга. Не связана с users.
 ```
 
 **`users`** — single-tenant пока что. Один админ, всё остальное FK на этого юзера.
@@ -31,6 +32,32 @@ scraper_state    — отдельная таблица для метаданны
 - скрейпером — для self-healing lookback (`compute_lookback_hours`),
 - API `/api/health` — для светофора в UI и health-check'ов.
 
+**`waitlist_signups`** — лиды с публичного лендинга. Не связана с `users` — это pre-signup записи. Поля:
+
+| Колонка | Тип | Назначение |
+|---|---|---|
+| `id` | serial | PK, auto-increment |
+| `email` | text NOT NULL | Контактный email заявителя |
+| `phone` | text | Телефон (опционально) |
+| `brand` | text NOT NULL | Название бренда/магазина |
+| `creators_range` | text NOT NULL | Кол-во креаторов: `"1-5"` / `"6-20"` / `"20+"` |
+| `source` | text | UTM-источник или идентификатор формы |
+| `consent_accepted_at` | timestamptz NOT NULL | Момент согласия с политикой (GDPR-трекинг) |
+| `status` | text DEFAULT `'new'` | Этап воронки: `"new"` / `"contacted"` / `"onboarded"` / `"rejected"` |
+| `notes` | text | Внутренние заметки менеджера |
+| `created_at` | timestamptz DEFAULT now() | Время создания записи |
+
+Как наполняется: через POST `/api/waitlist` (endpoint — вторая фаза). Лендинг (`content-radar-landing/`) делает server-to-server запрос на основной VPS.
+
+Инварианты `waitlist_signups`:
+- **Append-only по смыслу лида.** Один email может появиться дважды — это валидно (человек исправил данные, отправил снова). Поэтому `UNIQUE` на `email` **не ставится**.
+- Не апсертим — каждая отправка формы = новая строка.
+- `consent_accepted_at` заполняет лендинг в момент клика «Отправить» — не `DEFAULT NOW()`, чтобы зафиксировать реальный момент согласия, а не момент записи в БД.
+
+Индексы:
+- `idx_waitlist_signups_created_at` ON `created_at` — основная сортировка в будущей админ-странице (`ORDER BY created_at DESC`).
+- `idx_waitlist_signups_status` ON `status` — фильтрация по этапу воронки.
+
 ## Платформенный enum
 
 ```ts
@@ -41,7 +68,7 @@ platformEnum = ["tiktok", "youtube", "instagram", "likee", "pinterest"]
 
 ## Файлы
 
-- `schema.ts` — определения таблиц + inferred-типы (`User`, `Creator`, `Product`, `Video`, `VideoMetric`, `ScraperState`, `Platform`).
+- `schema.ts` — определения таблиц + inferred-типы (`User`, `Creator`, `Product`, `Video`, `VideoMetric`, `ScraperState`, `Platform`, `WaitlistSignup`).
 - `index.ts` — drizzle-клиент (используется в API-роутах).
 - `seed.ts` — реальные данные клиента (3 креатора, ~13 товаров с артикулами WB). Запускается через `npm run db:seed`.
 

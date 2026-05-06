@@ -111,6 +111,33 @@ tail -f /var/log/content-radar/audit.log     # сверка
 1. Локальная схема разошлась с прод-БД. На проде запусти `npm run db:push` (для single-dev) или `db:migrate` (с миграциями).
 2. **Проверь, что Python-скрейпер тоже работает с новой схемой** — в `scraper/db.py` колонки захардкожены.
 
+## DNS-миграция на app.contentradar.app
+
+Лендинг (`content-radar-landing`) задеплоен на Vercel и хочет занять корневой домен `contentradar.app`. Само приложение переезжает на поддомен `app.contentradar.app`. Первый клиент сейчас работает — нельзя обрезать доступ.
+
+Порядок действий без даунтайма:
+
+1. **В Vercel (лендинг)** → Domains → добавить `app.contentradar.app`. Vercel выдаст CNAME-запись.
+2. **В DNS** → добавить `CNAME app → <vercel-cname>`. VPS ещё отвечает на корневом домене — клиент продолжает работать.
+3. **В `.env.local` на VPS** → обновить `NEXTAUTH_URL=https://app.contentradar.app`.
+4. **Выдать клиенту ссылку `app.contentradar.app`**, попросить попользоваться 2-3 дня.
+5. После подтверждения: **в DNS** → переключить `A @` / `ALIAS @` с IP VPS на Vercel (лендинг занимает корневой домен).
+6. **На Nginx/VPS** → добавить `301 Redirect` с `contentradar.app` на `app.contentradar.app` (или через Vercel Redirect).
+7. Убедиться что `WAITLIST_INGEST_SECRET` на Vercel-лендинге совпадает с тем что на VPS.
+
+При откате: вернуть DNS `A @` на IP VPS, `NEXTAUTH_URL` не трогать — `app.contentradar.app` продолжит работать.
+
+## Ротация WAITLIST_INGEST_SECRET
+
+Секрет используется для server-to-server auth между лендингом (Vercel) и основным приложением (VPS). Ротация без даунтайма:
+
+1. Сгенерировать новый секрет: `openssl rand -hex 32`.
+2. **Сначала** обновить на VPS: `/root/content-radar/.env.local` → `WAITLIST_INGEST_SECRET=<new>`, затем `pm2 restart content-radar --update-env`. VPS теперь принимает только новый секрет.
+3. **Сразу** обновить в Vercel: Dashboard → content-radar-landing → Settings → Environment Variables → `WAITLIST_INGEST_SECRET`. Redeploy Vercel (или дождаться auto-deploy при следующем push).
+4. Проверить: отправить тестовую заявку с лендинга, убедиться что в `/admin/waitlist` появилась строка и пришёл Telegram.
+
+Если между шагами 2 и 3 лендинг отправит заявку — она вернёт 401 (секрет старый). Период риска — время Vercel-деплоя (обычно < 1 минуты). Потерянные заявки в этот момент придётся добавить вручную через `/admin/waitlist`.
+
 ## Ротация секретов
 
 Сейчас **API-ключи лежат в `scripts/setup-cron.sh`** в открытом виде, и они уже видны в git history. Это значит при передаче проекта новым агентам нужно:

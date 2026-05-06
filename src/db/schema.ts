@@ -6,6 +6,8 @@ import {
   bigint,
   timestamp,
   pgEnum,
+  serial,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const platformEnum = pgEnum("platform", [
@@ -106,6 +108,33 @@ export const scraperState = pgTable("scraper_state", {
   lastMessage: text("last_message"),
 });
 
+// Lead capture from the public landing page. Not linked to users — pre-signup.
+// Append-only: one row per submission, duplicates by email are intentional
+// (a prospect may re-submit with corrected data).
+export const waitlistSignups = pgTable(
+  "waitlist_signups",
+  {
+    id: serial("id").primaryKey(),
+    email: text("email").notNull(),
+    phone: text("phone"),
+    brand: text("brand").notNull(),
+    creatorsRange: text("creators_range").notNull(), // "1-5" | "6-20" | "20+"
+    source: text("source"),
+    consentAcceptedAt: timestamp("consent_accepted_at", {
+      withTimezone: true,
+    }).notNull(),
+    status: text("status").notNull().default("new"), // "new" | "contacted" | "onboarded" | "rejected"
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("idx_waitlist_signups_created_at").on(t.createdAt),
+    index("idx_waitlist_signups_status").on(t.status),
+  ],
+);
+
 // Inferred types for use in application code
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -126,3 +155,6 @@ export type ScraperState = typeof scraperState.$inferSelect;
 export type NewScraperState = typeof scraperState.$inferInsert;
 
 export type Platform = (typeof platformEnum.enumValues)[number];
+
+export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
+export type NewWaitlistSignup = typeof waitlistSignups.$inferInsert;

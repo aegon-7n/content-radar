@@ -59,6 +59,41 @@
   rsync кода → npm ci && npm run build → pm2 restart content-radar.
 ```
 
+## Лендинг и воронка заявок
+
+Публичный лендинг живёт в **отдельном репо** `content-radar-landing`, задеплоен на Vercel, доступен по домену `contentradar.app`.
+
+Само приложение (этот репо) переезжает на `app.contentradar.app` — так лендинг-домен можно передать Vercel, сохранив производственный доступ первого клиента.
+
+Поток заявки с лендинга:
+
+```
+Посетитель contentradar.app
+        │
+        │ POST /api/submit (Next.js лендинг на Vercel)
+        ▼
+Лендинг → POST https://app.contentradar.app/api/waitlist
+          Authorization: Bearer ${WAITLIST_INGEST_SECRET}
+        │
+        ▼
+VPS (Next.js) /api/waitlist
+  ├─ Zod-валидация
+  ├─ rate-limit by IP (5 req/min, in-memory Map)
+  ├─ INSERT → waitlist_signups
+  ├─ Resend email → пользователю (подтверждение заявки)
+  └─ Telegram Bot → TELEGRAM_CHAT_ID (уведомление админу)
+```
+
+Переменные окружения: `WAITLIST_INGEST_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`. `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` уже используются скрейпером — общие для всех уведомлений.
+
+Управление заявками: `/admin/waitlist` — Server Component за NextAuth, таблица с фильтром по статусу, Server Action для смены статуса.
+
+| Сервис | Назначение | Стоимость |
+|---|---|---|
+| Vercel (лендинг) | Хостинг `contentradar.app` | бесплатный Hobby — **риск:** ToS Hobby формально только для non-commercial; принято осознанно ради быстрого старта. План миграции: при апгрейде VPS-конфига перевезти лендинг на тот же VPS под PM2; либо апгрейд до Vercel Pro $20/мес как промежуточный шаг. См. [backlog.md → Лендинг и хостинг](backlog.md#лендинг-и-хостинг). |
+| Resend | Email подтверждения заявки | бесплатно до 3K emails/мес |
+| Cloudflare | DNS + proxy для `contentradar.app` и `app.contentradar.app` | бесплатный Free план, режим **Full** |
+
 ## Модель данных
 
 Полная схема — в [src/db/schema.ts](../src/db/schema.ts), пояснения и инварианты — в [src/db/CLAUDE.md](../src/db/CLAUDE.md).
@@ -71,7 +106,8 @@ users (1) ─┬─→ creators (N) ─┐
                             │
                             └─ fail_streak ≥ 3 → "недоступно"
 
-scraper_state — три строки на три крон-джоба, для self-healing lookback
+scraper_state    — три строки на три крон-джоба, для self-healing lookback
+waitlist_signups — лиды с лендинга (не связаны с users, pre-signup)
 ```
 
 **Ключевой инвариант:** `video_metrics` — append-only. Каждый успешный скрейп = новая строка с `scraped_at`. Любая дельта-аналитика держится на этом свойстве.
@@ -117,7 +153,9 @@ delta(video) = MAX(views) WHERE scraped_at <= to
 | HikerAPI | Instagram метрики | ~$0.0006-0.003/req | https://hikerapi.com |
 | Apify | Likee метрики | ~$0.01/ролик | https://apify.com |
 | Pinterest | RSS + HTML | бесплатно | https://www.pinterest.com |
-| Telegram Bot | Алерты | бесплатно | https://t.me/BotFather |
+| Telegram Bot | Алерты скрейпера + waitlist-уведомления | бесплатно | https://t.me/BotFather |
+| Resend | Email-подтверждение заявок на waitlist | бесплатно до 3K/мес | https://resend.com |
+| Vercel | Хостинг лендинга `contentradar.app` | бесплатно (hobby) | https://vercel.com |
 
 Точная разбивка стоимости — в [scraper/CLAUDE.md](../scraper/CLAUDE.md). Ежедневный расход на дату 2026-04-26 — около **$1.7-1.8/сутки** (доминирует HikerAPI).
 
