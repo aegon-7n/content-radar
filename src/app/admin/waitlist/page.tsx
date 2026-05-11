@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { waitlistSignups } from "@/db/schema";
 import type { WaitlistSignup } from "@/db/schema";
-import { eq, desc, count } from "drizzle-orm";
+import { eq, and, desc, count, isNotNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { getToken } from "next-auth/jwt";
@@ -106,18 +106,26 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 interface PageProps {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; campaign?: string }>;
 }
 
 export default async function WaitlistPage({ searchParams }: PageProps) {
-  const { status: statusFilter } = await searchParams;
+  const { status: statusFilter, campaign: campaignFilter } = await searchParams;
 
-  // Build query — filter by status if provided and valid
-  const rows: WaitlistSignup[] = statusFilter && isValidStatus(statusFilter)
+  // Build query — filter by status and/or utm_campaign
+  const conditions = [];
+  if (statusFilter && isValidStatus(statusFilter)) {
+    conditions.push(eq(waitlistSignups.status, statusFilter));
+  }
+  if (campaignFilter) {
+    conditions.push(eq(waitlistSignups.utmCampaign, campaignFilter));
+  }
+
+  const rows: WaitlistSignup[] = conditions.length > 0
     ? await db
         .select()
         .from(waitlistSignups)
-        .where(eq(waitlistSignups.status, statusFilter))
+        .where(conditions.length === 1 ? conditions[0] : and(...conditions))
         .orderBy(desc(waitlistSignups.createdAt))
         .limit(100)
     : await db
@@ -134,6 +142,16 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
     .select({ total: count() })
     .from(waitlistSignups)
     .where(eq(waitlistSignups.status, "new"));
+
+  // Distinct campaigns for filter
+  const campaignRows = await db
+    .selectDistinct({ campaign: waitlistSignups.utmCampaign })
+    .from(waitlistSignups)
+    .where(isNotNull(waitlistSignups.utmCampaign))
+    .orderBy(waitlistSignups.utmCampaign);
+  const campaigns = campaignRows
+    .map((r) => r.campaign)
+    .filter((c): c is string => c !== null);
 
   const total = totals?.total ?? 0;
   const newTotal = newCount?.total ?? 0;
@@ -179,35 +197,80 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      {/* Status filter tab-bar */}
-      <div
-        className="flex items-center gap-1 p-1 rounded-xl w-fit"
-        style={{
-          background: "var(--surface-1)",
-          border: "1px solid var(--border-default)",
-        }}
-      >
-        {FILTER_TABS.map((tab) => {
-          const isActive = (statusFilter ?? "") === tab.value;
-          const href =
-            tab.value === ""
-              ? "/admin/waitlist"
-              : `/admin/waitlist?status=${tab.value}`;
-          return (
-            <a
-              key={tab.value}
-              href={href}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+      {/* Filters row */}
+      <div className="flex items-center gap-4 flex-wrap">
+        {/* Status filter tab-bar */}
+        <div
+          className="flex items-center gap-1 p-1 rounded-xl w-fit"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          {FILTER_TABS.map((tab) => {
+            const isActive = (statusFilter ?? "") === tab.value;
+            const params = new URLSearchParams();
+            if (tab.value) params.set("status", tab.value);
+            if (campaignFilter) params.set("campaign", campaignFilter);
+            const qs = params.toString();
+            const href = `/admin/waitlist${qs ? `?${qs}` : ""}`;
+            return (
+              <a
+                key={tab.value}
+                href={href}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  background: isActive ? "var(--surface-3)" : "transparent",
+                  color: isActive ? "var(--text-primary)" : "var(--text-muted)",
+                  textDecoration: "none",
+                }}
+              >
+                {tab.label}
+              </a>
+            );
+          })}
+        </div>
+
+        {/* Campaign filter */}
+        {campaigns.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Кампания:
+            </span>
+            <div
+              className="flex items-center gap-1 p-1 rounded-xl w-fit"
               style={{
-                background: isActive ? "var(--surface-3)" : "transparent",
-                color: isActive ? "var(--text-primary)" : "var(--text-muted)",
-                textDecoration: "none",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
               }}
             >
-              {tab.label}
-            </a>
-          );
-        })}
+              {[{ value: "", label: "Все" }, ...campaigns.map((c) => ({ value: c, label: c }))].map(
+                (tab) => {
+                  const isActive = (campaignFilter ?? "") === tab.value;
+                  const params = new URLSearchParams();
+                  if (statusFilter) params.set("status", statusFilter);
+                  if (tab.value) params.set("campaign", tab.value);
+                  const qs = params.toString();
+                  const href = `/admin/waitlist${qs ? `?${qs}` : ""}`;
+                  return (
+                    <a
+                      key={tab.value}
+                      href={href}
+                      className="px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                      style={{
+                        background: isActive ? "var(--surface-3)" : "transparent",
+                        color: isActive ? "var(--text-primary)" : "var(--text-muted)",
+                        textDecoration: "none",
+                      }}
+                    >
+                      {tab.label}
+                    </a>
+                  );
+                },
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Table / empty state */}
@@ -255,6 +318,7 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
                     "Бренд",
                     "Креаторов",
                     "Источник",
+                    "Кампания",
                     "Статус",
                   ].map((h) => (
                     <th
@@ -327,6 +391,15 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
                       style={{ color: "var(--text-muted)" }}
                     >
                       {row.source ?? "—"}
+                    </td>
+
+                    {/* UTM Campaign */}
+                    <td
+                      className="px-4 py-3 whitespace-nowrap text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                      title={[row.utmSource, row.utmMedium, row.utmCampaign].filter(Boolean).join(" / ") || undefined}
+                    >
+                      {row.utmCampaign ?? "—"}
                     </td>
 
                     {/* Status badge */}

@@ -41,7 +41,13 @@ waitlist_signups — лиды с публичного лендинга. Не с�
 | `phone` | text | Телефон (опционально) |
 | `brand` | text NOT NULL | Название бренда/магазина |
 | `creators_range` | text NOT NULL | Кол-во креаторов: `"1-5"` / `"6-20"` / `"20+"` |
-| `source` | text | UTM-источник или идентификатор формы |
+| `source` | text | Идентификатор формы (legacy, для обратной совместимости) |
+| `utm_source` | text | UTM-параметр: источник трафика (`partner`, `founder`, …) |
+| `utm_medium` | text | UTM-параметр: канал (`telegram`, `email`, …) |
+| `utm_campaign` | text | UTM-параметр: кампания (`cohort_a_teaser`, …) |
+| `utm_content` | text | UTM-параметр: вариант креатива |
+| `utm_term` | text | UTM-параметр: ключевое слово |
+| `referrer` | text | HTTP Referer на момент отправки формы |
 | `consent_accepted_at` | timestamptz NOT NULL | Момент согласия с политикой (GDPR-трекинг) |
 | `status` | text DEFAULT `'new'` | Этап воронки: `"new"` / `"contacted"` / `"onboarded"` / `"rejected"` |
 | `notes` | text | Внутренние заметки менеджера |
@@ -55,8 +61,9 @@ waitlist_signups — лиды с публичного лендинга. Не с�
 - `consent_accepted_at` заполняет лендинг в момент клика «Отправить» — не `DEFAULT NOW()`, чтобы зафиксировать реальный момент согласия, а не момент записи в БД.
 
 Индексы:
-- `idx_waitlist_signups_created_at` ON `created_at` — основная сортировка в будущей админ-странице (`ORDER BY created_at DESC`).
+- `idx_waitlist_signups_created_at` ON `created_at` — основная сортировка в админ-странице (`ORDER BY created_at DESC`).
 - `idx_waitlist_signups_status` ON `status` — фильтрация по этапу воронки.
+- `idx_waitlist_signups_utm_campaign` ON `utm_campaign` — фильтрация по кампании в `/admin/waitlist`.
 
 ## Платформенный enum
 

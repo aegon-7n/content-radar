@@ -120,6 +120,12 @@ export const waitlistSignups = pgTable(
     brand: text("brand").notNull(),
     creatorsRange: text("creators_range").notNull(), // "1-5" | "6-20" | "20+"
     source: text("source"),
+    utmSource: text("utm_source"),
+    utmMedium: text("utm_medium"),
+    utmCampaign: text("utm_campaign"),
+    utmContent: text("utm_content"),
+    utmTerm: text("utm_term"),
+    referrer: text("referrer"),
     consentAcceptedAt: timestamp("consent_accepted_at", {
       withTimezone: true,
     }).notNull(),
@@ -132,6 +138,7 @@ export const waitlistSignups = pgTable(
   (t) => [
     index("idx_waitlist_signups_created_at").on(t.createdAt),
     index("idx_waitlist_signups_status").on(t.status),
+    index("idx_waitlist_signups_utm_campaign").on(t.utmCampaign),
   ],
 );
 

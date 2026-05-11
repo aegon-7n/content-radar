@@ -53,6 +53,12 @@ const SubmitSchema = z.object({
   brand: z.string().min(1).max(200),
   creatorsRange: z.enum(["1-5", "6-20", "20+"]),
   source: z.string().max(64).optional().nullable(),
+  utmSource: z.string().max(64).optional().nullable(),
+  utmMedium: z.string().max(64).optional().nullable(),
+  utmCampaign: z.string().max(128).optional().nullable(),
+  utmContent: z.string().max(128).optional().nullable(),
+  utmTerm: z.string().max(128).optional().nullable(),
+  referrer: z.string().max(2048).optional().nullable(),
   consent: z.literal(true),
   consentAcceptedAt: z.string().datetime().optional(),
 });
@@ -140,6 +146,7 @@ async function sendTelegramNotification(
   brand: string,
   creatorsRange: string,
   source: string | null | undefined,
+  utmCampaign: string | null | undefined,
   insertedId: number
 ): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -159,6 +166,7 @@ async function sendTelegramNotification(
     `Бренд: <code>${brand}</code>\n` +
     `Креаторов: <code>${creatorsRange}</code>\n` +
     `Источник: <code>${source ?? "—"}</code>\n` +
+    `Кампания: <code>${utmCampaign ?? "—"}</code>\n` +
     `ID: #${insertedId}`;
 
   const res = await fetch(
@@ -232,8 +240,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { email, phone, brand, creatorsRange, source, consentAcceptedAt } =
-    parsed.data;
+  const {
+    email, phone, brand, creatorsRange, source,
+    utmSource, utmMedium, utmCampaign, utmContent, utmTerm, referrer,
+    consentAcceptedAt,
+  } = parsed.data;
 
   // 4. INSERT into waitlist_signups
   const consentAt = consentAcceptedAt
@@ -248,6 +259,12 @@ export async function POST(request: NextRequest) {
       brand,
       creatorsRange,
       source: source ?? null,
+      utmSource: utmSource ?? null,
+      utmMedium: utmMedium ?? null,
+      utmCampaign: utmCampaign ?? null,
+      utmContent: utmContent ?? null,
+      utmTerm: utmTerm ?? null,
+      referrer: referrer ?? null,
       consentAcceptedAt: consentAt,
       status: "new",
     })
@@ -258,7 +275,7 @@ export async function POST(request: NextRequest) {
   // 5 & 6. Notify — both in parallel, wait for both (lids are rare, latency ok)
   await Promise.allSettled([
     sendConfirmationEmail(email, brand),
-    sendTelegramNotification(email, phone, brand, creatorsRange, source, insertedId),
+    sendTelegramNotification(email, phone, brand, creatorsRange, source, utmCampaign, insertedId),
   ]);
 
   return NextResponse.json({ ok: true });
