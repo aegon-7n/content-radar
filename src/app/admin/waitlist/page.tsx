@@ -6,10 +6,10 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { getToken } from "next-auth/jwt";
 import { formatDate } from "@/lib/format";
+import { requireEnv } from "@/lib/env";
 
-// Defence-in-depth: middleware уже защищает /admin/*, но Server Action
-// валидирует токен явно — на случай если matcher изменится и кто-то
-// дёрнет действие напрямую с подделанным cookie.
+const SECRET = requireEnv("NEXTAUTH_SECRET");
+
 async function requireSession(): Promise<boolean> {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore
@@ -18,7 +18,7 @@ async function requireSession(): Promise<boolean> {
     .join("; ");
   const token = await getToken({
     req: { headers: { cookie: cookieHeader } } as Parameters<typeof getToken>[0]["req"],
-    secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production",
+    secret: SECRET,
   });
   return token !== null;
 }

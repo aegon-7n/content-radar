@@ -1,8 +1,9 @@
 import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { requireEnv } from "@/lib/env";
 
-const SECRET = process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production";
+const SECRET = requireEnv("NEXTAUTH_SECRET");
 
 export async function middleware(request: NextRequest) {
   try {
