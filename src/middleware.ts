@@ -5,16 +5,23 @@ import type { NextRequest } from "next/server";
 const SECRET = process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production";
 
 export async function middleware(request: NextRequest) {
-  const token = await getToken({ req: request, secret: SECRET });
+  try {
+    const token = await getToken({ req: request, secret: SECRET });
 
-  if (!token) {
+    if (!token) {
+      if (request.nextUrl.pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    return NextResponse.next();
+  } catch {
     if (request.nextUrl.pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
     return NextResponse.redirect(new URL("/login", request.url));
   }
-
-  return NextResponse.next();
 }
 
 export const config = {

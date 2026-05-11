@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { products, videos } from "@/db/schema";
 import { eq, count } from "drizzle-orm";
 import { z } from "zod";
+import { requireAuth } from "@/lib/auth";
 
 const patchProductSchema = z.object({
   name: z.string().min(1, "Название не может быть пустым").optional(),
@@ -14,6 +15,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const { id } = params;
 
@@ -58,9 +62,12 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const { id } = params;
 

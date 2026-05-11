@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { videos, users, creators, products } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { requireAuth } from "@/lib/auth";
 
 const PLATFORM_VALUES = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
 
@@ -26,6 +27,9 @@ const createVideoSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     const parsed = createVideoSchema.safeParse(body);

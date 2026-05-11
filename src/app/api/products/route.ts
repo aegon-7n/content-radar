@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
+import { requireAuth } from "@/lib/auth";
 
 /**
  * Products list — cumulative delta per product, matching /api/dashboard and
@@ -15,6 +16,9 @@ const querySchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const { searchParams } = request.nextUrl;
     const params = querySchema.parse(Object.fromEntries(searchParams));

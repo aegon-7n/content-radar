@@ -55,7 +55,11 @@ types/       глобальные .d.ts
 
 **Получение данных.** Страницы **никогда** не ходят в БД напрямую — только через `fetch('/api/...')`. Вся работа с Drizzle живёт в `app/api/*/route.ts`. На сетевой ошибке UI падает на `mock-data.ts` чтобы не показывать пустоту в деве.
 
-**Аутентификация.** [middleware.ts](middleware.ts) использует `getToken` из `next-auth/jwt` — все маршруты (включая `/api/*`) требуют JWT-токен, кроме allowlist: `/login`, `/api/auth`, `/api/health`, `/api/scrape`, `/api/waitlist`, статика. Незащищённые API-маршруты возвращают `401 JSON`, страницы — редирект на `/login`. Новые API-маршруты защищены по умолчанию (fail-closed). Для публичного маршрута — добавить в `config.matcher` allowlist.
+**Аутентификация (defense in depth).** Два слоя:
+1. [middleware.ts](middleware.ts) — `getToken` из `next-auth/jwt`, fail-closed (try/catch → 401). Все маршруты требуют JWT-токен, кроме allowlist: `/login`, `/api/auth`, `/api/health`, `/api/scrape`, `/api/waitlist`, статика.
+2. Route-level guard — каждый API handler вызывает `requireAuth(request)` из `lib/auth.ts` перед любой логикой. Если middleware упадёт/пропустит, хендлер сам вернёт 401.
+
+Новые API-маршруты **обязаны** добавить `requireAuth` в каждый экспортируемый handler. Для публичного маршрута — добавить в `config.matcher` allowlist и не вызывать `requireAuth`.
 
 **Стили.** Tailwind + CSS-переменные (`--bg-base`, `--surface-1`, `--text-primary`, `--accent-primary`, `--shadow-card`, etc.). Цвета платформ — через `getPlatformColor()` в `lib/format.ts`. Шрифты — `geist`.
 

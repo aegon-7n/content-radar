@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
+import { requireAuth } from "@/lib/auth";
 
 /**
  * Creator detail — cumulative delta model, same as /api/dashboard.
@@ -32,6 +33,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const { id } = await params;
     const { searchParams } = request.nextUrl;

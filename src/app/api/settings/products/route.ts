@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { products, users, videos } from "@/db/schema";
 import { eq, count } from "drizzle-orm";
 import { z } from "zod";
+import { requireAuth } from "@/lib/auth";
 
 // Cache the default user id at module level
 let defaultUserId: string | null = null;
@@ -21,7 +22,10 @@ const createProductSchema = z.object({
   category: z.string().optional().or(z.literal("")),
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const result = await db
       .select({
@@ -46,6 +50,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     const parsed = createProductSchema.safeParse(body);

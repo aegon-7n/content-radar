@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { z } from "zod";
+import { requireAuth } from "@/lib/auth";
 
 const PLATFORM_VALUES = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
 
@@ -16,6 +17,9 @@ const querySchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const { searchParams } = request.nextUrl;
     const params = querySchema.parse(Object.fromEntries(searchParams));

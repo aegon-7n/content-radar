@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { videos, creators, products, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
+import { requireAuth } from "@/lib/auth";
 
 const PLATFORM_VALUES = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
 
@@ -29,6 +30,9 @@ const importItemSchema = z.object({
 const importBodySchema = z.array(importItemSchema).min(1, "Массив не может быть пустым");
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     const parsed = importBodySchema.safeParse(body);
