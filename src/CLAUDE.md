@@ -9,7 +9,7 @@ app/         маршруты (страницы + API)
 components/  переиспользуемая UI (layout, ui-kit, providers)
 db/          drizzle-схема и подключение (см. src/db/CLAUDE.md)
 lib/         утилиты форматирования, моки, helpers
-middleware.ts  next-auth guard на все non-/login, non-/api маршруты
+middleware.ts  next-auth guard на все маршруты кроме /login, /api/auth, /api/health, /api/scrape, /api/waitlist, статика
 types/       глобальные .d.ts
 ```
 
@@ -43,7 +43,7 @@ types/       глобальные .d.ts
 - `scrape` — POST с `Authorization: Bearer ${SCRAPE_SECRET}`. Спавнит Python-subprocess в `scraper/`. Поддерживает `?async=true` (202 + фоновый запуск) или блокирующий режим. Не выставлять наружу без токена.
 
 **Публичный приём заявок (без NextAuth-сессии)**
-- `waitlist` — POST с `Authorization: Bearer ${WAITLIST_INGEST_SECRET}`. Принимает заявки с лендинга (`content-radar-landing` на Vercel). Поток: Zod-валидация → in-memory rate limit (5 req/min/IP) → INSERT в `waitlist_signups` → Resend email пользователю + Telegram-уведомление админу. Если `RESEND_API_KEY` или Telegram env не заданы — пропускает соответствующий шаг с `console.warn`, не падает. Путь `/api/waitlist` уже исключён из NextAuth-middleware (regex `(?!api|...)` в `middleware.ts` покрывает весь `/api`).
+- `waitlist` — POST с `Authorization: Bearer ${WAITLIST_INGEST_SECRET}`. Принимает заявки с лендинга (`content-radar-landing` на Vercel). Поток: Zod-валидация → in-memory rate limit (5 req/min/IP) → INSERT в `waitlist_signups` → Resend email пользователю + Telegram-уведомление админу. Если `RESEND_API_KEY` или Telegram env не заданы — пропускает соответствующий шаг с `console.warn`, не падает. Путь `/api/waitlist` явно исключён из NextAuth-middleware через allowlist в `config.matcher`.
 
 ## Маршруты `/admin/`
 
@@ -55,7 +55,7 @@ types/       глобальные .d.ts
 
 **Получение данных.** Страницы **никогда** не ходят в БД напрямую — только через `fetch('/api/...')`. Вся работа с Drizzle живёт в `app/api/*/route.ts`. На сетевой ошибке UI падает на `mock-data.ts` чтобы не показывать пустоту в деве.
 
-**Аутентификация.** [middleware.ts](middleware.ts) обёрнут в `withAuth` — все маршруты, кроме `/login`, `/api`, статики, требуют токен. Токен — JWT из NextAuth.
+**Аутентификация.** [middleware.ts](middleware.ts) использует `getToken` из `next-auth/jwt` — все маршруты (включая `/api/*`) требуют JWT-токен, кроме allowlist: `/login`, `/api/auth`, `/api/health`, `/api/scrape`, `/api/waitlist`, статика. Незащищённые API-маршруты возвращают `401 JSON`, страницы — редирект на `/login`. Новые API-маршруты защищены по умолчанию (fail-closed). Для публичного маршрута — добавить в `config.matcher` allowlist.
 
 **Стили.** Tailwind + CSS-переменные (`--bg-base`, `--surface-1`, `--text-primary`, `--accent-primary`, `--shadow-card`, etc.). Цвета платформ — через `getPlatformColor()` в `lib/format.ts`. Шрифты — `geist`.
 

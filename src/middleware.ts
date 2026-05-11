@@ -1,23 +1,24 @@
-import { withAuth } from "next-auth/middleware";
+import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export default withAuth(
-  function middleware() {
-    return NextResponse.next();
-  },
-  {
-    callbacks: {
-      authorized: ({ token }) => !!token,
-    },
-    pages: {
-      signIn: "/login",
-    },
-    secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production",
+const SECRET = process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production";
+
+export async function middleware(request: NextRequest) {
+  const token = await getToken({ req: request, secret: SECRET });
+
+  if (!token) {
+    if (request.nextUrl.pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    return NextResponse.redirect(new URL("/login", request.url));
   }
-);
+
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
-    "/((?!api|login|_next/static|_next/image|favicon.ico).*)",
+    "/((?!login|_next/static|_next/image|favicon.ico|api/auth|api/health|api/scrape|api/waitlist).*)",
   ],
 };
