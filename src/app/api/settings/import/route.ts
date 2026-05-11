@@ -1,22 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { videos, creators, products, users } from "@/db/schema";
+import { videos, creators, products } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth";
 
 const PLATFORM_VALUES = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
-
-// Cache the default user id at module level
-let defaultUserId: string | null = null;
-
-async function getDefaultUserId(): Promise<string> {
-  if (defaultUserId) return defaultUserId;
-  const result = await db.select({ id: users.id }).from(users).limit(1);
-  if (!result.length) throw new Error("No users found in database");
-  defaultUserId = result[0].id;
-  return defaultUserId;
-}
 
 const importItemSchema = z.object({
   url: z.string().url("URL ролика должен быть валидным"),
@@ -30,8 +19,9 @@ const importItemSchema = z.object({
 const importBodySchema = z.array(importItemSchema).min(1, "Массив не может быть пустым");
 
 export async function POST(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   try {
     const body = await request.json();
@@ -40,16 +30,14 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Ошибка валидации", details: parsed.error.issues },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const userId = await getDefaultUserId();
     const items = parsed.data;
 
-    // In-memory caches to avoid repeated DB lookups within the same request
-    const creatorCache = new Map<string, string>(); // name -> id
-    const productCache = new Map<string, string>();  // name -> id
+    const creatorCache = new Map<string, string>();
+    const productCache = new Map<string, string>();
 
     let imported = 0;
     const errors: string[] = [];
@@ -59,7 +47,6 @@ export async function POST(request: NextRequest) {
       const itemLabel = `[${i + 1}] "${item.url}"`;
 
       try {
-        // --- Resolve creator ---
         let creatorId = creatorCache.get(item.creatorName);
 
         if (!creatorId) {
@@ -82,7 +69,6 @@ export async function POST(request: NextRequest) {
           creatorCache.set(item.creatorName, creatorId);
         }
 
-        // --- Resolve product ---
         let productId = productCache.get(item.productName);
 
         if (!productId) {
@@ -109,7 +95,6 @@ export async function POST(request: NextRequest) {
           productCache.set(item.productName, productId);
         }
 
-        // --- Insert video ---
         await db.insert(videos).values({
           userId,
           creatorId,

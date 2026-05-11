@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { products, videos } from "@/db/schema";
-import { eq, count } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth";
 
@@ -13,15 +13,20 @@ const patchProductSchema = z.object({
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   try {
     const { id } = params;
 
-    const existing = await db.select({ id: products.id }).from(products).where(eq(products.id, id)).limit(1);
+    const existing = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(and(eq(products.id, id), eq(products.userId, userId)))
+      .limit(1);
     if (!existing.length) {
       return NextResponse.json({ error: "Товар не найден" }, { status: 404 });
     }
@@ -32,14 +37,14 @@ export async function PATCH(
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Ошибка валидации", details: parsed.error.issues },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const updates: Record<string, string | number | null> = {};
     if (parsed.data.name !== undefined) {
       updates.name = parsed.data.name;
-      updates.needsReview = 0; // снимаем флаг когда пользователь задаёт имя
+      updates.needsReview = 0;
     }
     if (parsed.data.wbArticle !== undefined) updates.wbArticle = parsed.data.wbArticle;
     if (parsed.data.category !== undefined) updates.category = parsed.data.category ?? null;
@@ -51,7 +56,7 @@ export async function PATCH(
     const [updated] = await db
       .update(products)
       .set(updates)
-      .where(eq(products.id, id))
+      .where(and(eq(products.id, id), eq(products.userId, userId)))
       .returning();
 
     return NextResponse.json({ product: updated });
@@ -63,15 +68,20 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   try {
     const { id } = params;
 
-    const existing = await db.select({ id: products.id }).from(products).where(eq(products.id, id)).limit(1);
+    const existing = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(and(eq(products.id, id), eq(products.userId, userId)))
+      .limit(1);
     if (!existing.length) {
       return NextResponse.json({ error: "Товар не найден" }, { status: 404 });
     }
@@ -84,11 +94,11 @@ export async function DELETE(
     if (Number(videoCount[0].count) > 0) {
       return NextResponse.json(
         { error: "Нельзя удалить: есть ролики" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
-    await db.delete(products).where(eq(products.id, id));
+    await db.delete(products).where(and(eq(products.id, id), eq(products.userId, userId)));
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -30,8 +30,9 @@ function calcChange(current: number, previous: number): number | null {
 }
 
 export async function GET(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   try {
     const { searchParams } = request.nextUrl;
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
       FROM videos v
       LEFT JOIN end_views ev ON ev.video_id = v.id
       LEFT JOIN start_views sv ON sv.video_id = v.id
+      WHERE v.user_id = ${userId}
     `;
 
     // Current period: delta per creator.
@@ -87,6 +89,7 @@ export async function GET(request: NextRequest) {
            AND v2.published_at <= ${to.toISOString()})::int AS new_videos
       FROM creators c
       LEFT JOIN deltas d ON d.creator_id = c.id
+      WHERE c.user_id = ${userId}
       GROUP BY c.id, c.name, c.avatar_url
       ORDER BY views DESC
     `);
@@ -99,6 +102,7 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(d.delta), 0)::bigint AS views
       FROM creators c
       LEFT JOIN deltas d ON d.creator_id = c.id
+      WHERE c.user_id = ${userId}
       GROUP BY c.id
     `);
 

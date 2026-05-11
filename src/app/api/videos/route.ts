@@ -17,8 +17,9 @@ const querySchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   try {
     const { searchParams } = request.nextUrl;
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
     const countResult = await db.execute(sql`
       SELECT COUNT(DISTINCT v.id)::int AS total
       FROM videos v
-      WHERE v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
+      WHERE v.user_id = ${userId} AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
         ${creatorFilter}
         ${productFilter}
         ${platformFilter}
@@ -94,7 +95,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN latest_metrics lm ON lm.video_id = v.id
       LEFT JOIN creators c ON c.id = v.creator_id
       LEFT JOIN products p ON p.id = v.product_id
-      WHERE v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
+      WHERE v.user_id = ${userId} AND v.published_at >= ${from.toISOString()} AND v.published_at <= ${to.toISOString()}
         ${creatorFilter}
         ${productFilter}
         ${platformFilter}

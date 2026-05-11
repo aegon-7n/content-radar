@@ -22,8 +22,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   try {
     const { id } = await params;
@@ -35,9 +36,9 @@ export async function GET(
       ? new Date(query.from + "T00:00:00Z")
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    // Product info.
+    // Product info — scoped to current user.
     const productResult = await db.execute(sql`
-      SELECT id, name, wb_article FROM products WHERE id = ${id}
+      SELECT id, name, wb_article FROM products WHERE id = ${id} AND user_id = ${userId}
     `);
     if (!productResult.length) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
@@ -54,7 +55,7 @@ export async function GET(
       product_videos AS (
         SELECT v.id, v.platform, v.creator_id, v.published_at
         FROM videos v
-        WHERE v.product_id = ${id}
+        WHERE v.product_id = ${id} AND v.user_id = ${userId}
       ),
       end_views AS (
         SELECT DISTINCT ON (vm.video_id) vm.video_id, vm.views
@@ -145,7 +146,7 @@ export async function GET(
       FROM videos v
       LEFT JOIN latest_metrics lm ON lm.video_id = v.id
       LEFT JOIN creators c ON c.id = v.creator_id
-      WHERE v.product_id = ${id}
+      WHERE v.product_id = ${id} AND v.user_id = ${userId}
       ORDER BY views DESC
     `);
 

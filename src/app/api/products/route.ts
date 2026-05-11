@@ -16,8 +16,9 @@ const querySchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   try {
     const { searchParams } = request.nextUrl;
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
       FROM videos v
       LEFT JOIN end_views ev ON ev.video_id = v.id
       LEFT JOIN start_views sv ON sv.video_id = v.id
+      WHERE v.user_id = ${userId}
     `;
 
     // Totals per product.
@@ -69,6 +71,7 @@ export async function GET(request: NextRequest) {
            AND v2.published_at <= ${to.toISOString()})::int AS new_videos
       FROM products p
       LEFT JOIN deltas d ON d.product_id = p.id
+      WHERE p.user_id = ${userId}
       GROUP BY p.id, p.name, p.wb_article
       ORDER BY views DESC
     `);

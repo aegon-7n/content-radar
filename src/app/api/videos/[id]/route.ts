@@ -6,8 +6,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   try {
     const { id } = await params;
@@ -28,7 +29,7 @@ export async function GET(
       FROM videos v
       INNER JOIN creators c ON c.id = v.creator_id
       INNER JOIN products p ON p.id = v.product_id
-      WHERE v.id = ${id}
+      WHERE v.id = ${id} AND v.user_id = ${userId}
     `);
 
     if (!videoResult.length) {

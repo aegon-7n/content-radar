@@ -33,8 +33,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   try {
     const { id } = await params;
@@ -48,9 +49,9 @@ export async function GET(
 
     const { prevFrom, prevTo } = getPreviousPeriod(from, to);
 
-    // Creator info.
+    // Creator info — scoped to current user.
     const creatorResult = await db.execute(sql`
-      SELECT id, name, avatar_url FROM creators WHERE id = ${id}
+      SELECT id, name, avatar_url FROM creators WHERE id = ${id} AND user_id = ${userId}
     `);
     if (!creatorResult.length) {
       return NextResponse.json({ error: "Creator not found" }, { status: 404 });
@@ -67,7 +68,7 @@ export async function GET(
       creator_videos AS (
         SELECT v.id, v.platform, v.product_id, v.published_at, v.url
         FROM videos v
-        WHERE v.creator_id = ${id}
+        WHERE v.creator_id = ${id} AND v.user_id = ${userId}
       ),
       end_views AS (
         SELECT DISTINCT ON (vm.video_id) vm.video_id, vm.views
@@ -148,7 +149,7 @@ export async function GET(
     // Daily delta series for this creator's videos.
     const byDayResult = await db.execute(sql`
       WITH
-      creator_videos AS (SELECT id FROM videos WHERE creator_id = ${id}),
+      creator_videos AS (SELECT id FROM videos WHERE creator_id = ${id} AND user_id = ${userId}),
       baseline AS (
         SELECT DISTINCT ON (vm.video_id) vm.video_id, vm.views
         FROM video_metrics vm
