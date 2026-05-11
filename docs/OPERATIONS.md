@@ -140,12 +140,15 @@ tail -f /var/log/content-radar/audit.log     # сверка
 
 ## Ротация секретов
 
-Сейчас **API-ключи лежат в `scripts/setup-cron.sh`** в открытом виде, и они уже видны в git history. Это значит при передаче проекта новым агентам нужно:
+`scripts/setup-cron.sh` читает все ключи из `.env.local` (или `$ENV_FILE`). В скрипте нет захардкоженных секретов.
+
+**Старые ключи были в git history** (до коммита, удалившего хардкод). При передаче проекта:
 
 1. **Получить новые ключи** в HikerAPI / TikAPI / YouTube API console / Apify (revoke старые).
-2. **Обновить `.env.local` локально** и `.env` на VPS.
-3. **Обновить `scripts/setup-cron.sh`** — но лучше переписать его так, чтобы он читал ключи из `/root/content-radar/.env`, а не хардкодил их. Это отдельный таск из бэклога.
-4. **Очистить git history** через `git filter-repo` или `BFG Repo Cleaner` если хочется убрать старые ключи из истории. Но проще — революки старых ключей; история становится бесполезной.
+2. **Обновить `.env.local` на VPS** (`/root/content-radar/.env.local`).
+3. **Перезапустить cron**: `bash /root/content-radar/scripts/setup-cron.sh` — скрипт сам подхватит новые значения.
+4. **Перезапустить фронт**: `pm2 restart content-radar --update-env`.
+5. Git history: можно почистить через `git filter-repo` / BFG, но при ротации ключей это необязательно — старые ключи бесполезны.
 
 ## Бэкапы
 

@@ -65,7 +65,7 @@
 4. **`video_metrics` — append-only.** Не UPDATE, не UPSERT. Это инвариант, без которого ломается аналитика динамики.
 5. **`fail_streak`** в `videos` защищает от траты квоты на удалённые/приватные ролики (>= 3 неудач = пропускаем навсегда).
 6. **Single-tenant пока что.** Один админ, всё через `ADMIN_EMAIL`/`ADMIN_PASSWORD` в env. Multi-tenancy — в бэклоге.
-7. **Секреты в `scripts/setup-cron.sh`** — сейчас в открытом виде, известный долг.
+7. **Секреты в git history** — `scripts/setup-cron.sh` теперь читает из `.env.local`, но старые ключи засветились в git history. Нужна ротация.
 
 ## Команды разработчика
 
@@ -150,4 +150,4 @@ TELEGRAM_CHAT_ID=...
 
 ## Известные планы
 
-См. [docs/backlog.md](docs/backlog.md). Главное в очереди: CI/CD деплой, обработка `permanently_unavailable` в UI, multi-tenancy (когда придёт второй клиент), вынос секретов из `scripts/setup-cron.sh`.
+См. [docs/backlog.md](docs/backlog.md). Главное в очереди: CI/CD деплой, обработка `permanently_unavailable` в UI, multi-tenancy (когда придёт второй клиент).
