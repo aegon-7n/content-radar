@@ -80,6 +80,26 @@ export default function LoginPage() {
             Аналитика контента для товарного бизнеса
           </p>
 
+          <div
+            className="text-xs rounded-lg px-3 py-2.5 mb-4"
+            style={{
+              background: "var(--accent-muted)",
+              border: "1px solid var(--accent-border)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            Доступ по приглашению.{" "}
+            <a
+              href="https://contentradar.app/#waitlist"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "var(--accent-primary)" }}
+              className="underline underline-offset-2 hover:no-underline"
+            >
+              Оставить заявку на waitlist
+            </a>
+          </div>
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
               <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
