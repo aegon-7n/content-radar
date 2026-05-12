@@ -142,6 +142,57 @@ export const waitlistSignups = pgTable(
   ],
 );
 
+// ── Billing ──────────────────────────────────────────────────────────────────
+
+export const subscriptions = pgTable("subscriptions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id)
+    .notNull(),
+  tier: text("tier").notNull(), // 'starter' | 'growth' | 'brand' | 'custom'
+  status: text("status").notNull().default("pending"), // 'pending' | 'active' | 'past_due' | 'cancelled'
+  tuLimit: integer("tu_limit").notNull(),
+  tuUsed: integer("tu_used").notNull().default(0),
+  currentPeriodStart: timestamp("current_period_start", {
+    withTimezone: true,
+  }),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const payments = pgTable(
+  "payments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    subscriptionId: uuid("subscription_id").references(
+      () => subscriptions.id,
+    ),
+    yookassaPaymentId: text("yookassa_payment_id").unique(),
+    type: text("type").notNull(), // 'subscription' | 'topup'
+    tier: text("tier"),
+    amountKopecks: integer("amount_kopecks").notNull(),
+    currency: text("currency").notNull().default("RUB"),
+    status: text("status").notNull().default("pending"), // 'pending' | 'succeeded' | 'cancelled' | 'refunded'
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("idx_payments_user_id").on(t.userId),
+    index("idx_payments_yookassa_id").on(t.yookassaPaymentId),
+    index("idx_payments_status").on(t.status),
+  ],
+);
+
 // Inferred types for use in application code
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -165,3 +216,9 @@ export type Platform = (typeof platformEnum.enumValues)[number];
 
 export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
 export type NewWaitlistSignup = typeof waitlistSignups.$inferInsert;
+
+export type Subscription = typeof subscriptions.$inferSelect;
+export type NewSubscription = typeof subscriptions.$inferInsert;
+
+export type Payment = typeof payments.$inferSelect;
+export type NewPayment = typeof payments.$inferInsert;

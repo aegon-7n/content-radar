@@ -65,6 +65,25 @@ waitlist_signups — лиды с публичного лендинга. Не с�
 - `idx_waitlist_signups_status` ON `status` — фильтрация по этапу воронки.
 - `idx_waitlist_signups_utm_campaign` ON `utm_campaign` — фильтрация по кампании в `/admin/waitlist`.
 
+**`subscriptions`** — текущая подписка юзера. Одна строка на юзера (single-tenant → пока один ряд). Поля:
+- `tier` — `'starter'` / `'growth'` / `'brand'` / `'custom'`
+- `status` — `'pending'` / `'active'` / `'past_due'` / `'cancelled'`
+- `tu_limit` — лимит TU в текущем периоде (300/1200/3000)
+- `tu_used` — использовано TU в текущем периоде
+- `current_period_start` / `current_period_end` — границы оплаченного периода (30 дней)
+
+При успешной оплате webhook обновляет или создаёт строку с `status = 'active'`, обнуляет `tu_used`, ставит новый период.
+
+**`payments`** — лог всех платёжных операций. Append-only по смыслу (статусы обновляются через webhook). Поля:
+- `yookassa_payment_id` — ID платежа в ЮKassa (UNIQUE, для дедупликации webhook)
+- `type` — `'subscription'` / `'topup'`
+- `tier` — какой тариф оплачивался (nullable для top-up)
+- `amount_kopecks` — сумма в копейках (5900₽ = 590000)
+- `status` — `'pending'` / `'succeeded'` / `'cancelled'` / `'refunded'`
+- `paid_at` — момент подтверждения оплаты (из webhook)
+
+Индексы: `user_id`, `yookassa_payment_id`, `status`.
+
 ## Платформенный enum
 
 ```ts
@@ -75,7 +94,7 @@ platformEnum = ["tiktok", "youtube", "instagram", "likee", "pinterest"]
 
 ## Файлы
 
-- `schema.ts` — определения таблиц + inferred-типы (`User`, `Creator`, `Product`, `Video`, `VideoMetric`, `ScraperState`, `Platform`, `WaitlistSignup`).
+- `schema.ts` — определения таблиц + inferred-типы (`User`, `Creator`, `Product`, `Video`, `VideoMetric`, `ScraperState`, `Platform`, `WaitlistSignup`, `Subscription`, `Payment`).
 - `index.ts` — drizzle-клиент (используется в API-роутах).
 - `seed.ts` — реальные данные клиента (3 креатора, ~13 товаров с артикулами WB). Запускается через `npm run db:seed`.
 
