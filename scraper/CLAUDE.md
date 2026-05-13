@@ -17,7 +17,7 @@
 | Платформа | Метрики (`run_daily`) | Discovery (`auto_discover`) | Стоимость |
 |---|---|---|---|
 | TikTok | TikAPI.io `/public/video` + HTTP fallback | TikAPI `/public/check` + `/public/posts` | ~$0.002/req. Нужен SOCKS5-прокси из EU из-за `ru_cross_border_block`. |
-| YouTube | YouTube Data API v3 `/videos` (1 unit) | `/search` (100 units!) + `/videos` | **Бесплатно**, лимит 10K units/день. `search.list` — самый дорогой эндпоинт. |
+| YouTube | YouTube Data API v3 `/videos` (1 unit) | `playlistItems.list` на Uploads playlist (1 unit/call) | **Бесплатно**, лимит 10K units/день. Discovery + audit теперь 1 unit/call (было 100 через `search.list`). |
 | Instagram | HikerAPI `/media/by/url` | HikerAPI `/user/by/username` + `/user/clips/chunk` | $0.0006/req для media, `/clips/chunk` дороже (~×3-5). |
 | Likee | Apify actor `sashaebashu/likee-scraper` | **Нет** — добавляется вручную через Settings | **~$0.01/ролик** — самый дорогой источник. |
 | Pinterest | HTTP-парсинг страницы | RSS-фид `pinterest.com/{user}/feed.rss` | **Бесплатно**. Метрики скудные (только `repin_count`). |
@@ -60,7 +60,7 @@ python main.py --platform tiktok --dry-run   # одна платформа бе�
 ## Известные ловушки
 
 1. **HikerAPI пагинация дорогая.** Любой `for _page in range(5)` на `/user/clips/chunk` — это 5 платных запросов. Ставь early-exit по `published_at < since`, как в `fetch_instagram_videos` ([auto_discover.py:507](auto_discover.py#L507)).
-2. **YouTube `search.list` стоит 100 units/запрос.** На 10 креаторах × 5 страниц = 5000 units только на discovery. Тоже нужен early-exit, и аудит должен брать не больше 1 страницы.
+2. **YouTube quota.** Discovery и audit теперь используют `playlistItems.list` (1 unit/call) вместо `search.list` (100 units/call). Uploads playlist ID = `"UU" + channelId[2:]`. Пагинация с early-exit по дате. Если кто-то вернёт `search.list` — это 100× откат по расходу квоты.
 3. **TikTok через российский IP блочит** (`ru_cross_border_block`). На проде заведён SSH-туннель `socks5://127.0.0.1:1080` к EU-VPS, путь `SOCKS_PROXY` в env. Без прокси — все TikTok-запросы вернут пустоту.
 4. **Likee discovery невозможен** — фид заблокирован anti-bot, единственный путь к их API — числовой `uid`, который пользователю не виден. Поэтому ролики Likee добавляются только вручную URL'ом через `/settings`. Контекст: [docs/likee-research.md](../docs/likee-research.md).
 5. **Apify actor для Likee синхронный, тайм-аут до 120 сек.** Это самая медленная и самая дорогая платформа.
