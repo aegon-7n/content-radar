@@ -277,7 +277,7 @@ export default function VideosTab({ showToast }: VideosTabProps) {
 
       {/* Recent videos table */}
       <div
-        className="rounded-xl overflow-hidden"
+        className="rounded-xl overflow-x-auto"
         style={{
           background: "var(--surface-1)",
           border: "1px solid var(--border-default)",

@@ -141,14 +141,14 @@ export default function ProductDetailPage() {
   const d = data;
 
   return (
-    <div className="p-6 flex flex-col gap-6">
+    <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
             onClick={() => router.push("/products")}
-            className="flex items-center gap-1.5 text-xs transition-colors"
+            className="flex items-center gap-1.5 text-xs transition-colors shrink-0"
             style={{ color: "var(--text-muted)" }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
@@ -156,14 +156,14 @@ export default function ProductDetailPage() {
             <ArrowLeft className="w-3.5 h-3.5" />
             Назад
           </button>
-          <div className="w-px h-4" style={{ background: "var(--border-default)" }} />
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+          <div className="w-px h-4 shrink-0" style={{ background: "var(--border-default)" }} />
+          <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+            <h1 className="text-xl font-semibold truncate" style={{ color: "var(--text-primary)" }}>
               {d?.product?.name ?? "Загрузка..."}
             </h1>
             {d && (
               <span
-                className="font-mono text-xs px-2 py-1 rounded"
+                className="font-mono text-xs px-2 py-1 rounded shrink-0"
                 style={{
                   color: "var(--text-muted)",
                   background: "var(--bg-muted)",
@@ -180,11 +180,11 @@ export default function ProductDetailPage() {
 
       {/* Stat cards */}
       {loading || !d ? (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
           {[...Array(3)].map((_, i) => <StatCardSkeleton key={i} />)}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
           <StatCard
             title="Прирост просмотров"
             value={formatViews(d.stats.views)}
@@ -266,7 +266,7 @@ export default function ProductDetailPage() {
       {/* By creator table */}
       {d && (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",
@@ -351,7 +351,7 @@ export default function ProductDetailPage() {
       {/* All videos table */}
       {d && d.videos.length > 0 && (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",

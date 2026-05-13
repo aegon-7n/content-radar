@@ -141,7 +141,7 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
             Эти товары найдены автоматически по артикулу из описания ролика. Добавь название.
           </p>
           <div
-            className="rounded-xl overflow-hidden"
+            className="rounded-xl overflow-x-auto"
             style={{
               background: "var(--surface-1)",
               border: "1px solid var(--warning-border)",
@@ -240,7 +240,7 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
         </div>
 
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",

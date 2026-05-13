@@ -207,14 +207,14 @@ export default function CreatorDetailPage() {
   const d = data;
 
   return (
-    <div className="p-6 flex flex-col gap-6">
+    <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
             onClick={() => router.push("/creators")}
-            className="flex items-center gap-1.5 text-xs transition-colors"
+            className="flex items-center gap-1.5 text-xs transition-colors shrink-0"
             style={{ color: "var(--text-muted)" }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
@@ -222,12 +222,12 @@ export default function CreatorDetailPage() {
             <ArrowLeft className="w-3.5 h-3.5" />
             Назад
           </button>
-          <div className="w-px h-4" style={{ background: "var(--border-default)" }} />
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
+          <div className="w-px h-4 shrink-0" style={{ background: "var(--border-default)" }} />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
               <span className="text-xs font-semibold text-white">{d?.creator?.name?.[0] ?? "?"}</span>
             </div>
-            <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+            <h1 className="text-xl font-semibold truncate" style={{ color: "var(--text-primary)" }}>
               {d?.creator?.name ?? "Загрузка..."}
             </h1>
           </div>
@@ -237,11 +237,11 @@ export default function CreatorDetailPage() {
 
       {/* Stat cards */}
       {loading || !d ? (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {[...Array(4)].map((_, i) => <StatCardSkeleton key={i} />)}
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <StatCard
             title="Прирост просмотров"
             value={formatViews(d.stats.views)}
@@ -384,7 +384,7 @@ export default function CreatorDetailPage() {
       {/* Products table */}
       {d && (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",
@@ -506,7 +506,7 @@ export default function CreatorDetailPage() {
       {/* Top videos table */}
       {d && d.topVideos.length > 0 && (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",

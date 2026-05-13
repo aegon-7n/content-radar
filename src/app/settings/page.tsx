@@ -29,7 +29,7 @@ export default function SettingsPage() {
 
   return (
     <div
-      className="p-6 flex flex-col gap-6 min-h-full"
+      className="p-4 md:p-6 flex flex-col gap-4 md:gap-6 min-h-full"
       style={{ background: "var(--bg-base)" }}
     >
       {/* Header */}
@@ -44,7 +44,7 @@ export default function SettingsPage() {
 
       {/* Tab bar */}
       <div
-        className="flex items-center gap-1 p-1 rounded-xl w-fit"
+        className="flex items-center gap-1 p-1 rounded-xl w-full md:w-fit overflow-x-auto"
         style={{
           background: "var(--surface-1)",
           border: "1px solid var(--border-default)",

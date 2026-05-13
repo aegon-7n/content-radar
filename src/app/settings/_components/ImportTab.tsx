@@ -183,7 +183,7 @@ export default function ImportTab({ showToast }: ImportTabProps) {
       {/* Preview */}
       {fileName && headers.length > 0 && (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",

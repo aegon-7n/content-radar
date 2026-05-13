@@ -175,7 +175,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
       </div>
 
       <div
-        className="rounded-xl overflow-hidden"
+        className="rounded-xl overflow-x-auto"
         style={{
           background: "var(--surface-1)",
           border: "1px solid var(--border-default)",
