@@ -66,19 +66,18 @@ waitlist_signups — лиды с публичного лендинга. Не с�
 - `idx_waitlist_signups_utm_campaign` ON `utm_campaign` — фильтрация по кампании в `/admin/waitlist`.
 
 **`subscriptions`** — текущая подписка юзера. Одна строка на юзера (single-tenant → пока один ряд). Поля:
-- `tier` — `'starter'` / `'growth'` / `'brand'` / `'custom'`
+- `tier` — `'solo'` / `'pro'` / `'studio'` / `'custom'`
 - `status` — `'pending'` / `'active'` / `'past_due'` / `'cancelled'`
-- `tu_limit` — лимит TU в текущем периоде (300/1200/3000)
-- `tu_used` — использовано TU в текущем периоде
+- `creator_limit` — максимум креаторов на тарифе (5/10/20)
 - `current_period_start` / `current_period_end` — границы оплаченного периода (30 дней)
 
-При успешной оплате webhook обновляет или создаёт строку с `status = 'active'`, обнуляет `tu_used`, ставит новый период.
+При успешной оплате webhook обновляет или создаёт строку с `status = 'active'`, ставит `creator_limit` из `TIER_CONFIG`, ставит новый период.
 
 **`payments`** — лог всех платёжных операций. Append-only по смыслу (статусы обновляются через webhook). Поля:
 - `yookassa_payment_id` — ID платежа в ЮKassa (UNIQUE, для дедупликации webhook)
-- `type` — `'subscription'` / `'topup'`
-- `tier` — какой тариф оплачивался (nullable для top-up)
-- `amount_kopecks` — сумма в копейках (5900₽ = 590000)
+- `type` — `'subscription'`
+- `tier` — какой тариф оплачивался (nullable)
+- `amount_kopecks` — сумма в копейках (4900₽ = 490000)
 - `status` — `'pending'` / `'succeeded'` / `'cancelled'` / `'refunded'`
 - `paid_at` — момент подтверждения оплаты (из webhook)
 

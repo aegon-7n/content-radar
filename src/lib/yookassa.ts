@@ -16,26 +16,17 @@ function authHeader(): string {
   return "Basic " + Buffer.from(`${shopId}:${apiKey}`).toString("base64");
 }
 
-// ── Tier & top-up pricing ────────────────────────────────────────────────────
+// ── Tier pricing (creator-cap model, CEO-approved 2026-05) ──────────────────
 
-export type BillingTier = "starter" | "growth" | "brand";
+export type BillingTier = "solo" | "pro" | "studio";
 
 export const TIER_CONFIG: Record<
   BillingTier,
-  { priceKopecks: number; tuLimit: number; label: string }
+  { priceKopecks: number; creatorLimit: number; label: string; trialDays: number }
 > = {
-  starter: { priceKopecks: 590_000, tuLimit: 300, label: "Starter" },
-  growth: { priceKopecks: 1_990_000, tuLimit: 1_200, label: "Growth" },
-  brand: { priceKopecks: 4_990_000, tuLimit: 3_000, label: "Brand" },
-};
-
-export const TOPUP_CONFIG: Record<
-  BillingTier,
-  { priceKopecks: number; tuAmount: number }
-> = {
-  starter: { priceKopecks: 59_000, tuAmount: 30 },
-  growth: { priceKopecks: 199_000, tuAmount: 120 },
-  brand: { priceKopecks: 499_000, tuAmount: 300 },
+  solo: { priceKopecks: 490_000, creatorLimit: 5, label: "Solo", trialDays: 14 },
+  pro: { priceKopecks: 990_000, creatorLimit: 10, label: "Pro", trialDays: 14 },
+  studio: { priceKopecks: 1_590_000, creatorLimit: 20, label: "Studio", trialDays: 14 },
 };
 
 // ── ЮKassa API types ─────────────────────────────────────────────────────────

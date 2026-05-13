@@ -21,7 +21,7 @@ async function getDefaultUserId(): Promise<string> {
 }
 
 const SubscribeSchema = z.object({
-  tier: z.enum(["starter", "growth", "brand"]),
+  tier: z.enum(["solo", "pro", "studio"]),
 });
 
 export async function POST(request: NextRequest) {

@@ -96,8 +96,7 @@ async function handlePaymentSucceeded(
         .set({
           tier,
           status: "active",
-          tuLimit: config.tuLimit,
-          tuUsed: 0,
+          creatorLimit: config.creatorLimit,
           currentPeriodStart: now,
           currentPeriodEnd: periodEnd,
           updatedAt: now,
@@ -115,8 +114,7 @@ async function handlePaymentSucceeded(
           userId: payment.userId,
           tier,
           status: "active",
-          tuLimit: config.tuLimit,
-          tuUsed: 0,
+          creatorLimit: config.creatorLimit,
           currentPeriodStart: now,
           currentPeriodEnd: periodEnd,
         })

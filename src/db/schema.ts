@@ -149,10 +149,9 @@ export const subscriptions = pgTable("subscriptions", {
   userId: uuid("user_id")
     .references(() => users.id)
     .notNull(),
-  tier: text("tier").notNull(), // 'starter' | 'growth' | 'brand' | 'custom'
+  tier: text("tier").notNull(), // 'solo' | 'pro' | 'studio' | 'custom'
   status: text("status").notNull().default("pending"), // 'pending' | 'active' | 'past_due' | 'cancelled'
-  tuLimit: integer("tu_limit").notNull(),
-  tuUsed: integer("tu_used").notNull().default(0),
+  creatorLimit: integer("creator_limit").notNull(),
   currentPeriodStart: timestamp("current_period_start", {
     withTimezone: true,
   }),
