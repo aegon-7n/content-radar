@@ -1,30 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, desc } from "drizzle-orm";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithTenant } from "@/lib/tenant";
 import { db } from "@/db";
-import { users, subscriptions, payments } from "@/db/schema";
-
-let defaultUserId: string | null = null;
-
-async function getDefaultUserId(): Promise<string> {
-  if (defaultUserId) return defaultUserId;
-  const result = await db.select({ id: users.id }).from(users).limit(1);
-  if (!result.length) throw new Error("No users found in database");
-  defaultUserId = result[0].id;
-  return defaultUserId;
-}
+import { subscriptions, payments } from "@/db/schema";
 
 export async function GET(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId } = auth.ctx;
 
   try {
-    const userId = await getDefaultUserId();
-
     const [subscription] = await db
       .select()
       .from(subscriptions)
-      .where(eq(subscriptions.userId, userId))
+      .where(eq(subscriptions.tenantId, tenantId))
       .limit(1);
 
     const recentPayments = await db
@@ -38,7 +27,7 @@ export async function GET(request: NextRequest) {
         createdAt: payments.createdAt,
       })
       .from(payments)
-      .where(eq(payments.userId, userId))
+      .where(eq(payments.tenantId, tenantId))
       .orderBy(desc(payments.createdAt))
       .limit(10);
 

@@ -1,20 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { creators, users, videos } from "@/db/schema";
+import { creators, videos } from "@/db/schema";
 import { eq, count } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
-
-// Cache the default user id at module level
-let defaultUserId: string | null = null;
-
-async function getDefaultUserId(): Promise<string> {
-  if (defaultUserId) return defaultUserId;
-  const result = await db.select({ id: users.id }).from(users).limit(1);
-  if (!result.length) throw new Error("No users found in database");
-  defaultUserId = result[0].id;
-  return defaultUserId;
-}
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 const createCreatorSchema = z.object({
   name: z.string().min(1, "Имя обязательно"),
@@ -26,8 +15,9 @@ const createCreatorSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId } = auth.ctx;
 
   try {
     const result = await db
@@ -43,6 +33,7 @@ export async function GET(request: NextRequest) {
         videoCount: count(videos.id),
       })
       .from(creators)
+      .where(eq(creators.tenantId, tenantId))
       .leftJoin(videos, eq(videos.creatorId, creators.id))
       .groupBy(
         creators.id,
@@ -64,8 +55,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId, userId } = auth.ctx;
 
   try {
     const body = await request.json();
@@ -78,7 +70,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userId = await getDefaultUserId();
     const {
       name,
       avatarUrl,
@@ -92,6 +83,7 @@ export async function POST(request: NextRequest) {
       .insert(creators)
       .values({
         userId,
+        tenantId,
         name,
         avatarUrl: avatarUrl || null,
         tiktokUsername: tiktokUsername || null,

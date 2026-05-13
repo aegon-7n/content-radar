@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { payments, subscriptions } from "@/db/schema";
+import { payments, subscriptions, users } from "@/db/schema";
 import { getPayment, TIER_CONFIG, type BillingTier } from "@/lib/yookassa";
 
 // ЮKassa doesn't use HMAC signatures. We verify by re-fetching the payment
@@ -108,9 +108,21 @@ async function handlePaymentSucceeded(
         .set({ subscriptionId: existingSub[0].id })
         .where(eq(payments.id, payment.id));
     } else {
+      const [paymentUser] = await db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.id, payment.userId))
+        .limit(1);
+
+      if (!paymentUser) {
+        console.error("[billing/webhook] user not found:", payment.userId);
+        return;
+      }
+
       const [sub] = await db
         .insert(subscriptions)
         .values({
+          tenantId: paymentUser.tenantId,
           userId: payment.userId,
           tier,
           status: "active",

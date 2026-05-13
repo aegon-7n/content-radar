@@ -18,69 +18,108 @@ export const platformEnum = pgEnum("platform", [
   "pinterest",
 ]);
 
+export const tenantRoleEnum = pgEnum("tenant_role", ["owner", "creator"]);
+
+// ── Tenants ─────────────────────────────────────────────────────────────────
+// One tenant per paying account. All domain data is scoped to a tenant.
+
+export const tenants = pgTable("tenants", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id)
+    .notNull(),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
+  role: tenantRoleEnum("role").notNull().default("owner"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
 });
 
-export const creators = pgTable("creators", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id)
-    .notNull(),
-  name: text("name").notNull(),
-  avatarUrl: text("avatar_url"),
-  tiktokUsername: text("tiktok_username"),
-  youtubeChannelId: text("youtube_channel_id"),
-  instagramUsername: text("instagram_username"),
-  pinterestUsername: text("pinterest_username"),
-  // Note: Likee discovery was intentionally removed in 2026-04 — see
-  // docs/likee-research.md. Manual Likee URL add through Settings →
-  // Videos still works and metrics still flow via the Apify actor.
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const creators = pgTable(
+  "creators",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    name: text("name").notNull(),
+    avatarUrl: text("avatar_url"),
+    tiktokUsername: text("tiktok_username"),
+    youtubeChannelId: text("youtube_channel_id"),
+    instagramUsername: text("instagram_username"),
+    pinterestUsername: text("pinterest_username"),
+    // Note: Likee discovery was intentionally removed in 2026-04 — see
+    // docs/likee-research.md. Manual Likee URL add through Settings →
+    // Videos still works and metrics still flow via the Apify actor.
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("idx_creators_tenant_id").on(t.tenantId)],
+);
 
-export const products = pgTable("products", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id)
-    .notNull(),
-  name: text("name").notNull(),
-  wbArticle: text("wb_article").notNull(),
-  category: text("category"),
-  needsReview: integer("needs_review").default(0).notNull(), // 1 = auto-discovered, needs name
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const products = pgTable(
+  "products",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    name: text("name").notNull(),
+    wbArticle: text("wb_article").notNull(),
+    category: text("category"),
+    needsReview: integer("needs_review").default(0).notNull(), // 1 = auto-discovered, needs name
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("idx_products_tenant_id").on(t.tenantId)],
+);
 
-export const videos = pgTable("videos", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id)
-    .notNull(),
-  creatorId: uuid("creator_id")
-    .references(() => creators.id)
-    .notNull(),
-  productId: uuid("product_id")
-    .references(() => products.id)
-    .notNull(),
-  platform: platformEnum("platform").notNull(),
-  url: text("url").notNull(),
-  publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
-  // Consecutive failed scrape nights. Reset to 0 on each successful scrape.
-  // When >= 3, run_daily skips the video and UI shows "недоступно".
-  failStreak: integer("fail_streak").default(0).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const videos = pgTable(
+  "videos",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    creatorId: uuid("creator_id")
+      .references(() => creators.id)
+      .notNull(),
+    productId: uuid("product_id")
+      .references(() => products.id)
+      .notNull(),
+    platform: platformEnum("platform").notNull(),
+    url: text("url").notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+    // Consecutive failed scrape nights. Reset to 0 on each successful scrape.
+    // When >= 3, run_daily skips the video and UI shows "недоступно".
+    failStreak: integer("fail_streak").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("idx_videos_tenant_id").on(t.tenantId)],
+);
 
 export const videoMetrics = pgTable("video_metrics", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -146,6 +185,9 @@ export const waitlistSignups = pgTable(
 
 export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id)
+    .notNull(),
   userId: uuid("user_id")
     .references(() => users.id)
     .notNull(),
@@ -168,6 +210,9 @@ export const payments = pgTable(
   "payments",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
     userId: uuid("user_id")
       .references(() => users.id)
       .notNull(),
@@ -193,8 +238,13 @@ export const payments = pgTable(
 );
 
 // Inferred types for use in application code
+export type Tenant = typeof tenants.$inferSelect;
+export type NewTenant = typeof tenants.$inferInsert;
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+
+export type TenantRole = (typeof tenantRoleEnum.enumValues)[number];
 
 export type Creator = typeof creators.$inferSelect;
 export type NewCreator = typeof creators.$inferInsert;

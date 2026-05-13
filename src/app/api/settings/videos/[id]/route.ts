@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { videos, videoMetrics } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { requireAuth } from "@/lib/auth";
+import { eq, and } from "drizzle-orm";
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId } = auth.ctx;
 
   try {
     const { id } = params;
@@ -17,18 +18,16 @@ export async function DELETE(
     const existing = await db
       .select({ id: videos.id })
       .from(videos)
-      .where(eq(videos.id, id))
+      .where(and(eq(videos.id, id), eq(videos.tenantId, tenantId)))
       .limit(1);
 
     if (!existing.length) {
       return NextResponse.json({ error: "Ролик не найден" }, { status: 404 });
     }
 
-    // Explicitly delete metrics first (in case no CASCADE is set on FK)
     await db.delete(videoMetrics).where(eq(videoMetrics.videoId, id));
 
-    // Delete the video itself
-    await db.delete(videos).where(eq(videos.id, id));
+    await db.delete(videos).where(and(eq(videos.id, id), eq(videos.tenantId, tenantId)));
 
     return NextResponse.json({ success: true });
   } catch (error) {

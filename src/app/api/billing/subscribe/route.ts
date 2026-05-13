@@ -1,32 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithTenant } from "@/lib/tenant";
 import { db } from "@/db";
-import { users, payments, subscriptions } from "@/db/schema";
+import { payments } from "@/db/schema";
 import {
   createPayment,
   TIER_CONFIG,
   type BillingTier,
 } from "@/lib/yookassa";
 
-let defaultUserId: string | null = null;
-
-async function getDefaultUserId(): Promise<string> {
-  if (defaultUserId) return defaultUserId;
-  const result = await db.select({ id: users.id }).from(users).limit(1);
-  if (!result.length) throw new Error("No users found in database");
-  defaultUserId = result[0].id;
-  return defaultUserId;
-}
-
 const SubscribeSchema = z.object({
   tier: z.enum(["solo", "pro", "studio"]),
 });
 
 export async function POST(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId, userId } = auth.ctx;
 
   let body: unknown;
   try {
@@ -45,7 +35,6 @@ export async function POST(request: NextRequest) {
 
   const { tier } = parsed.data;
   const config = TIER_CONFIG[tier as BillingTier];
-  const userId = await getDefaultUserId();
 
   const returnUrl = `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/settings?tab=billing&status=success`;
 
@@ -59,6 +48,7 @@ export async function POST(request: NextRequest) {
 
     await db.insert(payments).values({
       userId,
+      tenantId,
       yookassaPaymentId: yookassaPayment.id,
       type: "subscription",
       tier,

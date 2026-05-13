@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { creators, videos } from "@/db/schema";
-import { eq, count } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 const patchCreatorSchema = z.object({
   name: z.string().min(1, "Имя не может быть пустым").optional(),
@@ -18,13 +18,14 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId } = auth.ctx;
 
   try {
     const { id } = params;
 
-    const existing = await db.select({ id: creators.id }).from(creators).where(eq(creators.id, id)).limit(1);
+    const existing = await db.select({ id: creators.id }).from(creators).where(and(eq(creators.id, id), eq(creators.tenantId, tenantId))).limit(1);
     if (!existing.length) {
       return NextResponse.json({ error: "Креатор не найден" }, { status: 404 });
     }
@@ -64,7 +65,7 @@ export async function PATCH(
     const [updated] = await db
       .update(creators)
       .set(updates)
-      .where(eq(creators.id, id))
+      .where(and(eq(creators.id, id), eq(creators.tenantId, tenantId)))
       .returning();
 
     return NextResponse.json({ creator: updated });
@@ -78,13 +79,14 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId } = auth.ctx;
 
   try {
     const { id } = params;
 
-    const existing = await db.select({ id: creators.id }).from(creators).where(eq(creators.id, id)).limit(1);
+    const existing = await db.select({ id: creators.id }).from(creators).where(and(eq(creators.id, id), eq(creators.tenantId, tenantId))).limit(1);
     if (!existing.length) {
       return NextResponse.json({ error: "Креатор не найден" }, { status: 404 });
     }
@@ -101,7 +103,7 @@ export async function DELETE(
       );
     }
 
-    await db.delete(creators).where(eq(creators.id, id));
+    await db.delete(creators).where(and(eq(creators.id, id), eq(creators.tenantId, tenantId)));
 
     return NextResponse.json({ success: true });
   } catch (error) {

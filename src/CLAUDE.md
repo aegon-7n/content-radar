@@ -25,7 +25,8 @@ types/       глобальные .d.ts
 ## API-эндпоинты `app/api/`
 
 **Аутентификация**
-- `auth/[...nextauth]` — NextAuth handler. CredentialsProvider, hardcoded admin-юзер из `ADMIN_EMAIL` / `ADMIN_PASSWORD` (env), JWT-сессия 30 дней.
+- `auth/[...nextauth]` — NextAuth handler. CredentialsProvider, JWT-сессия 30 дней. `tenant_id` запекается в JWT при логине — per-request DB lookup не нужен.
+- `auth/register` — POST, создаёт тенант + owner-юзера атомарно. Защищён `Authorization: Bearer ${REGISTER_SECRET}`. Добавлен в middleware allowlist (покрывается паттерном `/api/auth`).
 
 **Чтение (UI зовёт это)**
 - `dashboard` — агрегаты + delta-модель за период (`?from=&to=&category=`).
@@ -62,9 +63,9 @@ types/       глобальные .d.ts
 
 **Аутентификация (defense in depth).** Два слоя:
 1. [middleware.ts](middleware.ts) — `getToken` из `next-auth/jwt`, fail-closed (try/catch → 401). Все маршруты требуют JWT-токен, кроме allowlist: `/login`, `/robots.txt`, `/sitemap.xml`, `/api/auth`, `/api/health`, `/api/scrape`, `/api/waitlist`, `/api/billing/webhooks`, статика.
-2. Route-level guard — каждый API handler вызывает `requireAuth(request)` из `lib/auth.ts` перед любой логикой. Если middleware упадёт/пропустит, хендлер сам вернёт 401.
+2. Route-level guard — каждый API handler вызывает `requireAuthWithTenant(request)` из `lib/tenant.ts` перед любой логикой. Возвращает `{ userId, tenantId }`. Если middleware упадёт/пропустит, хендлер сам вернёт 401. `tenant_id` берётся из JWT (запекается при логине) — per-request DB lookup не нужен.
 
-Новые API-маршруты **обязаны** добавить `requireAuth` в каждый экспортируемый handler. Для публичного маршрута — добавить в `config.matcher` allowlist и не вызывать `requireAuth`.
+Новые API-маршруты **обязаны** вызвать `requireAuthWithTenant` (из `lib/tenant.ts`) в каждом экспортируемом handler и скоупить все запросы по `tenantId`. Для публичного маршрута — добавить в `config.matcher` allowlist и не вызывать `requireAuthWithTenant`.
 
 **Стили.** Tailwind + CSS-переменные (`--bg-base`, `--surface-1`, `--text-primary`, `--accent-primary`, `--shadow-card`, etc.). Цвета платформ — через `getPlatformColor()` в `lib/format.ts`. Шрифты — `geist`.
 
@@ -101,7 +102,7 @@ npm run db:generate       # генерация SQL-миграции
 npm run db:seed           # загрузка реальных данных клиента
 ```
 
-`.env.local` обязан содержать: `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SCRAPE_SECRET`, плюс ключи для скрейпера если он гоняется локально.
+`.env.local` обязан содержать: `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SCRAPE_SECRET`, `REGISTER_SECRET`, плюс ключи для скрейпера если он гоняется локально.
 
 ## Правила
 

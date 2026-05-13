@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 /**
  * Dashboard analytics — cumulative delta model.
@@ -51,8 +51,9 @@ function calcChange(current: number, previous: number): number | null {
 }
 
 export async function GET(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId } = auth.ctx;
 
   try {
     const { searchParams } = request.nextUrl;
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
         SELECT v.id, v.platform, v.published_at
         FROM videos v
         LEFT JOIN products p ON p.id = v.product_id
-        WHERE TRUE ${categoryFilter}
+        WHERE v.tenant_id = ${tenantId} ${categoryFilter}
       ),
       end_views AS (
         SELECT DISTINCT ON (vm.video_id)
@@ -154,7 +155,7 @@ export async function GET(request: NextRequest) {
         SELECT v.id AS video_id
         FROM videos v
         LEFT JOIN products p ON p.id = v.product_id
-        WHERE TRUE ${categoryFilter}
+        WHERE v.tenant_id = ${tenantId} ${categoryFilter}
       ),
       baseline AS (
         SELECT DISTINCT ON (vm.video_id)
@@ -230,7 +231,7 @@ export async function GET(request: NextRequest) {
 
     // Categories for the filter chips.
     const categoriesResult = await db.execute(sql`
-      SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category ASC
+      SELECT DISTINCT category FROM products WHERE tenant_id = ${tenantId} AND category IS NOT NULL ORDER BY category ASC
     `);
 
     const current = currentResult[0] as unknown as {
