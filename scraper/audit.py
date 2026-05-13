@@ -100,6 +100,7 @@ def tiktok_count(username: Optional[str]) -> Optional[int] | str:
 
 
 def youtube_count(channel_id: Optional[str]) -> Optional[int] | str:
+    """Count uploads via playlistItems.list (1 unit/call, not search.list at 100)."""
     if not channel_id:
         return None
     try:
@@ -114,29 +115,41 @@ def youtube_count(channel_id: Optional[str]) -> Optional[int] | str:
                 return "no channel"
             channel_id = items[0]["id"]
 
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)).isoformat()
+        uploads_playlist_id = "UU" + channel_id[2:]
+        cutoff = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
         total = 0
         page_token = None
         for _ in range(5):
             params = {
-                "channelId": channel_id, "part": "id", "maxResults": 50,
-                "type": "video", "order": "date", "publishedAfter": cutoff,
+                "playlistId": uploads_playlist_id,
+                "part": "snippet",
+                "maxResults": 50,
                 "key": YOUTUBE_API_KEY,
             }
             if page_token:
                 params["pageToken"] = page_token
             r = requests.get(
-                "https://www.googleapis.com/youtube/v3/search",
+                "https://www.googleapis.com/youtube/v3/playlistItems",
                 params=params,
                 timeout=TIMEOUT,
             )
             if not r.ok:
-                return f"search {r.status_code}"
+                return f"playlistItems {r.status_code}"
             payload = r.json()
-            total += len(payload.get("items", []))
-            page_token = payload.get("nextPageToken")
-            if not page_token:
+            items = payload.get("items", [])
+            all_too_old = True
+            for item in items:
+                published_str = item.get("snippet", {}).get("publishedAt", "")
+                try:
+                    published_at = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+                if published_at >= cutoff:
+                    total += 1
+                    all_too_old = False
+            if all_too_old or not payload.get("nextPageToken"):
                 break
+            page_token = payload["nextPageToken"]
         return total
     except Exception as e:
         return f"exc {e.__class__.__name__}"

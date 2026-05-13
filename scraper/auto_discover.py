@@ -261,10 +261,12 @@ def fetch_youtube_videos(channel_id: str, since: datetime) -> list[dict]:
     Возвращает список {'url', 'description', 'published_at'}.
     Принимает channel ID или @handle — резолвит автоматически.
 
-    Пагинация: до 5 страниц по 50 = 250 видео максимум за период. Без
-    пагинации мы пропускали свежие публикации у активных креаторов
-    (например, у Полины 50 видео за 30 дней, а maxResults=20 без
-    pageToken возвращало только верхние 20).
+    Использует playlistItems.list на "Uploads" playlist (1 quota unit/call)
+    вместо search.list (100 units/call) — экономия в 100×.
+
+    Uploads playlist ID = "UU" + channel_id[2:] (canonical YouTube convention).
+    Items возвращаются от новых к старым; пагинация останавливается когда
+    все элементы страницы старше `since`.
     """
     if not YOUTUBE_API_KEY:
         logger.warning("YOUTUBE_API_KEY не задан, пропускаем YouTube auto-discover")
@@ -275,72 +277,51 @@ def fetch_youtube_videos(channel_id: str, since: datetime) -> list[dict]:
         return []
     channel_id = resolved_id
 
-    published_after = since.strftime("%Y-%m-%dT%H:%M:%SZ")
-    video_ids: list[str] = []
+    uploads_playlist_id = "UU" + channel_id[2:]
+    results: list[dict] = []
     page_token: Optional[str] = None
 
     try:
         for _ in range(5):  # safety cap: 250 videos per creator per run
-            params = {
-                "channelId": channel_id,
-                "part": "id",
-                "type": "video",
-                "publishedAfter": published_after,
+            params: dict = {
+                "playlistId": uploads_playlist_id,
+                "part": "snippet",
                 "maxResults": 50,
-                "order": "date",
                 "key": YOUTUBE_API_KEY,
             }
             if page_token:
                 params["pageToken"] = page_token
 
-            search_resp = requests.get(
-                "https://www.googleapis.com/youtube/v3/search",
+            resp = requests.get(
+                "https://www.googleapis.com/youtube/v3/playlistItems",
                 params=params,
                 timeout=_DEFAULT_TIMEOUT,
             )
-            if not search_resp.ok:
-                logger.warning("YouTube search status=%d для channel=%s", search_resp.status_code, channel_id)
+            if not resp.ok:
+                logger.warning("YouTube playlistItems status=%d для channel=%s", resp.status_code, channel_id)
                 break
 
-            payload = search_resp.json()
-            for item in payload.get("items", []):
-                vid = item.get("id", {}).get("videoId")
-                if vid:
-                    video_ids.append(vid)
+            payload = resp.json()
+            items = payload.get("items", [])
+            all_too_old = True
 
-            page_token = payload.get("nextPageToken")
-            if not page_token:
-                break
-
-        if not video_ids:
-            logger.info("YouTube channel=%s: новых видео нет", channel_id)
-            return []
-
-        # Step 2: descriptions + publishedAt via videos endpoint, batched 50.
-        results: list[dict] = []
-        for chunk_start in range(0, len(video_ids), 50):
-            chunk = video_ids[chunk_start:chunk_start + 50]
-            videos_resp = requests.get(
-                "https://www.googleapis.com/youtube/v3/videos",
-                params={
-                    "id": ",".join(chunk),
-                    "part": "snippet",
-                    "key": YOUTUBE_API_KEY,
-                },
-                timeout=_DEFAULT_TIMEOUT,
-            )
-            if not videos_resp.ok:
-                continue
-
-            for v in videos_resp.json().get("items", []):
-                snippet = v.get("snippet", {})
+            for item in items:
+                snippet = item.get("snippet", {})
                 published_str = snippet.get("publishedAt", "")
                 try:
                     published_at = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
                 except ValueError:
                     continue
 
-                url = f"https://www.youtube.com/watch?v={v['id']}"
+                if published_at < since:
+                    continue
+
+                all_too_old = False
+                video_id = snippet.get("resourceId", {}).get("videoId")
+                if not video_id:
+                    continue
+
+                url = f"https://www.youtube.com/watch?v={video_id}"
                 title = snippet.get("title", "")
                 desc = snippet.get("description", "")
                 combined_text = f"{title} {desc}"
@@ -350,6 +331,10 @@ def fetch_youtube_videos(channel_id: str, since: datetime) -> list[dict]:
                     "description": combined_text,
                     "published_at": published_at,
                 })
+
+            page_token = payload.get("nextPageToken")
+            if not page_token or all_too_old:
+                break
 
     except Exception as e:
         logger.error("Ошибка при запросе YouTube API для channel=%s: %s", channel_id, e)
