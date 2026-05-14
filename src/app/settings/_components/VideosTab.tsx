@@ -297,7 +297,7 @@ export default function VideosTab({ showToast }: VideosTabProps) {
             Нет роликов
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                 {["Платформа", "URL", "Креатор", "Товар", "Дата", ""].map((h, i) => (

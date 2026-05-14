@@ -444,7 +444,7 @@ export default function CreatorDetailPage() {
               </button>
             </div>
           </div>
-          <table className="w-full">
+          <table className="w-full min-w-[500px]">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
@@ -583,7 +583,7 @@ export default function CreatorDetailPage() {
               )}
             </div>
           </div>
-          <table className="w-full">
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"

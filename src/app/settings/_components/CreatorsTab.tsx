@@ -190,7 +190,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
             Нет креаторов
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                 {["Имя", "TikTok", "YouTube", "Instagram", "Pinterest", "Роликов", "Действия"].map((h, i) => (

@@ -305,7 +305,7 @@ function MetaCard({ detail }: { detail: VideoDetail }) {
 
 function LoadingSkeleton() {
   return (
-    <div className="p-4 md:p-4 md:p-6 flex flex-col gap-4 md:gap-6">
+    <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
       <Skeleton className="h-5 w-36" />
       <div className="flex items-center justify-between">
         <Skeleton className="h-7 w-64" />
@@ -373,7 +373,7 @@ export default function VideoDetailPage() {
   const shortTitle = video.url.replace(/^https?:\/\//, "").slice(0, 52);
 
   return (
-    <div className="p-4 md:p-4 md:p-6 flex flex-col gap-4 md:gap-6">
+    <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
       {/* Back */}
       <Link
         href="/videos"

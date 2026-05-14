@@ -308,7 +308,7 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
           }}
         >
           <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+            <table className="w-full min-w-[900px] text-sm border-collapse">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-default)" }}>
                   {[
