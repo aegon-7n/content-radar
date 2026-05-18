@@ -1,5 +1,9 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { compare } from "bcryptjs";
+import { db } from "@/db";
+import { adminSettings } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 const handler = NextAuth({
   providers: [
@@ -12,16 +16,31 @@ const handler = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const adminEmail    = process.env.ADMIN_EMAIL    ?? "admin@content-radar.ru";
-        const adminPassword = process.env.ADMIN_PASSWORD ?? "admin123";
+        const adminEmail = process.env.ADMIN_EMAIL ?? "admin@content-radar.ru";
+        if (credentials.email !== adminEmail) return null;
 
-        if (
-          credentials.email    === adminEmail &&
-          credentials.password === adminPassword
-        ) {
-          return { id: "1", email: adminEmail, name: "Администратор" };
+        // Prefer a bcrypt hash stored via the reset-password flow over the
+        // plaintext env var. Falls back to the env var on first boot.
+        let passwordOk = false;
+        try {
+          const [row] = await db
+            .select()
+            .from(adminSettings)
+            .where(eq(adminSettings.key, "password_hash"))
+            .limit(1);
+          if (row) {
+            passwordOk = await compare(credentials.password, row.value);
+          } else {
+            const adminPassword = process.env.ADMIN_PASSWORD ?? "admin123";
+            passwordOk = credentials.password === adminPassword;
+          }
+        } catch {
+          // DB unavailable — fall back to env var
+          const adminPassword = process.env.ADMIN_PASSWORD ?? "admin123";
+          passwordOk = credentials.password === adminPassword;
         }
-        return null;
+
+        return passwordOk ? { id: "1", email: adminEmail, name: "Администратор" } : null;
       },
     }),
   ],
