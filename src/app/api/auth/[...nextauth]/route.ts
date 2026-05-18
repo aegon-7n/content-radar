@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { adminSettings, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 const handler = NextAuth({
@@ -16,11 +16,28 @@ const handler = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const adminEmail    = process.env.ADMIN_EMAIL    ?? "admin@content-radar.ru";
-        const adminPassword = process.env.ADMIN_PASSWORD ?? "admin123";
+        const adminEmail = process.env.ADMIN_EMAIL ?? "admin@content-radar.ru";
 
-        // Bootstrap path for the initial owner account (env-var credentials).
-        if (credentials.email === adminEmail && credentials.password === adminPassword) {
+        if (credentials.email === adminEmail) {
+          // Admin/owner path: prefer bcrypt hash stored via reset-password flow,
+          // fall back to plaintext env var on first boot.
+          let passwordOk = false;
+          try {
+            const [row] = await db
+              .select()
+              .from(adminSettings)
+              .where(eq(adminSettings.key, "password_hash"))
+              .limit(1);
+            if (row) {
+              passwordOk = await compare(credentials.password, row.value);
+            } else {
+              passwordOk = credentials.password === (process.env.ADMIN_PASSWORD ?? "admin123");
+            }
+          } catch {
+            passwordOk = credentials.password === (process.env.ADMIN_PASSWORD ?? "admin123");
+          }
+          if (!passwordOk) return null;
+
           const [user] = await db
             .select({ id: users.id, tenantId: users.tenantId, email: users.email, name: users.name })
             .from(users)
@@ -30,7 +47,7 @@ const handler = NextAuth({
           return { id: user.id, email: user.email, name: user.name, tenantId: user.tenantId };
         }
 
-        // Creator path: look up by email, verify bcrypt hash.
+        // Creator path: look up by email, verify bcrypt hash stored in users.password_hash.
         try {
           const [user] = await db
             .select({ id: users.id, tenantId: users.tenantId, email: users.email, name: users.name, passwordHash: users.passwordHash })

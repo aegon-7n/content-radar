@@ -275,6 +275,14 @@ export type NewSubscription = typeof subscriptions.$inferInsert;
 export type Payment = typeof payments.$inferSelect;
 export type NewPayment = typeof payments.$inferInsert;
 
+// ── Admin settings ────────────────────────────────────────────────────────────
+// Key-value store for admin configuration overrides (e.g. password_hash).
+export const adminSettings = pgTable("admin_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ── Invite tokens ─────────────────────────────────────────────────────────────
 // Owner generates a token to invite a creator. Token is single-use, 7-day TTL.
 // email is optional — null means a shareable link (no specific recipient).
