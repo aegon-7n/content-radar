@@ -188,7 +188,7 @@ export default function DashboardPage() {
                 tick={{ fill: "var(--text-disabled)", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                interval="preserveStartEnd"
+                interval={d.dailyViews.length <= 14 ? 0 : Math.ceil(d.dailyViews.length / 10) - 1}
               />
               <YAxis
                 tickFormatter={formatViews}
