@@ -117,9 +117,18 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
-                Пароль
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
+                  Пароль
+                </label>
+                <a
+                  href="/forgot-password"
+                  className="text-xs transition hover:no-underline underline underline-offset-2"
+                  style={{ color: "var(--accent-primary)" }}
+                >
+                  Забыли пароль?
+                </a>
+              </div>
               <div className="relative">
                 <input
                   type={showPass ? "text" : "password"}
