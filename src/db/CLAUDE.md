@@ -23,7 +23,7 @@ waitlist_signups — лиды с публичного лендинга. Не с�
 
 **`tenant_role`** — enum: `'owner'` | `'creator'`. Определяет права пользователя внутри тенанта.
 
-**`users`** — пользователь системы. Принадлежит тенанту (`tenant_id` FK NOT NULL). Поле `role` (tenant_role, default `'owner'`) определяет уровень доступа.
+**`users`** — пользователь системы. Принадлежит тенанту (`tenant_id` FK NOT NULL). Поле `role` (tenant_role, default `'owner'`) определяет уровень доступа. `password_hash` (nullable) — bcrypt-хэш пароля creator-пользователей, созданных через invite flow. Owner-аккаунт может иметь `null` здесь (его пароль хранится в `admin_settings`).
 
 **`creators`** — имя + handles на каждой платформе (`tiktok_username`, `youtube_channel_id`, `instagram_username`, `pinterest_username`). `tenant_id` FK NOT NULL — креатор принадлежит конкретному тенанту. Заполнен handle → `auto_discover` пойдёт за роликами этой платформы.
 - Likee handle тут **намеренно нет** — discovery невозможен (см. [docs/likee-research.md](../../docs/likee-research.md)). Likee ролики добавляются вручную через `/settings` → Videos.
@@ -89,6 +89,12 @@ waitlist_signups — лиды с публичного лендинга. Не с�
 - `paid_at` — момент подтверждения оплаты (из webhook)
 
 Индексы: `user_id`, `yookassa_payment_id`, `status`.
+
+**`invite_tokens`** — однократные токены для приглашения creator-пользователей. `tenant_id` FK NOT NULL, `invited_by_user_id` FK NOT NULL. `email` nullable (null = sharable link без конкретного адресата). TTL 7 дней, `used_at` помечает использование.
+
+**`admin_settings`** — KV-хранилище для настроек admin-аккаунта. Используется для хранения bcrypt-хэша пароля owner-а после сброса через forgot-password flow. `key = 'password_hash'`, `value = bcrypt hash`. Нет FK — глобальная таблица (не per-tenant).
+
+**`password_reset_tokens`** — одноразовые токены сброса пароля для owner-аккаунта. TTL 1 час, `used_at` помечает использование. Нет FK — глобальная таблица.
 
 ## Enums
 
