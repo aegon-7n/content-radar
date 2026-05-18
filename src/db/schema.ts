@@ -40,6 +40,9 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   role: tenantRoleEnum("role").notNull().default("owner"),
+  // null = bootstrapped owner whose auth still goes through ADMIN_EMAIL/ADMIN_PASSWORD env var.
+  // Set on first invite-accept for creator users.
+  passwordHash: text("password_hash"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -271,3 +274,23 @@ export type NewSubscription = typeof subscriptions.$inferInsert;
 
 export type Payment = typeof payments.$inferSelect;
 export type NewPayment = typeof payments.$inferInsert;
+
+// ── Invite tokens ─────────────────────────────────────────────────────────────
+// Owner generates a token to invite a creator. Token is single-use, 7-day TTL.
+// email is optional — null means a shareable link (no specific recipient).
+export const inviteTokens = pgTable(
+  "invite_tokens",
+  {
+    token: text("token").primaryKey(),
+    tenantId: uuid("tenant_id").references(() => tenants.id).notNull(),
+    invitedByUserId: uuid("invited_by_user_id").references(() => users.id).notNull(),
+    email: text("email"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("idx_invite_tokens_tenant_id").on(t.tenantId)],
+);
+
+export type InviteToken = typeof inviteTokens.$inferSelect;
+export type NewInviteToken = typeof inviteTokens.$inferInsert;
