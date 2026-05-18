@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Radio, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
@@ -117,9 +118,18 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
-                Пароль
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
+                  Пароль
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs underline underline-offset-2 hover:no-underline"
+                  style={{ color: "var(--accent-primary)" }}
+                >
+                  Забыли пароль?
+                </Link>
+              </div>
               <div className="relative">
                 <input
                   type={showPass ? "text" : "password"}
