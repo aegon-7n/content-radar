@@ -12,6 +12,7 @@ import {
   Radio,
   Inbox,
   X,
+  UsersRound,
 } from "lucide-react";
 
 const navItems = [
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/products", label: "Товары", icon: Package },
   { href: "/videos", label: "Ролики", icon: Video },
   { href: "/settings", label: "Настройки", icon: Settings },
+  { href: "/settings/team", label: "Команда", icon: UsersRound },
   { href: "/admin/waitlist", label: "Waitlist", icon: Inbox },
 ];
 

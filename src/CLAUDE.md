@@ -20,13 +20,21 @@ types/       глобальные .d.ts
 - **`/products`**, **`/products/[id]`** — список и детальная.
 - **`/videos`**, **`/videos/[id]`** — список с фильтрами/сортировкой/пагинацией и детальная.
 - **`/settings`** — четыре таба: `CreatorsTab`, `ProductsTab`, `VideosTab`, `ImportTab`. Сабкомпоненты — в `app/settings/_components/`.
+- **`/settings/team`** — список пользователей тенанта (owner + creators), кнопка «Пригласить», отзыв доступа. Только для owner.
 - **`/login`** — форма, NextAuth `signIn("credentials")`, редирект на `/`.
+- **`/invite/[token]`** — публичная страница принятия инвайта. Creator вводит имя/пароль и создаёт аккаунт в тенанте owner-а. Исключена из middleware guard.
+- **`/forgot-password`** — форма запроса письма для сброса пароля. Публичная.
+- **`/reset-password`** — форма ввода нового пароля по токену из письма. Публичная.
 
 ## API-эндпоинты `app/api/`
 
 **Аутентификация**
-- `auth/[...nextauth]` — NextAuth handler. CredentialsProvider, JWT-сессия 30 дней. `tenant_id` запекается в JWT при логине — per-request DB lookup не нужен.
+- `auth/[...nextauth]` — NextAuth handler. CredentialsProvider, JWT-сессия 30 дней. `tenant_id` запекается в JWT при логине — per-request DB lookup не нужен. Два пути авторизации: owner-путь (по `ADMIN_EMAIL`, пароль проверяется через `adminSettings.key=password_hash` bcrypt или env-var fallback) + creator-путь (любой другой email, bcrypt через `users.password_hash`).
 - `auth/register` — POST, создаёт тенант + owner-юзера атомарно. Защищён `Authorization: Bearer ${REGISTER_SECRET}`. Добавлен в middleware allowlist (покрывается паттерном `/api/auth`).
+- `auth/invite/[token]` — GET, возвращает инфо об инвайте (email, tenantName). Публичный.
+- `auth/invite/[token]/accept` — POST, создаёт creator-пользователя по инвайту (имя + пароль). Публичный. После создания инвайт помечается usedAt.
+- `auth/forgot-password` — POST, генерирует одноразовый токен сброса (32 байта), пишет в `password_reset_tokens`, отправляет письмо через Resend. Всегда 200 (предотвращает email enumeration).
+- `auth/reset-password` — POST, проверяет токен (срок 1ч, не использован), bcrypt-хэшит новый пароль, записывает в `adminSettings.key=password_hash`, помечает токен usedAt.
 
 **Чтение (UI зовёт это)**
 - `dashboard` — агрегаты + delta-модель за период (`?from=&to=&category=`).
@@ -35,6 +43,10 @@ types/       глобальные .d.ts
 - `videos`, `videos/[id]`, `videos/export` (CSV).
 - `last-sync` — `MAX(scraped_at)` из `video_metrics`.
 - `health` — статус трёх scraper-джобов из `scraper_state`.
+
+**Инвайты и команда**
+- `invites` — GET (список активных инвайтов тенанта) + POST (создать инвайт). Только owner (`requireOwner()`).
+- `invites/[userId]` — DELETE, отзывает доступ creator (удаляет юзера из тенанта). Только owner.
 
 **Запись (`/api/settings/...`, POST/PUT/DELETE)**
 - `settings/{creators,products,videos}` + `[id]`-варианты.
@@ -62,10 +74,10 @@ types/       глобальные .d.ts
 **Получение данных.** Страницы **никогда** не ходят в БД напрямую — только через `fetch('/api/...')`. Вся работа с Drizzle живёт в `app/api/*/route.ts`. На сетевой ошибке UI падает на `mock-data.ts` чтобы не показывать пустоту в деве.
 
 **Аутентификация (defense in depth).** Два слоя:
-1. [middleware.ts](middleware.ts) — `getToken` из `next-auth/jwt`, fail-closed (try/catch → 401). Все маршруты требуют JWT-токен, кроме allowlist: `/login`, `/robots.txt`, `/sitemap.xml`, `/api/auth`, `/api/health`, `/api/scrape`, `/api/waitlist`, `/api/billing/webhooks`, статика.
+1. [middleware.ts](middleware.ts) — `getToken` из `next-auth/jwt`, fail-closed (try/catch → 401). Все маршруты требуют JWT-токен, кроме allowlist: `/login`, `/invite`, `/forgot-password`, `/reset-password`, `/robots.txt`, `/sitemap.xml`, `/api/auth`, `/api/health`, `/api/scrape`, `/api/waitlist`, `/api/billing/webhooks`, статика.
 2. Route-level guard — каждый API handler вызывает `requireAuthWithTenant(request)` из `lib/tenant.ts` перед любой логикой. Возвращает `{ userId, tenantId }`. Если middleware упадёт/пропустит, хендлер сам вернёт 401. `tenant_id` берётся из JWT (запекается при логине) — per-request DB lookup не нужен.
 
-Новые API-маршруты **обязаны** вызвать `requireAuthWithTenant` (из `lib/tenant.ts`) в каждом экспортируемом handler и скоупить все запросы по `tenantId`. Для публичного маршрута — добавить в `config.matcher` allowlist и не вызывать `requireAuthWithTenant`.
+Новые API-маршруты **обязаны** вызвать `requireAuthWithTenant` (из `lib/tenant.ts`) в каждом экспортируемом handler и скоупить все запросы по `tenantId`. Для owner-only маршрутов используй `requireOwner(request)` из того же файла — проверяет `role === 'owner'` из JWT. Для публичного маршрута — добавить в `config.matcher` allowlist и не вызывать `requireAuthWithTenant`.
 
 **Стили.** Tailwind + CSS-переменные (`--bg-base`, `--surface-1`, `--text-primary`, `--accent-primary`, `--shadow-card`, etc.). Цвета платформ — через `getPlatformColor()` в `lib/format.ts`. Шрифты — `geist`.
 
