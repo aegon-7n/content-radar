@@ -27,8 +27,9 @@
 │  │                              ▼ Unix socket / TCP localhost   │    │
 │  │  ┌────────────────────────────────────────────────────────┐  │    │
 │  │  │  PostgreSQL                                             │  │    │
-│  │  │  Таблицы: users, creators, products, videos,            │  │    │
-│  │  │           video_metrics, scraper_state                  │  │    │
+│  │  │  Таблицы: tenants, users, creators, products, videos,   │  │    │
+│  │  │           video_metrics, scraper_state,                 │  │    │
+│  │  │           subscriptions, payments                       │  │    │
 │  │  └────────────────────────────────────────────────────────┘  │    │
 │  │                              ▲                                │    │
 │  │                              │ psycopg2                       │    │
@@ -99,16 +100,21 @@ VPS (Next.js) /api/waitlist
 Полная схема — в [src/db/schema.ts](../src/db/schema.ts), пояснения и инварианты — в [src/db/CLAUDE.md](../src/db/CLAUDE.md).
 
 ```
-users (1) ─┬─→ creators (N) ─┐
-           └─→ products (N) ─┤
-                             ↓
-                          videos (N) ──→ video_metrics (M, append-only)
-                            │
-                            └─ fail_streak ≥ 3 → "недоступно"
+tenants (1) ─┬─→ users (N)
+             ├─→ creators (N) ─┐
+             ├─→ products (N) ─┤
+             │                  ↓
+             │               videos (N) ──→ video_metrics (M, append-only)
+             │                 │
+             │                 └─ fail_streak ≥ 3 → "недоступно"
+             ├─→ subscriptions (1)
+             └─→ payments (N)
 
 scraper_state    — три строки на три крон-джоба, для self-healing lookback
 waitlist_signups — лиды с лендинга (не связаны с users, pre-signup)
 ```
+
+**Tenant isolation:** все таблицы с данными (creators, products, videos, subscriptions, payments) имеют `tenant_id` FK NOT NULL. Изоляция обеспечивается единой точкой — `requireAuthWithTenant()` в `src/lib/tenant.ts`, которая извлекает `tenantId` из JWT. Все API-роуты скоупят запросы по `tenant_id`.
 
 **Ключевой инвариант:** `video_metrics` — append-only. Каждый успешный скрейп = новая строка с `scraped_at`. Любая дельта-аналитика держится на этом свойстве.
 
@@ -170,11 +176,10 @@ delta(video) = MAX(views) WHERE scraped_at <= to
 
 ## Что НЕ в архитектуре (намеренно)
 
-- **Кэш фронта** — нет Redis/Memcached. Postgres быстрый, нагрузка маленькая (один админ).
+- **Кэш фронта** — нет Redis/Memcached. Postgres быстрый, нагрузка маленькая.
 - **Очереди задач** — нет Celery/RabbitMQ. Cron + последовательная обработка хватает.
 - **Микросервисы** — фронт и скрейпер запускаются разными деплоями, но это всё ещё монолит.
 - **Realtime** — обновление раз в сутки, не WebSocket. Если клиент попросит — добавим.
-- **Multi-tenancy** — single admin пока что. Multi-tenancy в бэклоге.
 
 ## Граничные точки и риски
 

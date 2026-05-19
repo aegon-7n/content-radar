@@ -145,17 +145,21 @@ function engagement(views: number, platform: Platform) {
 async function seed() {
   console.log("Seeding database...");
 
-  // 1. User
+  // 1. Tenant + User
+  const [tenant] = await db.insert(schema.tenants)
+    .values({ name: "ContentRadar Demo", slug: "contentradar-demo", createdAt: daysAgo(90) })
+    .returning();
+
   const [user] = await db.insert(schema.users)
-    .values({ email: "admin@content-radar.ru", name: "Администратор", createdAt: daysAgo(90) })
+    .values({ tenantId: tenant.id, email: "admin@content-radar.ru", name: "Администратор", role: "owner", createdAt: daysAgo(90) })
     .returning();
 
   // 2. Creators — разные профили активности
   const [polina, katyaE, katyaDDD] = await db.insert(schema.creators)
     .values([
-      { userId: user.id, name: "Полина",       createdAt: daysAgo(90) },
-      { userId: user.id, name: "Катя Ежикова", createdAt: daysAgo(90) },
-      { userId: user.id, name: "Катя ДДД",     createdAt: daysAgo(90) },
+      { tenantId: tenant.id, userId: user.id, name: "Полина",       createdAt: daysAgo(90) },
+      { tenantId: tenant.id, userId: user.id, name: "Катя Ежикова", createdAt: daysAgo(90) },
+      { tenantId: tenant.id, userId: user.id, name: "Катя ДДД",     createdAt: daysAgo(90) },
     ])
     .returning();
 
@@ -175,7 +179,7 @@ async function seed() {
   ];
 
   const productRows = await db.insert(schema.products)
-    .values(productDefs.map(p => ({ userId: user.id, name: p.name, wbArticle: p.wbArticle, createdAt: daysAgo(90) })))
+    .values(productDefs.map(p => ({ tenantId: tenant.id, userId: user.id, name: p.name, wbArticle: p.wbArticle, createdAt: daysAgo(90) })))
     .returning();
 
   // map wbArticle → { row, hotness }
@@ -333,6 +337,7 @@ async function seed() {
 
   // Вставляем видео
   const videoInserts: schema.NewVideo[] = specs.map(s => ({
+    tenantId:   tenant.id,
     userId:     user.id,
     creatorId:  s.creatorId,
     productId:  s.productId,
