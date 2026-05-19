@@ -109,9 +109,9 @@ export default function CreatorsPage() {
   ];
 
   return (
-    <div className="p-6 flex flex-col gap-6">
+    <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
             Креаторы
@@ -128,13 +128,13 @@ export default function CreatorsPage() {
         <TableSkeleton rows={3} />
       ) : (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",
           }}
         >
-          <table className="w-full">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"

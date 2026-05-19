@@ -88,9 +88,9 @@ export default function VideosPage() {
   };
 
   return (
-    <div className="p-6 flex flex-col gap-6">
+    <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
@@ -111,7 +111,7 @@ export default function VideosPage() {
             Все публикации по всем платформам
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           <button
             type="button"
             onClick={() => {
@@ -144,8 +144,8 @@ export default function VideosPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+        <div className="relative flex-1 md:max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "var(--text-disabled)" }} />
           <input
             type="text"
@@ -202,13 +202,13 @@ export default function VideosPage() {
         <TableSkeleton rows={10} />
       ) : (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",
           }}
         >
-          <table className="w-full">
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
@@ -351,11 +351,11 @@ export default function VideosPage() {
 
       {/* Pagination */}
       {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <span className="text-xs" style={{ color: "var(--text-disabled)" }}>
             Показано {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} из {filtered.length}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-wrap">
             <button
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}

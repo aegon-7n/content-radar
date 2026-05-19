@@ -73,9 +73,9 @@ export default function DashboardPage() {
   const totalDonut = donutData.reduce((s, p) => s + p.value, 0);
 
   return (
-    <div className="p-6 flex flex-col gap-6">
+    <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
       {/* Header row */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
             Дашборд
@@ -84,10 +84,10 @@ export default function DashboardPage() {
             Прирост просмотров всех ваших роликов за выбранный период
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           {/* Category filter chips */}
           {allCategories.length > 0 && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap">
               <button
                 onClick={() => setSelectedCategory(null)}
                 className="px-2.5 py-1 rounded-lg text-xs transition-colors"
@@ -125,11 +125,11 @@ export default function DashboardPage() {
 
       {/* Stat cards */}
       {loading ? (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {[...Array(4)].map((_, i) => <StatCardSkeleton key={i} />)}
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <StatCard
             title="Прирост просмотров"
             value={formatViews(d.totalViews)}
@@ -218,7 +218,7 @@ export default function DashboardPage() {
 
       {/* Bottom two-column row */}
       {!loading && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Platform donut chart */}
           <div
             className="rounded-xl p-5"

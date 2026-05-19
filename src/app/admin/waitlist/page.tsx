@@ -166,7 +166,7 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
 
   return (
     <div
-      className="p-6 flex flex-col gap-6 min-h-full"
+      className="p-4 md:p-6 flex flex-col gap-4 md:gap-6 min-h-full"
       style={{ background: "var(--bg-base)" }}
     >
       {/* Header */}
@@ -300,7 +300,7 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
         </div>
       ) : (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",
@@ -308,7 +308,7 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
           }}
         >
           <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+            <table className="w-full min-w-[900px] text-sm border-collapse">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-default)" }}>
                   {[
