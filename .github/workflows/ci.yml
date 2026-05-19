@@ -1,4 +1,4 @@
-name: CI/CD
+name: CI
 
 on:
   push:
@@ -43,43 +43,3 @@ jobs:
 
       - name: Syntax check all scraper modules
         run: python -m compileall scraper
-
-  deploy:
-    needs: [build, python]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy to production
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-        run: |
-          # Write SSH key
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-
-          SSH="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no root@$DEPLOY_HOST"
-
-          # Sync code (excluding local-only files)
-          rsync -azP --delete \
-            --exclude='node_modules' \
-            --exclude='.next' \
-            --exclude='.env*' \
-            --exclude='scraper/venv' \
-            --exclude='__pycache__' \
-            --exclude='.git' \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            ./ "root@$DEPLOY_HOST:/root/content-radar/"
-
-          # Build and restart
-          $SSH 'cd /root/content-radar && \
-            npm ci && \
-            rm -rf .next && \
-            npm run build && \
-            pm2 restart content-radar --update-env'
-
-          echo "Deployed successfully"

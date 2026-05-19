@@ -44,7 +44,7 @@
                                                                        Браузер (HTTPS)
 ```
 
-Всё крутится на одном VPS (`/root/content-radar`): фронт через PM2 (`pm2 status content-radar`), Postgres локально, скрейпер по cron. Деплой — GitHub Actions [.github/workflows/ci.yml](.github/workflows/ci.yml): rsync + `npm run build` + `pm2 restart`. Расписание cron — [scripts/setup-cron.sh](scripts/setup-cron.sh).
+Всё крутится на одном VPS (`/root/content-radar`): фронт через PM2 (`pm2 status content-radar`), Postgres локально, скрейпер по cron. Деплой — GitHub Actions [.github/workflows/deploy.yml](.github/workflows/deploy.yml): SSH → `git pull` → `npm run build` → `npm run db:migrate` → `pm2 reload`. CI (без деплоя) — [ci.yml](.github/workflows/ci.yml). Расписание cron — [scripts/setup-cron.sh](scripts/setup-cron.sh).
 
 ## Стек
 
@@ -55,7 +55,7 @@
 | Auth | NextAuth (CredentialsProvider, JWT, multi-tenant) |
 | База | PostgreSQL (на прод-VPS / локальный postgres в деве) + Drizzle ORM |
 | Скрейпер | Python 3.11+, `requests`, `psycopg2`, `yt-dlp` (fallback). Cron по `setup-cron.sh`. |
-| Деплой | Один VPS на всё: фронт (PM2) + Postgres + cron-скрейпер. GitHub Actions делает rsync + `pm2 restart` ([.github/workflows/ci.yml](.github/workflows/ci.yml)). |
+| Деплой | Один VPS на всё: фронт (PM2) + Postgres + cron-скрейпер. GitHub Actions: [deploy.yml](.github/workflows/deploy.yml) (SSH → git pull → build → migrate → pm2 reload), [ci.yml](.github/workflows/ci.yml) (только CI). |
 
 ## Тёмные углы / что важно знать
 
