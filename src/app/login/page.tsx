@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Radio, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
@@ -152,12 +151,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-center text-xs mt-4" style={{ color: "var(--text-muted)" }}>
-            Нет аккаунта?{" "}
-            <Link href="/register" style={{ color: "var(--accent-primary)" }} className="hover:underline">
-              Регистрация →
-            </Link>
-          </p>
         </div>
       </div>
     </div>
