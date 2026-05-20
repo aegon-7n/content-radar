@@ -45,7 +45,7 @@ type HealthPayload = {
   jobs: HealthJob[];
 };
 
-export default function Sidebar() {
+export default function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
   const [health, setHealth] = useState<HealthPayload | null>(null);
 
@@ -65,8 +65,18 @@ export default function Sidebar() {
   const overallDegraded = health?.status === "degraded";
 
   return (
+    <>
+      {open && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
     <aside
-      className="fixed left-0 top-0 h-screen w-60 flex flex-col z-40"
+      className={`fixed left-0 top-0 h-screen w-60 flex flex-col z-40 transition-transform duration-200 ${
+        open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      }`}
       style={{
         background: "var(--surface-1)",
         borderRight: "1px solid var(--border-default)",
@@ -100,6 +110,7 @@ export default function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               className="flex items-center gap-3 rounded-md text-sm transition-colors duration-150"
               style={{
                 height: "36px",
@@ -175,5 +186,6 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }
