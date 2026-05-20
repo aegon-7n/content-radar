@@ -81,16 +81,17 @@ def get_creators(cur) -> list[dict]:
     # platform does not expose to end users. Manual URL add via the
     # Videos tab is the supported flow for Likee; see docs/likee-research.md.
     cur.execute("""
-        SELECT id, user_id, name,
-               tiktok_username,
-               youtube_channel_id,
-               instagram_username,
-               pinterest_username
-        FROM creators
-        WHERE tiktok_username IS NOT NULL
-           OR youtube_channel_id IS NOT NULL
-           OR instagram_username IS NOT NULL
-           OR pinterest_username IS NOT NULL
+        SELECT c.id, c.user_id, u.tenant_id, c.name,
+               c.tiktok_username,
+               c.youtube_channel_id,
+               c.instagram_username,
+               c.pinterest_username
+        FROM creators c
+        JOIN users u ON u.id = c.user_id
+        WHERE c.tiktok_username IS NOT NULL
+           OR c.youtube_channel_id IS NOT NULL
+           OR c.instagram_username IS NOT NULL
+           OR c.pinterest_username IS NOT NULL
     """)
     return [dict(r) for r in cur.fetchall()]
 
@@ -100,7 +101,7 @@ def url_exists(cur, url: str) -> bool:
     return cur.fetchone() is not None
 
 
-def get_or_create_product(cur, user_id: str, wb_article: str) -> Optional[str]:
+def get_or_create_product(cur, tenant_id: str, user_id: str, wb_article: str) -> Optional[str]:
     """Возвращает product_id. Создаёт товар с needs_review=1 если не найден."""
     cur.execute(
         "SELECT id FROM products WHERE wb_article = %s AND user_id = %s LIMIT 1",
@@ -113,24 +114,24 @@ def get_or_create_product(cur, user_id: str, wb_article: str) -> Optional[str]:
     # Создаём новый товар-заглушку
     cur.execute(
         """
-        INSERT INTO products (id, user_id, name, wb_article, needs_review, created_at)
-        VALUES (gen_random_uuid(), %s, %s, %s, 1, NOW())
+        INSERT INTO products (id, tenant_id, user_id, name, wb_article, needs_review, created_at)
+        VALUES (gen_random_uuid(), %s, %s, %s, %s, 1, NOW())
         RETURNING id
         """,
-        (user_id, f"Артикул {wb_article}", wb_article),
+        (tenant_id, user_id, f"Артикул {wb_article}", wb_article),
     )
     new_id = str(cur.fetchone()[0])
     logger.info("  Создан новый товар: артикул=%s id=%s (needs_review)", wb_article, new_id)
     return new_id
 
 
-def insert_video(cur, user_id, creator_id, product_id, platform, url, published_at):
+def insert_video(cur, tenant_id, user_id, creator_id, product_id, platform, url, published_at):
     cur.execute(
         """
-        INSERT INTO videos (id, user_id, creator_id, product_id, platform, url, published_at, created_at)
-        VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, NOW())
+        INSERT INTO videos (id, tenant_id, user_id, creator_id, product_id, platform, url, published_at, created_at)
+        VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, %s, NOW())
         """,
-        (user_id, creator_id, product_id, platform, url, published_at),
+        (tenant_id, user_id, creator_id, product_id, platform, url, published_at),
     )
 
 
@@ -730,6 +731,7 @@ def main():
     for creator in creators:
         creator_id = str(creator["id"])
         user_id = str(creator["user_id"])
+        tenant_id = str(creator["tenant_id"])
         name = creator["name"]
         logger.info("--- Креатор: %s ---", name)
 
@@ -775,12 +777,12 @@ def main():
                 continue
 
             # Получаем/создаём товар
-            product_id = get_or_create_product(cur, user_id, article)
+            product_id = get_or_create_product(cur, tenant_id, user_id, article)
             if not product_id:
                 continue
 
             # Добавляем видео
-            insert_video(cur, user_id, creator_id, product_id, v["platform"], url, v["published_at"])
+            insert_video(cur, tenant_id, user_id, creator_id, product_id, v["platform"], url, v["published_at"])
             logger.info("  + Добавлено: %s | артикул=%s | %s", v["platform"], article, url[:60])
             total_added += 1
 
