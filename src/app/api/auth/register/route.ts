@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 import { db } from "@/db";
 import { tenants, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -8,6 +9,7 @@ const RegisterSchema = z.object({
   email: z.string().email("Некорректный email"),
   name: z.string().min(1, "Имя обязательно"),
   companyName: z.string().min(1, "Название компании обязательно"),
+  password: z.string().min(8, "Пароль минимум 8 символов"),
 });
 
 function slugify(name: string): string {
@@ -20,12 +22,6 @@ function slugify(name: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const bearer = request.headers.get("authorization")?.replace("Bearer ", "");
-  const secret = process.env.REGISTER_SECRET;
-  if (!secret || bearer !== secret) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -41,7 +37,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { email, name, companyName } = parsed.data;
+  const { email, name, companyName, password } = parsed.data;
 
   const existing = await db
     .select({ id: users.id })
@@ -55,6 +51,8 @@ export async function POST(request: NextRequest) {
       { status: 409 },
     );
   }
+
+  const passwordHash = await bcrypt.hash(password, 12);
 
   const slug = slugify(companyName) || `tenant-${Date.now()}`;
 
@@ -71,6 +69,7 @@ export async function POST(request: NextRequest) {
         email,
         name,
         role: "owner",
+        passwordHash,
       })
       .returning();
 

@@ -70,6 +70,14 @@ export async function GET(request: NextRequest) {
       ? sql` AND p.category = ${params.category}`
       : sql``;
 
+    const emptyCheck = await db.execute(sql`
+      SELECT
+        (SELECT COUNT(*) FROM creators WHERE tenant_id = ${tenantId})::int AS creator_count,
+        (SELECT COUNT(*) FROM videos   WHERE tenant_id = ${tenantId})::int AS video_count
+    `);
+    const emptyRow = emptyCheck[0] as unknown as { creator_count: number; video_count: number };
+    const isEmpty = emptyRow.creator_count === 0 && emptyRow.video_count === 0;
+
     // Per-video delta for a window — reusable CTE. For each video that passes
     // the category filter we compute max(views@to − views@from, 0).
     const perVideoDelta = (fromISO: string, toISO: string) => sql`
@@ -321,6 +329,8 @@ export async function GET(request: NextRequest) {
         productName: row.product_name,
         publishedAt: new Date(row.published_at).toISOString(),
       })),
+
+      isEmpty,
 
       period: {
         from: from.toISOString(),

@@ -41,7 +41,7 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   role: tenantRoleEnum("role").notNull().default("owner"),
   // null = bootstrapped owner whose auth still goes through ADMIN_EMAIL/ADMIN_PASSWORD env var.
-  // Set on first invite-accept for creator users.
+  // Set on first invite-accept or self-serve signup.
   passwordHash: text("password_hash"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
