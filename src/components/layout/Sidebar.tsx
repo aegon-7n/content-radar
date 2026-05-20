@@ -11,6 +11,7 @@ import {
   Settings,
   Radio,
   Inbox,
+  X,
 } from "lucide-react";
 
 const navItems = [
@@ -99,6 +100,15 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
         >
           ContentRadar
         </span>
+        <button
+          onClick={onClose}
+          type="button"
+          aria-label="Закрыть меню"
+          className="md:hidden ml-auto flex items-center justify-center min-h-[44px] min-w-[44px] rounded-md -mr-2"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Nav */}
