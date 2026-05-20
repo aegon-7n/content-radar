@@ -113,7 +113,8 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPass(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 transition"
+                  aria-label={showPass ? "Скрыть пароль" : "Показать пароль"}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-11 h-11 transition"
                   style={{ color: "var(--text-disabled)" }}
                   onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
                   onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-disabled)")}
