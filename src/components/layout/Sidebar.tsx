@@ -120,7 +120,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           <button
             type="button"
             onClick={onClose}
-            className="md:hidden p-1 rounded-md"
+            className="md:hidden p-3 rounded-md"
             style={{ color: "var(--text-muted)" }}
           >
             <X className="w-5 h-5" />

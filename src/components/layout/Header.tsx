@@ -42,7 +42,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         <button
           type="button"
           onClick={onMenuToggle}
-          className="md:hidden p-2 -ml-1 rounded-md"
+          className="md:hidden p-3 -ml-1 rounded-md"
           style={{ color: "var(--text-muted)" }}
         >
           <Menu className="w-5 h-5" />
