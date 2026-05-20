@@ -80,26 +80,6 @@ export default function LoginPage() {
             Аналитика контента для товарного бизнеса
           </p>
 
-          <div
-            className="text-xs rounded-lg px-3 py-2.5 mb-4"
-            style={{
-              background: "var(--accent-muted)",
-              border: "1px solid var(--accent-border)",
-              color: "var(--text-secondary)",
-            }}
-          >
-            Доступ по приглашению.{" "}
-            <a
-              href="https://contentradar.app/#waitlist"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: "var(--accent-primary)" }}
-              className="underline underline-offset-2 hover:no-underline"
-            >
-              Оставить заявку на waitlist
-            </a>
-          </div>
-
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
               <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
@@ -133,7 +113,8 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPass(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 transition"
+                  aria-label={showPass ? "Скрыть пароль" : "Показать пароль"}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-11 h-11 transition"
                   style={{ color: "var(--text-disabled)" }}
                   onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
                   onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-disabled)")}
@@ -159,7 +140,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full text-sm font-medium py-2.5 rounded-lg transition-colors duration-150 mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full text-sm font-medium py-3 rounded-lg transition-colors duration-150 mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: "var(--accent-primary)",
                 color: "#fff",
@@ -170,6 +151,7 @@ export default function LoginPage() {
               {loading ? "Вход..." : "Войти"}
             </button>
           </form>
+
         </div>
       </div>
     </div>
