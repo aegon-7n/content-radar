@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 
 const SECRET = process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production";
 
-const KNOWN_PAGE_ROUTES = /^\/($|creators(\/[^/]+)?$|products(\/[^/]+)?$|videos(\/[^/]+)?$|settings$|admin\/waitlist$)/;
+const KNOWN_PAGE_ROUTES = /^\/($|dashboard$|creators(\/[^/]+)?$|products(\/[^/]+)?$|videos(\/[^/]+)?$|settings$|admin\/waitlist$)/;
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -35,6 +35,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!login|_next/static|_next/image|favicon.ico|api/auth|api/health|api/scrape|api/waitlist).*)",
+    "/((?!login|_next/static|_next/image|favicon.ico|api/auth|api/scrape|api/waitlist).*)",
   ],
 };
