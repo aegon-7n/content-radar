@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
+import { requireAuth } from "@/lib/auth";
 
 /**
  * GET /api/health — operational overview of the scraper pipeline.
@@ -19,7 +21,10 @@ import { sql } from "drizzle-orm";
  * `status: "error"` so the sidebar can show something instead of
  * crashing the whole render.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = await requireAuth(request);
+  if (authError) return authError;
+
   try {
     const [counts, state] = await Promise.all([
       db.execute(sql`
