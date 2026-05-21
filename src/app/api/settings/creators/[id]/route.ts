@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { creators, videos } from "@/db/schema";
-import { eq, and, count } from "drizzle-orm";
+import { creators, videos, subscriptions } from "@/db/schema";
+import { eq, and, count, sum, ne } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuthWithTenant } from "@/lib/tenant";
+import { requireOwner } from "@/lib/tenant";
+import { getTuPool } from "@/lib/yookassa";
 
 const patchCreatorSchema = z.object({
   name: z.string().min(1, "Имя не может быть пустым").optional(),
@@ -20,7 +21,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const auth = await requireAuthWithTenant(request);
+  const auth = await requireOwner(request);
   if (!auth.ok) return auth.response;
   const { tenantId } = auth.ctx;
 
@@ -40,6 +41,44 @@ export async function PATCH(
         { error: "Ошибка валидации", details: parsed.error.issues },
         { status: 400 }
       );
+    }
+
+    if (parsed.data.videoLimit !== undefined && parsed.data.videoLimit !== null) {
+      const newLimit = parsed.data.videoLimit;
+
+      // C3: new limit must not be below creator's current video count.
+      const [creatorCount] = await db
+        .select({ count: count() })
+        .from(videos)
+        .where(and(eq(videos.creatorId, id), eq(videos.tenantId, tenantId)));
+      const currentUsed = Number(creatorCount?.count ?? 0);
+      if (newLimit < currentUsed) {
+        return NextResponse.json(
+          { error: `Нельзя снизить лимит ниже текущего количества роликов (${currentUsed})` },
+          { status: 422 }
+        );
+      }
+
+      // C1: SUM of all other creators' limits + new limit must not exceed tenant pool.
+      const [sub] = await db
+        .select({ tier: subscriptions.tier })
+        .from(subscriptions)
+        .where(eq(subscriptions.tenantId, tenantId))
+        .limit(1);
+      const tuPool = getTuPool(sub?.tier);
+
+      const [otherSum] = await db
+        .select({ total: sum(creators.videoLimit) })
+        .from(creators)
+        .where(and(eq(creators.tenantId, tenantId), ne(creators.id, id)));
+      const otherTotal = Number(otherSum?.total ?? 0);
+
+      if (otherTotal + newLimit > tuPool) {
+        return NextResponse.json(
+          { error: `Сумма лимитов всех креаторов превысит пул тарифа (${tuPool} роликов). Доступно: ${tuPool - otherTotal}` },
+          { status: 422 }
+        );
+      }
     }
 
     const updates: Record<string, string | number | null> = {};
@@ -84,7 +123,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const auth = await requireAuthWithTenant(request);
+  const auth = await requireOwner(request);
   if (!auth.ok) return auth.response;
   const { tenantId } = auth.ctx;
 
