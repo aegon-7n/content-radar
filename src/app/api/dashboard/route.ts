@@ -211,7 +211,10 @@ export async function GET(request: NextRequest) {
         SELECT d::date::text AS date
         FROM generate_series(
           (${from.toISOString()}::timestamptz AT TIME ZONE 'Asia/Makassar')::date,
-          (${to.toISOString()}::timestamptz AT TIME ZONE 'Asia/Makassar')::date,
+          LEAST(
+            (${to.toISOString()}::timestamptz AT TIME ZONE 'Asia/Makassar')::date,
+            (NOW() AT TIME ZONE 'Asia/Makassar')::date - INTERVAL '1 day'
+          ),
           '1 day'::interval
         ) d
       )
