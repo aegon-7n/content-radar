@@ -44,7 +44,7 @@ const handler = NextAuth({
             .where(eq(users.email, adminEmail))
             .limit(1);
           if (!user) return null;
-          return { id: user.id, email: user.email, name: user.name, tenantId: user.tenantId, role: user.role, creatorId: user.creatorId };
+          return { id: user.id, email: user.email, name: user.name, tenantId: user.tenantId, role: user.role, creatorId: user.creatorId, isGlobalAdmin: true };
         }
 
         // Creator path: look up by email, verify bcrypt hash stored in users.password_hash.
@@ -88,20 +88,22 @@ const handler = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.userId = user.id;
-        const u = user as typeof user & { tenantId: string; role: string; creatorId: string | null };
+        const u = user as typeof user & { tenantId: string; role: string; creatorId: string | null; isGlobalAdmin?: boolean };
         token.tenantId = u.tenantId;
         token.role = u.role;
         token.creatorId = u.creatorId ?? null;
+        token.isGlobalAdmin = u.isGlobalAdmin ?? false;
       }
       return token;
     },
     async session({ session, token }) {
       if (token.userId) {
-        const u = session.user as typeof session.user & { id: string; tenantId: string; role: string; creatorId: string | null };
+        const u = session.user as typeof session.user & { id: string; tenantId: string; role: string; creatorId: string | null; isGlobalAdmin: boolean };
         u.id = token.userId as string;
         u.tenantId = token.tenantId as string;
         u.role = (token.role as string) ?? "owner";
         u.creatorId = (token.creatorId as string | null) ?? null;
+        u.isGlobalAdmin = (token.isGlobalAdmin as boolean) ?? false;
       }
       return session;
     },

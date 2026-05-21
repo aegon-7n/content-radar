@@ -17,13 +17,13 @@ import {
 } from "lucide-react";
 
 const allNavItems = [
-  { href: "/", label: "Дашборд", icon: LayoutDashboard, ownerOnly: false },
-  { href: "/creators", label: "Креаторы", icon: Users, ownerOnly: false },
-  { href: "/products", label: "Товары", icon: Package, ownerOnly: false },
-  { href: "/videos", label: "Ролики", icon: Video, ownerOnly: false },
-  { href: "/settings", label: "Настройки", icon: Settings, ownerOnly: true },
-  { href: "/settings/team", label: "Команда", icon: UsersRound, ownerOnly: true },
-  { href: "/admin/waitlist", label: "Waitlist", icon: Inbox, ownerOnly: true },
+  { href: "/", label: "Дашборд", icon: LayoutDashboard, ownerOnly: false, adminOnly: false },
+  { href: "/creators", label: "Креаторы", icon: Users, ownerOnly: false, adminOnly: false },
+  { href: "/products", label: "Товары", icon: Package, ownerOnly: false, adminOnly: false },
+  { href: "/videos", label: "Ролики", icon: Video, ownerOnly: false, adminOnly: false },
+  { href: "/settings", label: "Настройки", icon: Settings, ownerOnly: true, adminOnly: false },
+  { href: "/settings/team", label: "Команда", icon: UsersRound, ownerOnly: true, adminOnly: false },
+  { href: "/admin/waitlist", label: "Waitlist", icon: Inbox, ownerOnly: true, adminOnly: true },
 ];
 
 function formatLastSync(iso: string | null): string {
@@ -58,7 +58,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = (session?.user as { role?: string } | undefined)?.role ?? "owner";
-  const navItems = allNavItems.filter((item) => !item.ownerOnly || role === "owner");
+  const isGlobalAdmin = (session?.user as { isGlobalAdmin?: boolean } | undefined)?.isGlobalAdmin ?? false;
+  const navItems = allNavItems.filter((item) => {
+    if (item.adminOnly && !isGlobalAdmin) return false;
+    if (item.ownerOnly && role !== "owner") return false;
+    return true;
+  });
   const [health, setHealth] = useState<HealthPayload | null>(null);
 
   useEffect(() => {
@@ -135,7 +140,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <nav className="flex-1 px-2 py-3 flex flex-col gap-0.5 overflow-y-auto">
           {navItems.map(({ href, label, icon: Icon }) => {
             const isActive =
-              href === "/" ? pathname === "/" : pathname.startsWith(href);
+              href === "/" ? pathname === "/" :
+              href === "/settings" ? pathname === "/settings" :
+              pathname.startsWith(href);
             return (
               <Link
                 key={href}

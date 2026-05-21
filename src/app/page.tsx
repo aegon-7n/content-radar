@@ -74,6 +74,8 @@ export default function DashboardPage() {
   }, [isEmpty, session]);
 
   const d = (isEmpty || !data) ? MOCK_DASHBOARD : data;
+  const hasRealData = (d.dailyViews ?? []).some((v: { views: number }) => v.views > 0);
+  const chartData = hasRealData ? (d.dailyViews ?? []) : (MOCK_DASHBOARD.dailyViews ?? []);
 
   const donutData = [...(d.byPlatform ?? [])]
     .filter((p) => p.views > 0)
@@ -230,7 +232,7 @@ export default function DashboardPage() {
             <div className="relative group">
               <HelpCircle className="w-3.5 h-3.5 cursor-help" style={{ color: "var(--text-disabled)" }} />
               <div
-                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 w-64 rounded-lg px-3 py-2 text-xs leading-relaxed pointer-events-none"
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 max-w-[280px] w-max rounded-lg px-3 py-2 text-xs leading-relaxed pointer-events-none"
                 style={{
                   background: "var(--surface-1)",
                   border: "1px solid var(--border-default)",
@@ -242,8 +244,23 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+          <div className="relative">
+            {!hasRealData && !isEmpty && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                <span
+                  className="text-xs px-3 py-1.5 rounded-lg"
+                  style={{
+                    background: "var(--accent-muted)",
+                    color: "var(--accent-primary)",
+                    border: "1px solid var(--accent-border)",
+                  }}
+                >
+                  🎬 ДЕМО — данных за этот период пока нет
+                </span>
+              </div>
+            )}
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={d.dailyViews} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+            <LineChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
               <XAxis
                 dataKey="date"
@@ -251,7 +268,7 @@ export default function DashboardPage() {
                 tick={{ fill: "var(--text-disabled)", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                interval={d.dailyViews.length <= 14 ? 0 : Math.ceil(d.dailyViews.length / 10) - 1}
+                interval={chartData.length <= 14 ? 0 : Math.ceil(chartData.length / 10) - 1}
               />
               <YAxis
                 tickFormatter={formatViews}
@@ -276,6 +293,7 @@ export default function DashboardPage() {
               />
             </LineChart>
           </ResponsiveContainer>
+          </div>
         </div>
       )}
 
