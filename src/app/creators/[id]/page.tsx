@@ -278,12 +278,12 @@ export default function CreatorDetailPage() {
 
       {/* Charts row */}
       {loading || !d ? (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ChartSkeleton height={280} />
           <ChartSkeleton height={280} />
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Line chart */}
           <div
             className="rounded-xl p-5"
@@ -391,7 +391,7 @@ export default function CreatorDetailPage() {
           }}
         >
           <div
-            className="px-5 py-4 flex items-center justify-between gap-3"
+            className="px-5 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
             style={{ borderBottom: "1px solid var(--border-default)" }}
           >
             <h2 className="text-sm font-medium shrink-0" style={{ color: "var(--text-primary)" }}>
@@ -400,7 +400,7 @@ export default function CreatorDetailPage() {
                 {filteredProducts.length}
               </span>
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <Search
                   className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
@@ -411,8 +411,8 @@ export default function CreatorDetailPage() {
                   placeholder="Поиск товара..."
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
-                  className="pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
-                  style={{ ...inputBase, width: "180px" }}
+                  className="w-full sm:w-44 pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
+                  style={inputBase}
                 />
               </div>
               <select
@@ -513,7 +513,7 @@ export default function CreatorDetailPage() {
           }}
         >
           <div
-            className="px-5 py-4 flex items-center justify-between gap-3"
+            className="px-5 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
             style={{ borderBottom: "1px solid var(--border-default)" }}
           >
             <h2 className="text-sm font-medium shrink-0" style={{ color: "var(--text-primary)" }}>
@@ -522,7 +522,7 @@ export default function CreatorDetailPage() {
                 {totalFilteredVideos}
               </span>
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <Search
                   className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
@@ -533,8 +533,8 @@ export default function CreatorDetailPage() {
                   placeholder="Поиск по URL, товару..."
                   value={videoSearch}
                   onChange={(e) => { setVideoSearch(e.target.value); setVideoPage(1); }}
-                  className="pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
-                  style={{ ...inputBase, width: "200px" }}
+                  className="w-full sm:w-48 pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
+                  style={inputBase}
                 />
               </div>
               <select
