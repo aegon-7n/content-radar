@@ -32,7 +32,7 @@ function calcChange(current: number, previous: number): number | null {
 export async function GET(request: NextRequest) {
   const auth = await requireAuthWithTenant(request);
   if (!auth.ok) return auth.response;
-  const { tenantId } = auth.ctx;
+  const { tenantId, role, creatorId } = auth.ctx;
 
   try {
     const { searchParams } = request.nextUrl;
@@ -44,6 +44,12 @@ export async function GET(request: NextRequest) {
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const { prevFrom, prevTo } = getPreviousPeriod(from, to);
+
+    // For creator-role users scope all queries to their own data.
+    const videoCreatorFilter =
+      role === "creator" && creatorId ? sql`AND v.creator_id = ${creatorId}` : sql``;
+    const creatorListFilter =
+      role === "creator" && creatorId ? sql`AND c.id = ${creatorId}` : sql``;
 
     // Per-video delta over [fromISO, toISO]. Shared with dashboard.
     const perVideoDelta = (fromISO: string, toISO: string) => sql`
@@ -72,6 +78,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN end_views ev ON ev.video_id = v.id
       LEFT JOIN start_views sv ON sv.video_id = v.id
       WHERE v.tenant_id = ${tenantId}
+      ${videoCreatorFilter}
     `;
 
     // Current period: delta per creator.
@@ -90,6 +97,7 @@ export async function GET(request: NextRequest) {
       FROM creators c
       LEFT JOIN deltas d ON d.creator_id = c.id
       WHERE c.tenant_id = ${tenantId}
+      ${creatorListFilter}
       GROUP BY c.id, c.name, c.avatar_url
       ORDER BY views DESC
     `);
@@ -103,6 +111,7 @@ export async function GET(request: NextRequest) {
       FROM creators c
       LEFT JOIN deltas d ON d.creator_id = c.id
       WHERE c.tenant_id = ${tenantId}
+      ${creatorListFilter}
       GROUP BY c.id
     `);
 

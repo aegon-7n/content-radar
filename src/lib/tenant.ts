@@ -1,34 +1,28 @@
 import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
 
 const SECRET = process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production";
 
 export interface TenantContext {
   userId: string;
   tenantId: string;
+  role: "owner" | "creator";
+  creatorId: string | null;
 }
 
 type AuthResult =
   | { ok: true; ctx: TenantContext }
   | { ok: false; response: NextResponse };
 
-export interface TenantContextWithRole extends TenantContext {
-  role: "owner" | "creator";
-}
-
-type AuthResultWithRole =
-  | { ok: true; ctx: TenantContextWithRole }
-  | { ok: false; response: NextResponse };
+// Alias kept so callers of requireOwner don't need a signature change.
+export type TenantContextWithRole = TenantContext;
+type AuthResultWithRole = AuthResult;
 
 /**
  * Single enforcement point for tenant-scoped auth.
- * Every protected route MUST call this instead of requireAuth().
- * Returns the userId and tenantId from the JWT — no DB lookup needed
- * because tenantId is baked into the token at login.
+ * Returns userId, tenantId, role, and creatorId from the JWT — no DB lookup
+ * needed because all four fields are baked into the token at login.
  */
 export async function requireAuthWithTenant(
   req: NextRequest,
@@ -46,6 +40,8 @@ export async function requireAuthWithTenant(
       ctx: {
         userId: token.userId as string,
         tenantId: token.tenantId as string,
+        role: (token.role as "owner" | "creator") ?? "owner",
+        creatorId: (token.creatorId as string | null) ?? null,
       },
     };
   } catch {
@@ -57,25 +53,19 @@ export async function requireAuthWithTenant(
 }
 
 /**
- * Like requireAuthWithTenant but additionally loads the user's role from DB
- * and returns 403 if the caller is not an owner.
+ * Like requireAuthWithTenant but additionally returns 403 if the caller is not
+ * an owner. Role comes from the JWT — no DB lookup.
  */
 export async function requireOwner(req: NextRequest): Promise<AuthResultWithRole> {
   const base = await requireAuthWithTenant(req);
   if (!base.ok) return base;
 
-  const [user] = await db
-    .select({ role: users.role })
-    .from(users)
-    .where(and(eq(users.id, base.ctx.userId), eq(users.tenantId, base.ctx.tenantId)))
-    .limit(1);
-
-  if (!user || user.role !== "owner") {
+  if (base.ctx.role !== "owner") {
     return {
       ok: false,
       response: NextResponse.json({ error: "forbidden" }, { status: 403 }),
     };
   }
 
-  return { ok: true, ctx: { ...base.ctx, role: "owner" } };
+  return base;
 }

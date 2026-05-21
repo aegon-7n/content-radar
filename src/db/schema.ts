@@ -40,6 +40,9 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   role: tenantRoleEnum("role").notNull().default("owner"),
+  // Nullable FK to creators.id — set when a creator-role user is created via invite.
+  // Null for owner accounts and creator accounts not yet linked.
+  creatorId: uuid("creator_id"),
   // null = bootstrapped owner whose auth still goes through ADMIN_EMAIL/ADMIN_PASSWORD env var.
   // Set on first invite-accept or self-serve signup.
   passwordHash: text("password_hash"),
@@ -293,6 +296,8 @@ export const inviteTokens = pgTable(
     tenantId: uuid("tenant_id").references(() => tenants.id).notNull(),
     invitedByUserId: uuid("invited_by_user_id").references(() => users.id).notNull(),
     email: text("email"),
+    // Which creator this invite is for. Set when owner invites a specific creator.
+    creatorId: uuid("creator_id"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     usedAt: timestamp("used_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

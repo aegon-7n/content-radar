@@ -19,7 +19,7 @@ const querySchema = z.object({
 export async function GET(request: NextRequest) {
   const auth = await requireAuthWithTenant(request);
   if (!auth.ok) return auth.response;
-  const { tenantId } = auth.ctx;
+  const { tenantId, role, creatorId: sessionCreatorId } = auth.ctx;
 
   try {
     const { searchParams } = request.nextUrl;
@@ -35,9 +35,11 @@ export async function GET(request: NextRequest) {
 
     const { sql } = await import("drizzle-orm");
 
-    // Build optional filter fragments
-    const creatorFilter = params.creatorId
-      ? sql`AND v.creator_id = ${params.creatorId}`
+    // Creator-role users are always scoped to their own creator; owners can filter optionally.
+    const effectiveCreatorId =
+      role === "creator" ? sessionCreatorId : (params.creatorId ?? null);
+    const creatorFilter = effectiveCreatorId
+      ? sql`AND v.creator_id = ${effectiveCreatorId}`
       : sql``;
     const productFilter = params.productId
       ? sql`AND v.product_id = ${params.productId}`

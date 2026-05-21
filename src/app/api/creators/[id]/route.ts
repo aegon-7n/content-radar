@@ -35,10 +35,14 @@ export async function GET(
 ) {
   const auth = await requireAuthWithTenant(request);
   if (!auth.ok) return auth.response;
-  const { tenantId } = auth.ctx;
+  const { tenantId, role, creatorId } = auth.ctx;
 
   try {
     const { id } = await params;
+
+    if (role === "creator" && creatorId !== id) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
     const { searchParams } = request.nextUrl;
     const query = querySchema.parse(Object.fromEntries(searchParams));
 
