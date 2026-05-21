@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, HelpCircle } from "lucide-react";
 
 interface Props {
   tenantId: string;
@@ -131,7 +131,7 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5">
+        <div className="px-6 pt-5 pb-7">
           {/* ── Step 1: Welcome ── */}
           {step === 1 && (
             <div className="flex flex-col gap-4">
@@ -139,8 +139,8 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
                 Привет, {userName}! 👋
               </h2>
               <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                ContentRadar собирает аналитику с TikTok, Instagram, YouTube и других платформ раз в
-                сутки. Подключим первого креатора?
+                ContentRadar собирает аналитику с TikTok, Instagram и YouTube раз в сутки.
+                Подключим первого креатора?
               </p>
               <div className="flex flex-col gap-2 pt-1">
                 <button
@@ -245,9 +245,25 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
 
               {/* YouTube Channel ID */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                  YouTube Channel ID
-                </label>
+                <div className="flex items-center gap-1">
+                  <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+                    YouTube Channel ID
+                  </label>
+                  <div className="relative group">
+                    <HelpCircle className="w-3 h-3 cursor-help" style={{ color: "var(--text-disabled)" }} />
+                    <div
+                      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 max-w-[240px] w-max rounded-lg px-3 py-2 text-xs leading-relaxed pointer-events-none"
+                      style={{
+                        background: "var(--surface-1)",
+                        border: "1px solid var(--border-default)",
+                        color: "var(--text-secondary)",
+                        boxShadow: "var(--shadow-card)",
+                      }}
+                    >
+                      Найди на странице канала: youtube.com/channel/<strong>UC…</strong>. Начинается с «UC».
+                    </div>
+                  </div>
+                </div>
                 <input
                   type="text"
                   value={youtubeChannelId}
@@ -299,8 +315,8 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
                 Готово! 🚀
               </h2>
               <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                Скрейпер запустится сегодня ночью. Первые метрики появятся через 24 часа. Пока
-                можешь изучить интерфейс на демо-данных.
+                Данные собираются ночью около 04:00 Bali. Завтра утром увидишь прирост за сегодня.
+                Пока можешь изучить интерфейс на демо-данных.
               </p>
               <button
                 onClick={handleComplete}
