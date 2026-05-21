@@ -207,7 +207,7 @@ export default function DashboardPage() {
             title="Активных платформ"
             value={d.activePlatforms}
             icon={<LayoutGrid className="w-4 h-4" style={{ color: "#D97706" }} />}
-            subtitle="из 5 доступных"
+            subtitle="TT, Instagram, YouTube"
             mono={false}
             help="Сколько платформ из TikTok/YouTube/Instagram/Likee/Pinterest принесли хотя бы один новый просмотр."
           />

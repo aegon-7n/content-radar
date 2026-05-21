@@ -5,6 +5,13 @@ import { eq, count } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthWithTenant } from "@/lib/tenant";
 
+function stripAt(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const t = s.trim().replace(/^@+/, "").trim();
+  return t.length ? t : null;
+}
+
+
 const createCreatorSchema = z.object({
   name: z.string().min(1, "Имя обязательно"),
   avatarUrl: z.string().url("Некорректный URL аватара").optional().or(z.literal("")),
@@ -86,9 +93,9 @@ export async function POST(request: NextRequest) {
         tenantId,
         name,
         avatarUrl: avatarUrl || null,
-        tiktokUsername: tiktokUsername || null,
+        tiktokUsername: stripAt(tiktokUsername),
         youtubeChannelId: youtubeChannelId || null,
-        instagramUsername: instagramUsername || null,
+        instagramUsername: stripAt(instagramUsername),
         pinterestUsername: pinterestUsername || null,
       })
       .returning();

@@ -83,7 +83,7 @@ export default function RegisterPage() {
             Создать аккаунт
           </h1>
           <p className="text-xs mb-6" style={{ color: "var(--text-muted)" }}>
-            Бесплатно. Первые данные — через 24 часа.
+            Бесплатно. Первые данные — завтра утром (скрейпер собирает в ~00:10 МСК).
           </p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">

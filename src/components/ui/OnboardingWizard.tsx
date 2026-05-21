@@ -250,7 +250,7 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
                     YouTube Channel ID
                   </label>
                   <div className="relative group">
-                    <HelpCircle className="w-3 h-3 cursor-help" style={{ color: "var(--text-disabled)" }} />
+                    <HelpCircle className="w-4 h-4 cursor-help" style={{ color: "var(--accent-primary)" }} />
                     <div
                       className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 max-w-[240px] w-max rounded-lg px-3 py-2 text-xs leading-relaxed pointer-events-none"
                       style={{
@@ -315,7 +315,7 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
                 Готово! 🚀
               </h2>
               <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                Данные собираются ночью около 04:00 Bali. Завтра утром увидишь прирост за сегодня.
+                Данные собираются ночью, около 00:10 по МСК. Завтра утром увидишь прирост за сегодня.
                 Пока можешь изучить интерфейс на демо-данных.
               </p>
               <button
