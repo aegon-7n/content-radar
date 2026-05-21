@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/health — operational overview of the scraper pipeline.
  *
