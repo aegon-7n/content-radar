@@ -67,6 +67,7 @@ export async function POST(
     email: finalEmail,
     name: parsed.name,
     role: "creator",
+    creatorId: row.creatorId ?? null,
     passwordHash,
   });
 

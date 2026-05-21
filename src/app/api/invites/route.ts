@@ -8,6 +8,7 @@ import { requireOwner } from "@/lib/tenant";
 
 const CreateInviteSchema = z.object({
   email: z.string().email().optional(),
+  creatorId: z.string().uuid().optional(),
 });
 
 /** GET /api/invites — list team members + pending invites. Owner only. */
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
   const { tenantId, userId } = auth.ctx;
 
   let email: string | undefined;
+  let creatorId: string | undefined;
   try {
     const body = await req.json();
     const parsed = CreateInviteSchema.safeParse(body);
@@ -51,6 +53,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request." }, { status: 400 });
     }
     email = parsed.data.email;
+    creatorId = parsed.data.creatorId;
   } catch {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
@@ -58,7 +61,7 @@ export async function POST(req: NextRequest) {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-  await db.insert(inviteTokens).values({ token, tenantId, invitedByUserId: userId, email: email ?? null, expiresAt });
+  await db.insert(inviteTokens).values({ token, tenantId, invitedByUserId: userId, email: email ?? null, creatorId: creatorId ?? null, expiresAt });
 
   const baseUrl = process.env.NEXTAUTH_URL ?? "https://contentradar.app";
   const inviteUrl = `${baseUrl}/invite/${token}`;

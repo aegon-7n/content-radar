@@ -53,7 +53,7 @@ function calcChange(current: number, previous: number): number | null {
 export async function GET(request: NextRequest) {
   const auth = await requireAuthWithTenant(request);
   if (!auth.ok) return auth.response;
-  const { tenantId } = auth.ctx;
+  const { tenantId, role, creatorId } = auth.ctx;
 
   try {
     const { searchParams } = request.nextUrl;
@@ -77,6 +77,8 @@ export async function GET(request: NextRequest) {
     `);
     const emptyRow = emptyCheck[0] as unknown as { creator_count: number; video_count: number };
     const isEmpty = emptyRow.creator_count === 0 && emptyRow.video_count === 0;
+        const creatorFilter =
+      role === "creator" && creatorId ? sql` AND v.creator_id = ${creatorId}` : sql``;
 
     // Per-video delta for a window — reusable CTE. For each video that passes
     // the category filter we compute max(views@to − views@from, 0).
@@ -86,7 +88,7 @@ export async function GET(request: NextRequest) {
         SELECT v.id, v.platform, v.published_at
         FROM videos v
         LEFT JOIN products p ON p.id = v.product_id
-        WHERE v.tenant_id = ${tenantId} ${categoryFilter}
+        WHERE v.tenant_id = ${tenantId} ${categoryFilter} ${creatorFilter}
       ),
       end_views AS (
         SELECT DISTINCT ON (vm.video_id)
@@ -163,7 +165,7 @@ export async function GET(request: NextRequest) {
         SELECT v.id AS video_id
         FROM videos v
         LEFT JOIN products p ON p.id = v.product_id
-        WHERE v.tenant_id = ${tenantId} ${categoryFilter}
+        WHERE v.tenant_id = ${tenantId} ${categoryFilter} ${creatorFilter}
       ),
       baseline AS (
         SELECT DISTINCT ON (vm.video_id)

@@ -19,7 +19,7 @@ const handler = NextAuth({
         const adminEmail = process.env.ADMIN_EMAIL ?? "admin@content-radar.ru";
 
         if (credentials.email === adminEmail) {
-          // Admin/owner path: prefer bcrypt hash stored via reset-password flow,
+          // Owner path: prefer bcrypt hash stored via reset-password flow,
           // fall back to plaintext env var on first boot.
           let passwordOk = false;
           try {
@@ -39,23 +39,23 @@ const handler = NextAuth({
           if (!passwordOk) return null;
 
           const [user] = await db
-            .select({ id: users.id, tenantId: users.tenantId, email: users.email, name: users.name })
+            .select({ id: users.id, tenantId: users.tenantId, email: users.email, name: users.name, role: users.role, creatorId: users.creatorId })
             .from(users)
             .where(eq(users.email, adminEmail))
             .limit(1);
           if (!user) return null;
-          return { id: user.id, email: user.email, name: user.name, tenantId: user.tenantId };
+          return { id: user.id, email: user.email, name: user.name, tenantId: user.tenantId, role: user.role, creatorId: user.creatorId };
         }
 
         // Creator path: look up by email, verify bcrypt hash stored in users.password_hash.
         try {
           const [user] = await db
-            .select({ id: users.id, tenantId: users.tenantId, email: users.email, name: users.name, passwordHash: users.passwordHash })
+            .select({ id: users.id, tenantId: users.tenantId, email: users.email, name: users.name, role: users.role, creatorId: users.creatorId, passwordHash: users.passwordHash })
             .from(users)
             .where(eq(users.email, credentials.email))
             .limit(1);
           if (user?.passwordHash && await compare(credentials.password, user.passwordHash)) {
-            return { id: user.id, email: user.email, name: user.name, tenantId: user.tenantId };
+            return { id: user.id, email: user.email, name: user.name, tenantId: user.tenantId, role: user.role, creatorId: user.creatorId };
           }
         } catch {
           // DB unavailable — fall through.
@@ -88,14 +88,20 @@ const handler = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.userId = user.id;
-        token.tenantId = (user as typeof user & { tenantId: string }).tenantId;
+        const u = user as typeof user & { tenantId: string; role: string; creatorId: string | null };
+        token.tenantId = u.tenantId;
+        token.role = u.role;
+        token.creatorId = u.creatorId ?? null;
       }
       return token;
     },
     async session({ session, token }) {
       if (token.userId) {
-        (session.user as typeof session.user & { id: string; tenantId: string }).id = token.userId as string;
-        (session.user as typeof session.user & { id: string; tenantId: string }).tenantId = token.tenantId as string;
+        const u = session.user as typeof session.user & { id: string; tenantId: string; role: string; creatorId: string | null };
+        u.id = token.userId as string;
+        u.tenantId = token.tenantId as string;
+        u.role = (token.role as string) ?? "owner";
+        u.creatorId = (token.creatorId as string | null) ?? null;
       }
       return session;
     },
