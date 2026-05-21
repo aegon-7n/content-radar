@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Copy, UserMinus, UserPlus, Check } from "lucide-react";
+import { Copy, UserMinus, UserPlus, Check, Video } from "lucide-react";
+import { formatNumber } from "@/lib/format";
 
 type Member = {
   id: string;
@@ -24,10 +25,26 @@ type TeamData = {
   me: Member | null;
 };
 
+type CreatorQuota = {
+  id: string;
+  name: string;
+  videoLimit: number | null;
+  videosUsed: number;
+  atLimit: boolean;
+};
+
+type TuData = {
+  pool: number;
+  used: number;
+  usedPct: number;
+  byCreator: CreatorQuota[];
+};
+
 export default function TeamPage() {
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [tuData, setTuData] = useState<TuData | null>(null);
 
   // Invite form state
   const [inviteEmail, setInviteEmail] = useState("");
@@ -35,11 +52,23 @@ export default function TeamPage() {
   const [inviteResult, setInviteResult] = useState<{ url: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Quota edit state
+  const [editingQuota, setEditingQuota] = useState<string | null>(null);
+  const [quotaInput, setQuotaInput] = useState("");
+  const [savingQuota, setSavingQuota] = useState(false);
+
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("/api/invites");
-      if (!res.ok) throw new Error("Ошибка загрузки");
-      setData(await res.json() as TeamData);
+      const [teamRes, billingRes] = await Promise.all([
+        fetch("/api/invites"),
+        fetch("/api/billing/status"),
+      ]);
+      if (!teamRes.ok) throw new Error("Ошибка загрузки");
+      setData(await teamRes.json() as TeamData);
+      if (billingRes.ok) {
+        const billing = await billingRes.json() as { tu?: TuData };
+        if (billing.tu) setTuData(billing.tu);
+      }
     } catch {
       setError("Не удалось загрузить данные команды.");
     } finally {
@@ -82,6 +111,34 @@ export default function TeamPage() {
     } else {
       const d = await res.json().catch(() => ({})) as { error?: string };
       setError(d.error ?? "Ошибка при отзыве доступа.");
+    }
+  }
+
+  async function handleSaveQuota(creatorId: string) {
+    setSavingQuota(true);
+    const value = quotaInput.trim() === "" ? null : parseInt(quotaInput, 10);
+    if (quotaInput.trim() !== "" && (isNaN(value as number) || (value as number) < 1)) {
+      setError("Лимит должен быть положительным числом.");
+      setSavingQuota(false);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/settings/creators/${creatorId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoLimit: value }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string };
+        setError(d.error ?? "Ошибка сохранения.");
+      } else {
+        setEditingQuota(null);
+        void fetchData();
+      }
+    } catch {
+      setError("Сетевая ошибка.");
+    } finally {
+      setSavingQuota(false);
     }
   }
 
@@ -199,6 +256,101 @@ export default function TeamPage() {
           </ul>
         )}
       </div>
+
+      {/* TU quota panel */}
+      {tuData && (
+        <div className="rounded-xl p-5" style={cardStyle}>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              <Video className="inline w-4 h-4 mr-1.5" style={{ color: "var(--accent-primary)" }} />
+              Квоты видео
+            </h2>
+            <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+              {formatNumber(tuData.used)} / {formatNumber(tuData.pool)} роликов
+            </span>
+          </div>
+
+          {/* Pool usage bar */}
+          <div className="mb-4">
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.min(tuData.usedPct, 100)}%`,
+                  background: tuData.usedPct >= 100
+                    ? "var(--error-text)"
+                    : tuData.usedPct >= 80
+                    ? "var(--warning-text)"
+                    : "var(--accent-primary)",
+                }}
+              />
+            </div>
+            <p className="text-[11px] mt-1" style={{ color: "var(--text-disabled)" }}>
+              {tuData.usedPct}% тарифного пула использовано
+            </p>
+          </div>
+
+          {/* Per-creator rows */}
+          {tuData.byCreator.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--text-disabled)" }}>Нет креаторов.</p>
+          ) : (
+            <ul className="space-y-2">
+              {tuData.byCreator.map((c) => (
+                <li key={c.id} className="flex items-center justify-between gap-3 py-1">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm truncate" style={{ color: "var(--text-primary)" }}>{c.name}</p>
+                    <p className="text-xs font-mono" style={{ color: c.atLimit ? "var(--error-text)" : "var(--text-disabled)" }}>
+                      {formatNumber(c.videosUsed)}{c.videoLimit !== null ? ` / ${formatNumber(c.videoLimit)}` : ""} роликов
+                      {c.atLimit && " · лимит"}
+                    </p>
+                  </div>
+                  {editingQuota === c.id ? (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <input
+                        type="number"
+                        min={1}
+                        value={quotaInput}
+                        onChange={(e) => setQuotaInput(e.target.value)}
+                        placeholder="∞"
+                        className="w-16 px-2 py-1 text-xs rounded-lg outline-none"
+                        style={{ background: "var(--surface-2)", border: "1px solid var(--accent-primary)", color: "var(--text-primary)" }}
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleSaveQuota(c.id)}
+                        disabled={savingQuota}
+                        className="text-xs px-2 py-1 rounded-lg transition disabled:opacity-50"
+                        style={{ background: "var(--accent-primary)", color: "#fff" }}
+                      >
+                        {savingQuota ? "…" : "OK"}
+                      </button>
+                      <button
+                        onClick={() => setEditingQuota(null)}
+                        className="text-xs px-1.5 py-1 rounded-lg transition"
+                        style={{ background: "var(--surface-2)", color: "var(--text-muted)" }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingQuota(c.id);
+                        setQuotaInput(c.videoLimit !== null ? String(c.videoLimit) : "");
+                      }}
+                      className="text-xs shrink-0 transition"
+                      style={{ color: "var(--text-disabled)" }}
+                      title="Изменить лимит"
+                    >
+                      {c.videoLimit !== null ? `лимит: ${formatNumber(c.videoLimit)}` : "без лимита"}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Pending invites */}
       {data?.pendingInvites.length ? (

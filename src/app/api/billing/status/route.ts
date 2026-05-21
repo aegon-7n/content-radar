@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, count, and } from "drizzle-orm";
 import { requireAuthWithTenant } from "@/lib/tenant";
 import { db } from "@/db";
-import { subscriptions, payments } from "@/db/schema";
+import { subscriptions, payments, creators, videos } from "@/db/schema";
+import { getTuPool } from "@/lib/yookassa";
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuthWithTenant(request);
@@ -31,9 +32,53 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(payments.createdAt))
       .limit(10);
 
+    // TU pool: total allowed active videos for this tenant (from subscription tier).
+    const tuPool = getTuPool(subscription?.tier);
+
+    // Per-creator TU usage = count of active videos (fail_streak < 3).
+    const creatorRows = await db
+      .select({
+        id: creators.id,
+        name: creators.name,
+        videoLimit: creators.videoLimit,
+      })
+      .from(creators)
+      .where(eq(creators.tenantId, tenantId));
+
+    const byCreator = await Promise.all(
+      creatorRows.map(async (c) => {
+        const [row] = await db
+          .select({ count: count() })
+          .from(videos)
+          .where(
+            and(
+              eq(videos.creatorId, c.id),
+              eq(videos.tenantId, tenantId),
+            )
+          );
+        const used = Number(row?.count ?? 0);
+        return {
+          id: c.id,
+          name: c.name,
+          videoLimit: c.videoLimit ?? null,
+          videosUsed: used,
+          atLimit: c.videoLimit !== null && used >= c.videoLimit,
+        };
+      })
+    );
+
+    const totalUsed = byCreator.reduce((s, c) => s + c.videosUsed, 0);
+    const poolUsedPct = tuPool > 0 ? Math.round((totalUsed / tuPool) * 100) : 0;
+
     return NextResponse.json({
       subscription: subscription ?? null,
       payments: recentPayments,
+      tu: {
+        pool: tuPool,
+        used: totalUsed,
+        usedPct: poolUsedPct,
+        byCreator,
+      },
     });
   } catch (error) {
     console.error("[billing/status] error:", error);

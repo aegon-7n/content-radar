@@ -12,6 +12,8 @@ const patchCreatorSchema = z.object({
   youtubeChannelId: z.string().optional().or(z.literal("")),
   instagramUsername: z.string().optional().or(z.literal("")),
   pinterestUsername: z.string().optional().or(z.literal("")),
+  // Per-creator video cap. null removes the limit.
+  videoLimit: z.number().int().min(1).nullable().optional(),
 });
 
 export async function PATCH(
@@ -40,7 +42,7 @@ export async function PATCH(
       );
     }
 
-    const updates: Record<string, string | null> = {};
+    const updates: Record<string, string | number | null> = {};
     if (parsed.data.name !== undefined) updates.name = parsed.data.name;
     if (parsed.data.avatarUrl !== undefined) {
       updates.avatarUrl = parsed.data.avatarUrl === "" ? null : parsed.data.avatarUrl;
@@ -56,6 +58,9 @@ export async function PATCH(
     }
     if (parsed.data.pinterestUsername !== undefined) {
       updates.pinterestUsername = parsed.data.pinterestUsername === "" ? null : parsed.data.pinterestUsername;
+    }
+    if (parsed.data.videoLimit !== undefined) {
+      updates.videoLimit = parsed.data.videoLimit;
     }
 
     if (Object.keys(updates).length === 0) {
