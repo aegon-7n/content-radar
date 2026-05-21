@@ -70,13 +70,25 @@ export async function GET(request: NextRequest) {
       ? sql` AND p.category = ${params.category}`
       : sql``;
 
-    const emptyCheck = await db.execute(sql`
-      SELECT
-        (SELECT COUNT(*) FROM creators WHERE tenant_id = ${tenantId})::int AS creator_count,
-        (SELECT COUNT(*) FROM videos   WHERE tenant_id = ${tenantId})::int AS video_count
-    `);
-    const emptyRow = emptyCheck[0] as unknown as { creator_count: number; video_count: number };
-    const isEmpty = emptyRow.creator_count === 0 && emptyRow.video_count === 0;
+    // For creator-role users, isEmpty = no videos attributed to them specifically.
+    // For owners, isEmpty = tenant has no creators and no videos at all.
+    let isEmpty: boolean;
+    if (role === "creator" && creatorId) {
+      const myVideoCheck = await db.execute(sql`
+        SELECT COUNT(*)::int AS my_video_count
+        FROM videos
+        WHERE tenant_id = ${tenantId} AND creator_id = ${creatorId}
+      `);
+      isEmpty = (myVideoCheck[0] as unknown as { my_video_count: number }).my_video_count === 0;
+    } else {
+      const emptyCheck = await db.execute(sql`
+        SELECT
+          (SELECT COUNT(*) FROM creators WHERE tenant_id = ${tenantId})::int AS creator_count,
+          (SELECT COUNT(*) FROM videos   WHERE tenant_id = ${tenantId})::int AS video_count
+      `);
+      const emptyRow = emptyCheck[0] as unknown as { creator_count: number; video_count: number };
+      isEmpty = emptyRow.creator_count === 0 && emptyRow.video_count === 0;
+    }
         const creatorFilter =
       role === "creator" && creatorId ? sql` AND v.creator_id = ${creatorId}` : sql``;
 

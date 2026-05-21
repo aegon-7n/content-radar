@@ -34,6 +34,7 @@ const tooltipStyle = {
 
 export default function DashboardPage() {
   const { data: session } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role ?? "owner";
   const [period, setPeriod] = useState<Period>("30d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -64,14 +65,15 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, [period, customFrom, customTo, selectedCategory]);
 
-  // Show onboarding wizard for empty tenants that haven't seen it yet
+  // Show onboarding wizard for empty owner tenants that haven't seen it yet.
+  // Creators get a simpler "no videos yet" banner, not the full setup wizard.
   useEffect(() => {
-    if (isEmpty && session?.user) {
+    if (isEmpty && session?.user && role !== "creator") {
       const tenantId = (session.user as { tenantId?: string }).tenantId ?? "";
       const done = localStorage.getItem(`onboarding_done_${tenantId}`);
       if (!done) setShowWizard(true);
     }
-  }, [isEmpty, session]);
+  }, [isEmpty, session, role]);
 
   const d = (isEmpty || !data) ? MOCK_DASHBOARD : data;
 
@@ -148,7 +150,19 @@ export default function DashboardPage() {
       </div>
 
       {/* Demo banner */}
-      {isEmpty && (
+      {isEmpty && role === "creator" && (
+        <div
+          className="rounded-xl px-4 py-3 flex items-center gap-3"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
+        >
+          <span className="text-base">🎬</span>
+          <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Роликов пока нет — попросите менеджера добавить вас в качестве автора хотя бы одного ролика.
+            Ниже показан пример дашборда.
+          </span>
+        </div>
+      )}
+      {isEmpty && role !== "creator" && (
         <div
           className="rounded-xl px-4 py-3 flex items-center justify-between gap-4"
           style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-border)" }}
