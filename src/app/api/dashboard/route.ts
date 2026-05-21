@@ -177,15 +177,15 @@ export async function GET(request: NextRequest) {
         ORDER BY vm.video_id, vm.scraped_at DESC
       ),
       daily_latest AS (
-        SELECT DISTINCT ON (vm.video_id, DATE(vm.scraped_at AT TIME ZONE 'UTC'))
+        SELECT DISTINCT ON (vm.video_id, DATE(vm.scraped_at AT TIME ZONE 'Asia/Makassar'))
           vm.video_id,
-          DATE(vm.scraped_at AT TIME ZONE 'UTC') AS day,
+          DATE(vm.scraped_at AT TIME ZONE 'Asia/Makassar') AS day,
           vm.views
         FROM video_metrics vm
         INNER JOIN filtered_videos fv ON fv.video_id = vm.video_id
         WHERE vm.scraped_at >= ${from.toISOString()}
           AND vm.scraped_at <= ${to.toISOString()}
-        ORDER BY vm.video_id, DATE(vm.scraped_at AT TIME ZONE 'UTC'), vm.scraped_at DESC
+        ORDER BY vm.video_id, DATE(vm.scraped_at AT TIME ZONE 'Asia/Makassar'), vm.scraped_at DESC
       ),
       with_prev AS (
         SELECT
@@ -210,8 +210,8 @@ export async function GET(request: NextRequest) {
       all_days AS (
         SELECT d::date::text AS date
         FROM generate_series(
-          ${from.toISOString()}::date,
-          ${to.toISOString()}::date,
+          (${from.toISOString()}::timestamptz AT TIME ZONE 'Asia/Makassar')::date,
+          (${to.toISOString()}::timestamptz AT TIME ZONE 'Asia/Makassar')::date,
           '1 day'::interval
         ) d
       )
