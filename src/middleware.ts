@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 
 const SECRET = process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production";
 
-const KNOWN_PAGE_ROUTES = /^\/($|dashboard$|creators(\/[^/]+)?$|products(\/[^/]+)?$|videos(\/[^/]+)?$|settings$|admin\/waitlist$)/;
+const KNOWN_PAGE_ROUTES = /^\/($|dashboard$|creators(\/[^/]+)?$|products(\/[^/]+)?$|videos(\/[^/]+)?$|settings(\/team)?$|admin\/waitlist$)/;
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -22,6 +22,10 @@ export async function middleware(request: NextRequest) {
         return NextResponse.json({ error: "unauthorized" }, { status: 401 });
       }
       return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    if (pathname === "/dashboard") {
+      return NextResponse.redirect(new URL("/", request.url));
     }
 
     return NextResponse.next();
