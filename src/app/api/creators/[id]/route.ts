@@ -196,7 +196,7 @@ export async function GET(
         SELECT d::date::text AS date
         FROM generate_series(
           ${from.toISOString()}::date,
-          ${to.toISOString()}::date,
+          LEAST(${to.toISOString()}::date, (NOW() AT TIME ZONE 'Asia/Makassar')::date - INTERVAL '1 day'),
           '1 day'::interval
         ) d
       )

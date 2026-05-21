@@ -14,7 +14,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { Eye, Film, TrendingUp, LayoutGrid } from "lucide-react";
+import { Eye, Film, TrendingUp, LayoutGrid, HelpCircle } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
@@ -223,9 +223,25 @@ export default function DashboardPage() {
             border: "1px solid var(--border-default)",
           }}
         >
-          <h2 className="text-sm font-medium mb-5" style={{ color: "var(--text-primary)" }}>
-            Прирост просмотров по дням
-          </h2>
+          <div className="flex items-center gap-1.5 mb-5">
+            <h2 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              Прирост просмотров по дням
+            </h2>
+            <div className="relative group">
+              <HelpCircle className="w-3.5 h-3.5 cursor-help" style={{ color: "var(--text-disabled)" }} />
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 w-64 rounded-lg px-3 py-2 text-xs leading-relaxed pointer-events-none"
+                style={{
+                  background: "var(--surface-1)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-secondary)",
+                  boxShadow: "var(--shadow-card)",
+                }}
+              >
+                Данные обновляются раз в сутки утром. Прирост за сегодня появится завтра в районе 04:30 Bali.
+              </div>
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={d.dailyViews} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
