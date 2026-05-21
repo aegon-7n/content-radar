@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 /**
  * Dashboard analytics — cumulative delta model.
@@ -51,8 +51,9 @@ function calcChange(current: number, previous: number): number | null {
 }
 
 export async function GET(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId, role, creatorId } = auth.ctx;
 
   try {
     const { searchParams } = request.nextUrl;
@@ -69,6 +70,16 @@ export async function GET(request: NextRequest) {
       ? sql` AND p.category = ${params.category}`
       : sql``;
 
+    const emptyCheck = await db.execute(sql`
+      SELECT
+        (SELECT COUNT(*) FROM creators WHERE tenant_id = ${tenantId})::int AS creator_count,
+        (SELECT COUNT(*) FROM videos   WHERE tenant_id = ${tenantId})::int AS video_count
+    `);
+    const emptyRow = emptyCheck[0] as unknown as { creator_count: number; video_count: number };
+    const isEmpty = emptyRow.creator_count === 0 && emptyRow.video_count === 0;
+        const creatorFilter =
+      role === "creator" && creatorId ? sql` AND v.creator_id = ${creatorId}` : sql``;
+
     // Per-video delta for a window — reusable CTE. For each video that passes
     // the category filter we compute max(views@to − views@from, 0).
     const perVideoDelta = (fromISO: string, toISO: string) => sql`
@@ -77,7 +88,7 @@ export async function GET(request: NextRequest) {
         SELECT v.id, v.platform, v.published_at
         FROM videos v
         LEFT JOIN products p ON p.id = v.product_id
-        WHERE TRUE ${categoryFilter}
+        WHERE v.tenant_id = ${tenantId} ${categoryFilter} ${creatorFilter}
       ),
       end_views AS (
         SELECT DISTINCT ON (vm.video_id)
@@ -154,7 +165,7 @@ export async function GET(request: NextRequest) {
         SELECT v.id AS video_id
         FROM videos v
         LEFT JOIN products p ON p.id = v.product_id
-        WHERE TRUE ${categoryFilter}
+        WHERE v.tenant_id = ${tenantId} ${categoryFilter} ${creatorFilter}
       ),
       baseline AS (
         SELECT DISTINCT ON (vm.video_id)
@@ -166,15 +177,15 @@ export async function GET(request: NextRequest) {
         ORDER BY vm.video_id, vm.scraped_at DESC
       ),
       daily_latest AS (
-        SELECT DISTINCT ON (vm.video_id, DATE(vm.scraped_at AT TIME ZONE 'UTC'))
+        SELECT DISTINCT ON (vm.video_id, DATE(vm.scraped_at AT TIME ZONE 'Asia/Makassar'))
           vm.video_id,
-          DATE(vm.scraped_at AT TIME ZONE 'UTC') AS day,
+          DATE(vm.scraped_at AT TIME ZONE 'Asia/Makassar') AS day,
           vm.views
         FROM video_metrics vm
         INNER JOIN filtered_videos fv ON fv.video_id = vm.video_id
         WHERE vm.scraped_at >= ${from.toISOString()}
           AND vm.scraped_at <= ${to.toISOString()}
-        ORDER BY vm.video_id, DATE(vm.scraped_at AT TIME ZONE 'UTC'), vm.scraped_at DESC
+        ORDER BY vm.video_id, DATE(vm.scraped_at AT TIME ZONE 'Asia/Makassar'), vm.scraped_at DESC
       ),
       with_prev AS (
         SELECT
@@ -188,13 +199,31 @@ export async function GET(request: NextRequest) {
           ) AS prev_views
         FROM daily_latest dl
         LEFT JOIN baseline bl ON bl.video_id = dl.video_id
+      ),
+      actual_days AS (
+        SELECT
+          day::text AS date,
+          COALESCE(SUM(GREATEST(views - prev_views, 0)), 0)::bigint AS views
+        FROM with_prev
+        GROUP BY day
+      ),
+      all_days AS (
+        SELECT d::date::text AS date
+        FROM generate_series(
+          (${from.toISOString()}::timestamptz AT TIME ZONE 'Asia/Makassar')::date,
+          LEAST(
+            (${to.toISOString()}::timestamptz AT TIME ZONE 'Asia/Makassar')::date,
+            (NOW() AT TIME ZONE 'Asia/Makassar')::date - INTERVAL '1 day'
+          ),
+          '1 day'::interval
+        ) d
       )
       SELECT
-        day::text AS date,
-        COALESCE(SUM(GREATEST(views - prev_views, 0)), 0)::bigint AS views
-      FROM with_prev
-      GROUP BY day
-      ORDER BY day ASC
+        ad.date,
+        COALESCE(act.views, 0)::bigint AS views
+      FROM all_days ad
+      LEFT JOIN actual_days act ON act.date = ad.date
+      ORDER BY ad.date ASC
     `);
 
     // Top 5 videos by delta in the period.
@@ -230,7 +259,7 @@ export async function GET(request: NextRequest) {
 
     // Categories for the filter chips.
     const categoriesResult = await db.execute(sql`
-      SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category ASC
+      SELECT DISTINCT category FROM products WHERE tenant_id = ${tenantId} AND category IS NOT NULL ORDER BY category ASC
     `);
 
     const current = currentResult[0] as unknown as {
@@ -305,6 +334,8 @@ export async function GET(request: NextRequest) {
         productName: row.product_name,
         publishedAt: new Date(row.published_at).toISOString(),
       })),
+
+      isEmpty,
 
       period: {
         from: from.toISOString(),

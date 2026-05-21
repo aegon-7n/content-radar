@@ -141,13 +141,13 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
             Эти товары найдены автоматически по артикулу из описания ролика. Добавь название.
           </p>
           <div
-            className="rounded-xl overflow-hidden"
+            className="rounded-xl overflow-x-auto"
             style={{
               background: "var(--surface-1)",
               border: "1px solid var(--warning-border)",
             }}
           >
-            <table className="w-full">
+            <table className="w-full min-w-[400px]">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                   {["Артикул WB", "Роликов", "Действие"].map((h, i) => (
@@ -240,7 +240,7 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
         </div>
 
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",
@@ -255,7 +255,7 @@ export default function ProductsTab({ showToast }: ProductsTabProps) {
               Нет товаров
             </div>
           ) : (
-            <table className="w-full">
+            <table className="w-full min-w-[600px]">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                   {["Название", "Артикул WB", "Категория", "Роликов", "Действия"].map((h, i) => (

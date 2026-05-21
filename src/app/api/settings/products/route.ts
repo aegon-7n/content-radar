@@ -1,20 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { products, users, videos } from "@/db/schema";
+import { products, videos } from "@/db/schema";
 import { eq, count } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
-
-// Cache the default user id at module level
-let defaultUserId: string | null = null;
-
-async function getDefaultUserId(): Promise<string> {
-  if (defaultUserId) return defaultUserId;
-  const result = await db.select({ id: users.id }).from(users).limit(1);
-  if (!result.length) throw new Error("No users found in database");
-  defaultUserId = result[0].id;
-  return defaultUserId;
-}
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 const createProductSchema = z.object({
   name: z.string().min(1, "Название обязательно"),
@@ -23,8 +12,9 @@ const createProductSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId } = auth.ctx;
 
   try {
     const result = await db
@@ -38,6 +28,7 @@ export async function GET(request: NextRequest) {
         videoCount: count(videos.id),
       })
       .from(products)
+      .where(eq(products.tenantId, tenantId))
       .leftJoin(videos, eq(videos.productId, products.id))
       .groupBy(products.id, products.name, products.wbArticle, products.category, products.needsReview, products.createdAt)
       .orderBy(products.name);
@@ -50,8 +41,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId, userId } = auth.ctx;
 
   try {
     const body = await request.json();
@@ -64,13 +56,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userId = await getDefaultUserId();
     const { name, wbArticle, category } = parsed.data;
 
     const [product] = await db
       .insert(products)
       .values({
         userId,
+        tenantId,
         name,
         wbArticle,
         category: category || null,

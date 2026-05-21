@@ -113,7 +113,8 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPass(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 transition"
+                  aria-label={showPass ? "Скрыть пароль" : "Показать пароль"}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-11 h-11 transition"
                   style={{ color: "var(--text-disabled)" }}
                   onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
                   onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-disabled)")}
@@ -139,7 +140,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full text-sm font-medium py-2.5 rounded-lg transition-colors duration-150 mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full text-sm font-medium py-3 rounded-lg transition-colors duration-150 mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: "var(--accent-primary)",
                 color: "#fff",
@@ -150,6 +151,14 @@ export default function LoginPage() {
               {loading ? "Вход..." : "Войти"}
             </button>
           </form>
+
+          <p className="text-xs text-center mt-4" style={{ color: "var(--text-muted)" }}>
+            Нет аккаунта?{" "}
+            <a href="/register" className="underline underline-offset-2 hover:no-underline" style={{ color: "var(--accent-primary)" }}>
+              Зарегистрироваться
+            </a>
+          </p>
+
         </div>
       </div>
     </div>

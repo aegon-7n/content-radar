@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 /**
  * Creators list — same cumulative delta model as /api/dashboard.
@@ -30,8 +30,9 @@ function calcChange(current: number, previous: number): number | null {
 }
 
 export async function GET(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId, role, creatorId } = auth.ctx;
 
   try {
     const { searchParams } = request.nextUrl;
@@ -43,6 +44,12 @@ export async function GET(request: NextRequest) {
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const { prevFrom, prevTo } = getPreviousPeriod(from, to);
+
+    // For creator-role users scope all queries to their own data.
+    const videoCreatorFilter =
+      role === "creator" && creatorId ? sql`AND v.creator_id = ${creatorId}` : sql``;
+    const creatorListFilter =
+      role === "creator" && creatorId ? sql`AND c.id = ${creatorId}` : sql``;
 
     // Per-video delta over [fromISO, toISO]. Shared with dashboard.
     const perVideoDelta = (fromISO: string, toISO: string) => sql`
@@ -70,6 +77,8 @@ export async function GET(request: NextRequest) {
       FROM videos v
       LEFT JOIN end_views ev ON ev.video_id = v.id
       LEFT JOIN start_views sv ON sv.video_id = v.id
+      WHERE v.tenant_id = ${tenantId}
+      ${videoCreatorFilter}
     `;
 
     // Current period: delta per creator.
@@ -87,6 +96,8 @@ export async function GET(request: NextRequest) {
            AND v2.published_at <= ${to.toISOString()})::int AS new_videos
       FROM creators c
       LEFT JOIN deltas d ON d.creator_id = c.id
+      WHERE c.tenant_id = ${tenantId}
+      ${creatorListFilter}
       GROUP BY c.id, c.name, c.avatar_url
       ORDER BY views DESC
     `);
@@ -99,6 +110,8 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(d.delta), 0)::bigint AS views
       FROM creators c
       LEFT JOIN deltas d ON d.creator_id = c.id
+      WHERE c.tenant_id = ${tenantId}
+      ${creatorListFilter}
       GROUP BY c.id
     `);
 

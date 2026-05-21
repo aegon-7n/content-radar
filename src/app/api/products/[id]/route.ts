@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 /**
  * Product detail — cumulative delta for the product's videos in the selected
@@ -22,8 +22,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId } = auth.ctx;
 
   try {
     const { id } = await params;
@@ -37,7 +38,7 @@ export async function GET(
 
     // Product info.
     const productResult = await db.execute(sql`
-      SELECT id, name, wb_article FROM products WHERE id = ${id}
+      SELECT id, name, wb_article FROM products WHERE id = ${id} AND tenant_id = ${tenantId}
     `);
     if (!productResult.length) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
@@ -54,7 +55,7 @@ export async function GET(
       product_videos AS (
         SELECT v.id, v.platform, v.creator_id, v.published_at
         FROM videos v
-        WHERE v.product_id = ${id}
+        WHERE v.product_id = ${id} AND v.tenant_id = ${tenantId}
       ),
       end_views AS (
         SELECT DISTINCT ON (vm.video_id) vm.video_id, vm.views
@@ -145,7 +146,7 @@ export async function GET(
       FROM videos v
       LEFT JOIN latest_metrics lm ON lm.video_id = v.id
       LEFT JOIN creators c ON c.id = v.creator_id
-      WHERE v.product_id = ${id}
+      WHERE v.product_id = ${id} AND v.tenant_id = ${tenantId}
       ORDER BY views DESC
     `);
 

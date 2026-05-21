@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId } = auth.ctx;
 
   try {
     const { id } = await params;
@@ -28,7 +29,7 @@ export async function GET(
       FROM videos v
       INNER JOIN creators c ON c.id = v.creator_id
       INNER JOIN products p ON p.id = v.product_id
-      WHERE v.id = ${id}
+      WHERE v.id = ${id} AND v.tenant_id = ${tenantId}
     `);
 
     if (!videoResult.length) {

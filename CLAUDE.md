@@ -44,7 +44,7 @@
                                                                        Браузер (HTTPS)
 ```
 
-Всё крутится на одном VPS (`/root/content-radar`): фронт через PM2 (`pm2 status content-radar`), Postgres локально, скрейпер по cron. Деплой — GitHub Actions [.github/workflows/ci.yml](.github/workflows/ci.yml): rsync + `npm run build` + `pm2 restart`. Расписание cron — [scripts/setup-cron.sh](scripts/setup-cron.sh).
+Всё крутится на одном VPS (`/root/content-radar`): фронт через PM2 (`pm2 status content-radar`), Postgres локально, скрейпер по cron. Деплой — GitHub Actions [.github/workflows/deploy.yml](.github/workflows/deploy.yml): SSH → `git pull` → `npm run build` → `npm run db:migrate` → `pm2 reload`. CI (без деплоя) — [ci.yml](.github/workflows/ci.yml). Расписание cron — [scripts/setup-cron.sh](scripts/setup-cron.sh).
 
 ## Стек
 
@@ -52,10 +52,10 @@
 |---|---|
 | Frontend | Next.js 14 App Router, React 18, TypeScript strict, Tailwind, Recharts, Geist Sans/Mono |
 | API | Next.js API Routes, Zod-валидация |
-| Auth | NextAuth (CredentialsProvider, JWT, single admin) |
+| Auth | NextAuth (CredentialsProvider, JWT, multi-tenant) |
 | База | PostgreSQL (на прод-VPS / локальный postgres в деве) + Drizzle ORM |
 | Скрейпер | Python 3.11+, `requests`, `psycopg2`, `yt-dlp` (fallback). Cron по `setup-cron.sh`. |
-| Деплой | Один VPS на всё: фронт (PM2) + Postgres + cron-скрейпер. GitHub Actions делает rsync + `pm2 restart` ([.github/workflows/ci.yml](.github/workflows/ci.yml)). |
+| Деплой | Один VPS на всё: фронт (PM2) + Postgres + cron-скрейпер. GitHub Actions: [deploy.yml](.github/workflows/deploy.yml) (SSH → git pull → build → migrate → pm2 reload), [ci.yml](.github/workflows/ci.yml) (только CI). |
 
 ## Тёмные углы / что важно знать
 
@@ -64,7 +64,7 @@
 3. **Likee — частично сломан by design.** Их фид нельзя дискаверить, ролики добавляются вручную URL'ом. Контекст: [docs/likee-research.md](docs/likee-research.md).
 4. **`video_metrics` — append-only.** Не UPDATE, не UPSERT. Это инвариант, без которого ломается аналитика динамики.
 5. **`fail_streak`** в `videos` защищает от траты квоты на удалённые/приватные ролики (>= 3 неудач = пропускаем навсегда).
-6. **Single-tenant пока что.** Один админ, всё через `ADMIN_EMAIL`/`ADMIN_PASSWORD` в env. Multi-tenancy — в бэклоге.
+6. **Multi-tenancy.** Каждый тенант (бренд/магазин) изолирован через `tenant_id` на всех таблицах с данными. `tenant_id` запекается в JWT при логине. Единая точка проверки — `requireAuthWithTenant()` в `src/lib/tenant.ts`. Регистрация нового тенанта — `POST /api/auth/register` (защищён `REGISTER_SECRET`).
 7. **Секреты в git history** — `scripts/setup-cron.sh` теперь читает из `.env.local`, но старые ключи засветились в git history. Нужна ротация.
 
 ## Команды разработчика
@@ -92,6 +92,7 @@ NEXTAUTH_URL=http://localhost:3000
 ADMIN_EMAIL=...
 ADMIN_PASSWORD=...
 SCRAPE_SECRET=...        # bearer для /api/scrape
+REGISTER_SECRET=...      # bearer для /api/auth/register
 
 # скрейпер
 TIKAPI_KEY=...
@@ -150,4 +151,4 @@ TELEGRAM_CHAT_ID=...
 
 ## Известные планы
 
-См. [docs/backlog.md](docs/backlog.md). Главное в очереди: CI/CD деплой, обработка `permanently_unavailable` в UI, multi-tenancy (когда придёт второй клиент).
+См. [docs/backlog.md](docs/backlog.md). Главное в очереди: CI/CD деплой, обработка `permanently_unavailable` в UI. Multi-tenancy -- реализована (миграция `0001_tense_nicolaos.sql`).

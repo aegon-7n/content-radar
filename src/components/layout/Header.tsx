@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 
@@ -13,7 +13,11 @@ const pageTitles: Record<string, string> = {
   "/settings": "Настройки",
 };
 
-export default function Header() {
+type HeaderProps = {
+  onMenuToggle: () => void;
+};
+
+export default function Header({ onMenuToggle }: HeaderProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const title = Object.entries(pageTitles).find(([path]) =>
@@ -28,15 +32,25 @@ export default function Header() {
 
   return (
     <header
-      className="fixed top-0 left-60 right-0 h-14 flex items-center justify-between px-6 z-30 backdrop-blur"
+      className="fixed top-0 right-0 left-0 md:left-60 h-14 flex items-center justify-between px-4 md:px-6 z-30 backdrop-blur"
       style={{
         background: "var(--surface-1)",
         borderBottom: "1px solid var(--border-default)",
       }}
     >
-      <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-        {title}
-      </span>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onMenuToggle}
+          className="md:hidden p-3 -ml-1 rounded-md"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          {title}
+        </span>
+      </div>
 
       <div className="flex items-center gap-3">
         {/* User avatar + dropdown */}

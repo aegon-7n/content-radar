@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 /**
  * Products list — cumulative delta per product, matching /api/dashboard and
@@ -16,8 +16,9 @@ const querySchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId, role, creatorId } = auth.ctx;
 
   try {
     const { searchParams } = request.nextUrl;
@@ -27,6 +28,14 @@ export async function GET(request: NextRequest) {
     const from = params.from
       ? new Date(params.from + "T00:00:00Z")
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // Creator-role users see only products that have videos from their creator.
+    const videoCreatorFilter =
+      role === "creator" && creatorId ? sql`AND v.creator_id = ${creatorId}` : sql``;
+    const productCreatorFilter =
+      role === "creator" && creatorId
+        ? sql`AND EXISTS (SELECT 1 FROM videos vf WHERE vf.product_id = p.id AND vf.creator_id = ${creatorId} AND vf.tenant_id = ${tenantId})`
+        : sql``;
 
     const perVideoDelta = sql`
       WITH
@@ -52,6 +61,8 @@ export async function GET(request: NextRequest) {
       FROM videos v
       LEFT JOIN end_views ev ON ev.video_id = v.id
       LEFT JOIN start_views sv ON sv.video_id = v.id
+      WHERE v.tenant_id = ${tenantId}
+      ${videoCreatorFilter}
     `;
 
     // Totals per product.
@@ -69,6 +80,8 @@ export async function GET(request: NextRequest) {
            AND v2.published_at <= ${to.toISOString()})::int AS new_videos
       FROM products p
       LEFT JOIN deltas d ON d.product_id = p.id
+      WHERE p.tenant_id = ${tenantId}
+      ${productCreatorFilter}
       GROUP BY p.id, p.name, p.wb_article
       ORDER BY views DESC
     `);

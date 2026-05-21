@@ -1,22 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { videos, creators, products, users } from "@/db/schema";
+import { videos, creators, products } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 const PLATFORM_VALUES = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
-
-// Cache the default user id at module level
-let defaultUserId: string | null = null;
-
-async function getDefaultUserId(): Promise<string> {
-  if (defaultUserId) return defaultUserId;
-  const result = await db.select({ id: users.id }).from(users).limit(1);
-  if (!result.length) throw new Error("No users found in database");
-  defaultUserId = result[0].id;
-  return defaultUserId;
-}
 
 const importItemSchema = z.object({
   url: z.string().url("URL ролика должен быть валидным"),
@@ -30,8 +19,9 @@ const importItemSchema = z.object({
 const importBodySchema = z.array(importItemSchema).min(1, "Массив не может быть пустым");
 
 export async function POST(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId, userId } = auth.ctx;
 
   try {
     const body = await request.json();
@@ -44,7 +34,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userId = await getDefaultUserId();
     const items = parsed.data;
 
     // In-memory caches to avoid repeated DB lookups within the same request
@@ -66,7 +55,7 @@ export async function POST(request: NextRequest) {
           const existing = await db
             .select({ id: creators.id })
             .from(creators)
-            .where(and(eq(creators.userId, userId), eq(creators.name, item.creatorName)))
+            .where(and(eq(creators.tenantId, tenantId), eq(creators.name, item.creatorName)))
             .limit(1);
 
           if (existing.length) {
@@ -74,7 +63,7 @@ export async function POST(request: NextRequest) {
           } else {
             const [newCreator] = await db
               .insert(creators)
-              .values({ userId, name: item.creatorName })
+              .values({ userId, tenantId, name: item.creatorName })
               .returning({ id: creators.id });
             creatorId = newCreator.id;
           }
@@ -89,7 +78,7 @@ export async function POST(request: NextRequest) {
           const existing = await db
             .select({ id: products.id })
             .from(products)
-            .where(and(eq(products.userId, userId), eq(products.name, item.productName)))
+            .where(and(eq(products.tenantId, tenantId), eq(products.name, item.productName)))
             .limit(1);
 
           if (existing.length) {
@@ -99,6 +88,7 @@ export async function POST(request: NextRequest) {
               .insert(products)
               .values({
                 userId,
+                tenantId,
                 name: item.productName,
                 wbArticle: item.wbArticle ?? "unknown",
               })
@@ -112,6 +102,7 @@ export async function POST(request: NextRequest) {
         // --- Insert video ---
         await db.insert(videos).values({
           userId,
+          tenantId,
           creatorId,
           productId,
           platform: item.platform,

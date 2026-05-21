@@ -29,7 +29,7 @@ export default function Modal({ open, onClose, title, children }: ModalProps) {
     >
       <div className="absolute inset-0 backdrop-blur-sm bg-black/40" />
       <div
-        className="relative z-10 w-full max-w-md rounded-xl shadow-2xl"
+        className="relative z-10 w-full max-w-md rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto"
         style={{
           background: "var(--surface-1)",
           border: "1px solid var(--border-default)",

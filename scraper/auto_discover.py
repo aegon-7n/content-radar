@@ -81,16 +81,17 @@ def get_creators(cur) -> list[dict]:
     # platform does not expose to end users. Manual URL add via the
     # Videos tab is the supported flow for Likee; see docs/likee-research.md.
     cur.execute("""
-        SELECT id, user_id, name,
-               tiktok_username,
-               youtube_channel_id,
-               instagram_username,
-               pinterest_username
-        FROM creators
-        WHERE tiktok_username IS NOT NULL
-           OR youtube_channel_id IS NOT NULL
-           OR instagram_username IS NOT NULL
-           OR pinterest_username IS NOT NULL
+        SELECT c.id, c.user_id, u.tenant_id, c.name,
+               c.tiktok_username,
+               c.youtube_channel_id,
+               c.instagram_username,
+               c.pinterest_username
+        FROM creators c
+        JOIN users u ON u.id = c.user_id
+        WHERE c.tiktok_username IS NOT NULL
+           OR c.youtube_channel_id IS NOT NULL
+           OR c.instagram_username IS NOT NULL
+           OR c.pinterest_username IS NOT NULL
     """)
     return [dict(r) for r in cur.fetchall()]
 
@@ -100,7 +101,7 @@ def url_exists(cur, url: str) -> bool:
     return cur.fetchone() is not None
 
 
-def get_or_create_product(cur, user_id: str, wb_article: str) -> Optional[str]:
+def get_or_create_product(cur, tenant_id: str, user_id: str, wb_article: str) -> Optional[str]:
     """Возвращает product_id. Создаёт товар с needs_review=1 если не найден."""
     cur.execute(
         "SELECT id FROM products WHERE wb_article = %s AND user_id = %s LIMIT 1",
@@ -113,24 +114,24 @@ def get_or_create_product(cur, user_id: str, wb_article: str) -> Optional[str]:
     # Создаём новый товар-заглушку
     cur.execute(
         """
-        INSERT INTO products (id, user_id, name, wb_article, needs_review, created_at)
-        VALUES (gen_random_uuid(), %s, %s, %s, 1, NOW())
+        INSERT INTO products (id, tenant_id, user_id, name, wb_article, needs_review, created_at)
+        VALUES (gen_random_uuid(), %s, %s, %s, %s, 1, NOW())
         RETURNING id
         """,
-        (user_id, f"Артикул {wb_article}", wb_article),
+        (tenant_id, user_id, f"Артикул {wb_article}", wb_article),
     )
     new_id = str(cur.fetchone()[0])
     logger.info("  Создан новый товар: артикул=%s id=%s (needs_review)", wb_article, new_id)
     return new_id
 
 
-def insert_video(cur, user_id, creator_id, product_id, platform, url, published_at):
+def insert_video(cur, tenant_id, user_id, creator_id, product_id, platform, url, published_at):
     cur.execute(
         """
-        INSERT INTO videos (id, user_id, creator_id, product_id, platform, url, published_at, created_at)
-        VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, NOW())
+        INSERT INTO videos (id, tenant_id, user_id, creator_id, product_id, platform, url, published_at, created_at)
+        VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, %s, NOW())
         """,
-        (user_id, creator_id, product_id, platform, url, published_at),
+        (tenant_id, user_id, creator_id, product_id, platform, url, published_at),
     )
 
 
@@ -261,10 +262,12 @@ def fetch_youtube_videos(channel_id: str, since: datetime) -> list[dict]:
     Возвращает список {'url', 'description', 'published_at'}.
     Принимает channel ID или @handle — резолвит автоматически.
 
-    Пагинация: до 5 страниц по 50 = 250 видео максимум за период. Без
-    пагинации мы пропускали свежие публикации у активных креаторов
-    (например, у Полины 50 видео за 30 дней, а maxResults=20 без
-    pageToken возвращало только верхние 20).
+    Использует playlistItems.list на "Uploads" playlist (1 quota unit/call)
+    вместо search.list (100 units/call) — экономия в 100×.
+
+    Uploads playlist ID = "UU" + channel_id[2:] (canonical YouTube convention).
+    Items возвращаются от новых к старым; пагинация останавливается когда
+    все элементы страницы старше `since`.
     """
     if not YOUTUBE_API_KEY:
         logger.warning("YOUTUBE_API_KEY не задан, пропускаем YouTube auto-discover")
@@ -275,72 +278,51 @@ def fetch_youtube_videos(channel_id: str, since: datetime) -> list[dict]:
         return []
     channel_id = resolved_id
 
-    published_after = since.strftime("%Y-%m-%dT%H:%M:%SZ")
-    video_ids: list[str] = []
+    uploads_playlist_id = "UU" + channel_id[2:]
+    results: list[dict] = []
     page_token: Optional[str] = None
 
     try:
         for _ in range(5):  # safety cap: 250 videos per creator per run
-            params = {
-                "channelId": channel_id,
-                "part": "id",
-                "type": "video",
-                "publishedAfter": published_after,
+            params: dict = {
+                "playlistId": uploads_playlist_id,
+                "part": "snippet",
                 "maxResults": 50,
-                "order": "date",
                 "key": YOUTUBE_API_KEY,
             }
             if page_token:
                 params["pageToken"] = page_token
 
-            search_resp = requests.get(
-                "https://www.googleapis.com/youtube/v3/search",
+            resp = requests.get(
+                "https://www.googleapis.com/youtube/v3/playlistItems",
                 params=params,
                 timeout=_DEFAULT_TIMEOUT,
             )
-            if not search_resp.ok:
-                logger.warning("YouTube search status=%d для channel=%s", search_resp.status_code, channel_id)
+            if not resp.ok:
+                logger.warning("YouTube playlistItems status=%d для channel=%s", resp.status_code, channel_id)
                 break
 
-            payload = search_resp.json()
-            for item in payload.get("items", []):
-                vid = item.get("id", {}).get("videoId")
-                if vid:
-                    video_ids.append(vid)
+            payload = resp.json()
+            items = payload.get("items", [])
+            all_too_old = True
 
-            page_token = payload.get("nextPageToken")
-            if not page_token:
-                break
-
-        if not video_ids:
-            logger.info("YouTube channel=%s: новых видео нет", channel_id)
-            return []
-
-        # Step 2: descriptions + publishedAt via videos endpoint, batched 50.
-        results: list[dict] = []
-        for chunk_start in range(0, len(video_ids), 50):
-            chunk = video_ids[chunk_start:chunk_start + 50]
-            videos_resp = requests.get(
-                "https://www.googleapis.com/youtube/v3/videos",
-                params={
-                    "id": ",".join(chunk),
-                    "part": "snippet",
-                    "key": YOUTUBE_API_KEY,
-                },
-                timeout=_DEFAULT_TIMEOUT,
-            )
-            if not videos_resp.ok:
-                continue
-
-            for v in videos_resp.json().get("items", []):
-                snippet = v.get("snippet", {})
+            for item in items:
+                snippet = item.get("snippet", {})
                 published_str = snippet.get("publishedAt", "")
                 try:
                     published_at = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
                 except ValueError:
                     continue
 
-                url = f"https://www.youtube.com/watch?v={v['id']}"
+                if published_at < since:
+                    continue
+
+                all_too_old = False
+                video_id = snippet.get("resourceId", {}).get("videoId")
+                if not video_id:
+                    continue
+
+                url = f"https://www.youtube.com/watch?v={video_id}"
                 title = snippet.get("title", "")
                 desc = snippet.get("description", "")
                 combined_text = f"{title} {desc}"
@@ -350,6 +332,10 @@ def fetch_youtube_videos(channel_id: str, since: datetime) -> list[dict]:
                     "description": combined_text,
                     "published_at": published_at,
                 })
+
+            page_token = payload.get("nextPageToken")
+            if not page_token or all_too_old:
+                break
 
     except Exception as e:
         logger.error("Ошибка при запросе YouTube API для channel=%s: %s", channel_id, e)
@@ -745,6 +731,7 @@ def main():
     for creator in creators:
         creator_id = str(creator["id"])
         user_id = str(creator["user_id"])
+        tenant_id = str(creator["tenant_id"])
         name = creator["name"]
         logger.info("--- Креатор: %s ---", name)
 
@@ -790,12 +777,12 @@ def main():
                 continue
 
             # Получаем/создаём товар
-            product_id = get_or_create_product(cur, user_id, article)
+            product_id = get_or_create_product(cur, tenant_id, user_id, article)
             if not product_id:
                 continue
 
             # Добавляем видео
-            insert_video(cur, user_id, creator_id, product_id, v["platform"], url, v["published_at"])
+            insert_video(cur, tenant_id, user_id, creator_id, product_id, v["platform"], url, v["published_at"])
             logger.info("  + Добавлено: %s | артикул=%s | %s", v["platform"], article, url[:60])
             total_added += 1
 

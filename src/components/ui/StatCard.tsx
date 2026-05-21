@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import { HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPercent } from "@/lib/format";
 
@@ -8,7 +12,7 @@ interface StatCardProps {
   change?: number | null;
   icon?: React.ReactNode;
   subtitle?: string;
-  /** Tooltip text shown on hover over the title — explains what the number is. */
+  /** Tooltip text shown via info-icon popover — explains what the number means. */
   help?: string;
   mono?: boolean;
 }
@@ -22,6 +26,7 @@ export default function StatCard({
   help,
   mono = true,
 }: StatCardProps) {
+  const [tipVisible, setTipVisible] = useState(false);
   const hasChange = change !== undefined && change !== null;
   const isPositive = hasChange && (change as number) >= 0;
 
@@ -37,13 +42,58 @@ export default function StatCard({
       }}
     >
       <div className="flex items-center justify-between">
-        <span
-          className="text-[13px]"
-          style={{ color: "var(--text-muted)" }}
-          title={help}
-        >
-          {title}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="text-[13px]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {title}
+          </span>
+          {help && (
+            <div className="relative">
+              <button
+                type="button"
+                onMouseEnter={(e) => {
+                  setTipVisible(true);
+                  (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
+                }}
+                onMouseLeave={(e) => {
+                  setTipVisible(false);
+                  (e.currentTarget as HTMLElement).style.color = "var(--text-disabled)";
+                }}
+                onFocus={() => setTipVisible(true)}
+                onBlur={() => setTipVisible(false)}
+                className="flex items-center justify-center rounded transition-colors"
+                style={{ color: "var(--text-disabled)" }}
+                aria-label={`Подсказка: ${title}`}
+              >
+                <HelpCircle className="w-3 h-3" />
+              </button>
+              {tipVisible && (
+                <div
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg px-3 py-2 text-xs z-30 pointer-events-none"
+                  style={{
+                    background: "var(--surface-1)",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--text-secondary)",
+                    boxShadow: "var(--shadow-card)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {help}
+                  <div
+                    className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+                    style={{
+                      borderLeft: "5px solid transparent",
+                      borderRight: "5px solid transparent",
+                      borderTop: "5px solid var(--border-default)",
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         {icon && (
           <div
             className="flex items-center justify-center w-8 h-8 rounded-lg"

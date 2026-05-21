@@ -4,20 +4,33 @@ import type { NextRequest } from "next/server";
 
 const SECRET = process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production";
 
+const KNOWN_PAGE_ROUTES = /^\/($|dashboard$|creators(\/[^/]+)?$|products(\/[^/]+)?$|videos(\/[^/]+)?$|settings(\/team)?$|admin\/waitlist$)/;
+
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const isApi = pathname.startsWith("/api/");
+
+  if (!isApi && !KNOWN_PAGE_ROUTES.test(pathname)) {
+    return NextResponse.next();
+  }
+
   try {
     const token = await getToken({ req: request, secret: SECRET });
 
     if (!token) {
-      if (request.nextUrl.pathname.startsWith("/api/")) {
+      if (isApi) {
         return NextResponse.json({ error: "unauthorized" }, { status: 401 });
       }
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
+    if (pathname === "/dashboard") {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+
     return NextResponse.next();
   } catch {
-    if (request.nextUrl.pathname.startsWith("/api/")) {
+    if (isApi) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
     return NextResponse.redirect(new URL("/login", request.url));
@@ -26,6 +39,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!login|_next/static|_next/image|favicon.ico|api/auth|api/health|api/scrape|api/waitlist).*)",
+    "/((?!login|register|invite|forgot-password|reset-password|_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|api/auth|api/scrape|api/waitlist|api/billing/webhooks).*)",
   ],
 };

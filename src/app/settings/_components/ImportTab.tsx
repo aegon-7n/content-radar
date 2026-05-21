@@ -183,7 +183,7 @@ export default function ImportTab({ showToast }: ImportTabProps) {
       {/* Preview */}
       {fileName && headers.length > 0 && (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",
@@ -202,7 +202,7 @@ export default function ImportTab({ showToast }: ImportTabProps) {
             </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[700px]">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                   {headers.map((h) => (

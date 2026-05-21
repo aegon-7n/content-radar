@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Users } from "lucide-react";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import { TableSkeleton } from "@/components/ui/SkeletonCard";
@@ -109,9 +109,9 @@ export default function CreatorsPage() {
   ];
 
   return (
-    <div className="p-6 flex flex-col gap-6">
+    <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
             Креаторы
@@ -126,15 +126,30 @@ export default function CreatorsPage() {
       {/* Table */}
       {loading ? (
         <TableSkeleton rows={3} />
+      ) : creators.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-border)" }}>
+            <Users className="w-7 h-7" style={{ color: "var(--accent-primary)" }} />
+          </div>
+          <div>
+            <h3 className="text-base font-medium mb-1" style={{ color: "var(--text-primary)" }}>Пока нет креаторов</h3>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              Добавь первого креатора в{" "}
+              <a href="/settings" style={{ color: "var(--accent-primary)" }} className="hover:underline">Настройках</a>
+              {" "}или через мастер первого запуска.
+            </p>
+          </div>
+        </div>
       ) : (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",
           }}
         >
-          <table className="w-full">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"

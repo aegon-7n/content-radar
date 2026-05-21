@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 /**
  * Creator detail — cumulative delta model, same as /api/dashboard.
@@ -33,11 +33,16 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId, role, creatorId } = auth.ctx;
 
   try {
     const { id } = await params;
+
+    if (role === "creator" && creatorId !== id) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
     const { searchParams } = request.nextUrl;
     const query = querySchema.parse(Object.fromEntries(searchParams));
 
@@ -50,7 +55,7 @@ export async function GET(
 
     // Creator info.
     const creatorResult = await db.execute(sql`
-      SELECT id, name, avatar_url FROM creators WHERE id = ${id}
+      SELECT id, name, avatar_url FROM creators WHERE id = ${id} AND tenant_id = ${tenantId}
     `);
     if (!creatorResult.length) {
       return NextResponse.json({ error: "Creator not found" }, { status: 404 });
@@ -67,7 +72,7 @@ export async function GET(
       creator_videos AS (
         SELECT v.id, v.platform, v.product_id, v.published_at, v.url
         FROM videos v
-        WHERE v.creator_id = ${id}
+        WHERE v.creator_id = ${id} AND v.tenant_id = ${tenantId}
       ),
       end_views AS (
         SELECT DISTINCT ON (vm.video_id) vm.video_id, vm.views
@@ -148,7 +153,7 @@ export async function GET(
     // Daily delta series for this creator's videos.
     const byDayResult = await db.execute(sql`
       WITH
-      creator_videos AS (SELECT id FROM videos WHERE creator_id = ${id}),
+      creator_videos AS (SELECT id FROM videos WHERE creator_id = ${id} AND tenant_id = ${tenantId}),
       baseline AS (
         SELECT DISTINCT ON (vm.video_id) vm.video_id, vm.views
         FROM video_metrics vm
@@ -179,13 +184,28 @@ export async function GET(
           ) AS prev_views
         FROM daily_latest dl
         LEFT JOIN baseline bl ON bl.video_id = dl.video_id
+      ),
+      actual_days AS (
+        SELECT
+          day::text AS date,
+          COALESCE(SUM(GREATEST(views - prev_views, 0)), 0)::bigint AS views
+        FROM with_prev
+        GROUP BY day
+      ),
+      all_days AS (
+        SELECT d::date::text AS date
+        FROM generate_series(
+          ${from.toISOString()}::date,
+          LEAST(${to.toISOString()}::date, (NOW() AT TIME ZONE 'Asia/Makassar')::date - INTERVAL '1 day'),
+          '1 day'::interval
+        ) d
       )
       SELECT
-        day::text AS date,
-        COALESCE(SUM(GREATEST(views - prev_views, 0)), 0)::bigint AS views
-      FROM with_prev
-      GROUP BY day
-      ORDER BY day ASC
+        ad.date,
+        COALESCE(act.views, 0)::bigint AS views
+      FROM all_days ad
+      LEFT JOIN actual_days act ON act.date = ad.date
+      ORDER BY ad.date ASC
     `);
 
     // All videos with delta (no limit — frontend paginates client-side).

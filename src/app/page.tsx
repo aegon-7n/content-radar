@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import {
   LineChart,
   Line,
@@ -13,11 +14,12 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { Eye, Film, TrendingUp, LayoutGrid } from "lucide-react";
+import { Eye, Film, TrendingUp, LayoutGrid, HelpCircle } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import { StatCardSkeleton, ChartSkeleton } from "@/components/ui/SkeletonCard";
+import OnboardingWizard from "@/components/ui/OnboardingWizard";
 import { formatViews, formatDate, formatDateShort, formatER, getPlatformColor, getPlatformLabel } from "@/lib/format";
 import { MOCK_DASHBOARD, type DashboardData, type Platform } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,7 @@ const tooltipStyle = {
 };
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
   const [period, setPeriod] = useState<Period>("30d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -38,6 +41,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [allCategories, setAllCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isEmpty, setIsEmpty] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -50,6 +55,7 @@ export default function DashboardPage() {
       .then((d) => {
         d.dailyViews = d.byDay ?? [];
         setData(d);
+        setIsEmpty(d.isEmpty === true);
         if (d.categories?.length > 0) {
           setAllCategories(d.categories);
         }
@@ -58,7 +64,18 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, [period, customFrom, customTo, selectedCategory]);
 
-  const d = data ?? MOCK_DASHBOARD;
+  // Show onboarding wizard for empty tenants that haven't seen it yet
+  useEffect(() => {
+    if (isEmpty && session?.user) {
+      const tenantId = (session.user as { tenantId?: string }).tenantId ?? "";
+      const done = localStorage.getItem(`onboarding_done_${tenantId}`);
+      if (!done) setShowWizard(true);
+    }
+  }, [isEmpty, session]);
+
+  const d = (isEmpty || !data) ? MOCK_DASHBOARD : data;
+  const hasRealData = (d.dailyViews ?? []).some((v: { views: number }) => v.views > 0);
+  const chartData = hasRealData ? (d.dailyViews ?? []) : (MOCK_DASHBOARD.dailyViews ?? []);
 
   const donutData = [...(d.byPlatform ?? [])]
     .filter((p) => p.views > 0)
@@ -73,9 +90,18 @@ export default function DashboardPage() {
   const totalDonut = donutData.reduce((s, p) => s + p.value, 0);
 
   return (
-    <div className="p-6 flex flex-col gap-6">
+    <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
+      {/* Onboarding wizard */}
+      {showWizard && session?.user && (
+        <OnboardingWizard
+          tenantId={(session.user as { tenantId?: string }).tenantId ?? ""}
+          userName={session.user.name ?? ""}
+          onComplete={() => setShowWizard(false)}
+        />
+      )}
+
       {/* Header row */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
             Дашборд
@@ -84,10 +110,10 @@ export default function DashboardPage() {
             Прирост просмотров всех ваших роликов за выбранный период
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           {/* Category filter chips */}
           {allCategories.length > 0 && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap">
               <button
                 onClick={() => setSelectedCategory(null)}
                 className="px-2.5 py-1 rounded-lg text-xs transition-colors"
@@ -123,13 +149,36 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Demo banner */}
+      {isEmpty && (
+        <div
+          className="rounded-xl px-4 py-3 flex items-center justify-between gap-4"
+          style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-border)" }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base">🎬</span>
+            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              <strong style={{ color: "var(--accent-primary)" }}>ДЕМО</strong>
+              {" "}— это пример того, как будет выглядеть дашборд с вашими данными.
+            </span>
+          </div>
+          <button
+            onClick={() => setIsEmpty(false)}
+            className="text-xs px-3 py-1.5 rounded-lg shrink-0 transition-colors"
+            style={{ background: "var(--accent-primary)", color: "#fff" }}
+          >
+            Мои данные
+          </button>
+        </div>
+      )}
+
       {/* Stat cards */}
       {loading ? (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {[...Array(4)].map((_, i) => <StatCardSkeleton key={i} />)}
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <StatCard
             title="Прирост просмотров"
             value={formatViews(d.totalViews)}
@@ -158,7 +207,7 @@ export default function DashboardPage() {
             title="Активных платформ"
             value={d.activePlatforms}
             icon={<LayoutGrid className="w-4 h-4" style={{ color: "#D97706" }} />}
-            subtitle="из 5 доступных"
+            subtitle="TT, Instagram, YouTube"
             mono={false}
             help="Сколько платформ из TikTok/YouTube/Instagram/Likee/Pinterest принесли хотя бы один новый просмотр."
           />
@@ -176,11 +225,42 @@ export default function DashboardPage() {
             border: "1px solid var(--border-default)",
           }}
         >
-          <h2 className="text-sm font-medium mb-5" style={{ color: "var(--text-primary)" }}>
-            Прирост просмотров по дням
-          </h2>
+          <div className="flex items-center gap-1.5 mb-5">
+            <h2 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              Прирост просмотров по дням
+            </h2>
+            <div className="relative group">
+              <HelpCircle className="w-3.5 h-3.5 cursor-help" style={{ color: "var(--text-disabled)" }} />
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 max-w-[280px] w-max rounded-lg px-3 py-2 text-xs leading-relaxed pointer-events-none"
+                style={{
+                  background: "var(--surface-1)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-secondary)",
+                  boxShadow: "var(--shadow-card)",
+                }}
+              >
+                Данные обновляются раз в сутки утром. Прирост за сегодня появится завтра в районе 04:30 Bali.
+              </div>
+            </div>
+          </div>
+          <div className="relative">
+            {!hasRealData && !isEmpty && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                <span
+                  className="text-xs px-3 py-1.5 rounded-lg"
+                  style={{
+                    background: "var(--accent-muted)",
+                    color: "var(--accent-primary)",
+                    border: "1px solid var(--accent-border)",
+                  }}
+                >
+                  🎬 ДЕМО — данных за этот период пока нет
+                </span>
+              </div>
+            )}
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={d.dailyViews} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+            <LineChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
               <XAxis
                 dataKey="date"
@@ -188,7 +268,7 @@ export default function DashboardPage() {
                 tick={{ fill: "var(--text-disabled)", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                interval="preserveStartEnd"
+                interval={chartData.length <= 14 ? 0 : Math.ceil(chartData.length / 10) - 1}
               />
               <YAxis
                 tickFormatter={formatViews}
@@ -213,12 +293,13 @@ export default function DashboardPage() {
               />
             </LineChart>
           </ResponsiveContainer>
+          </div>
         </div>
       )}
 
       {/* Bottom two-column row */}
       {!loading && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Platform donut chart */}
           <div
             className="rounded-xl p-5"

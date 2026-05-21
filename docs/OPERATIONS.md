@@ -14,7 +14,7 @@
 | Cron | `/etc/cron.d/content-radar` | управляется через `scripts/setup-cron.sh` |
 | Логи скрейпера | `/var/log/content-radar/` | SSH + `tail -f` |
 | Логи фронта | `pm2 logs content-radar` | SSH |
-| Деплой | GitHub Actions → rsync → `pm2 restart` | [.github/workflows/ci.yml](../.github/workflows/ci.yml) + secrets `DEPLOY_HOST`, `DEPLOY_SSH_KEY` |
+| Деплой | GitHub Actions → SSH → `git pull` → `pm2 reload` | [.github/workflows/deploy.yml](../.github/workflows/deploy.yml) + secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_DEPLOY_PATH` |
 | Алерты | Telegram-бот | токен в `TELEGRAM_BOT_TOKEN` |
 
 ## Cron-расписание (МСК)
@@ -176,19 +176,25 @@ tail -f /var/log/content-radar/audit.log     # сверка
 
 ## Деплой фронта
 
-GitHub Actions ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) на каждый push в `main`:
+GitHub Actions разделён на два воркфлоу:
 
-1. **`build`** — `npm ci` + `npm run build` (typecheck + Next.js production build).
-2. **`python`** — `pip install -r scraper/requirements.txt` + `python -m compileall scraper`.
-3. **`deploy`** (только на push в `main`) — `rsync` кода на VPS → `npm ci && npm run build && pm2 restart content-radar`.
+- **[ci.yml](../.github/workflows/ci.yml)** — запускается на push и PR в `main`: `npm run build` + `python -m compileall scraper`. Не деплоит.
+- **[deploy.yml](../.github/workflows/deploy.yml)** — запускается только на push в `main` (или вручную через `workflow_dispatch`). Деплоит на VPS через SSH:
+  1. `git pull origin main`
+  2. `npm ci --omit=dev`
+  3. `npm run build`
+  4. `npm run db:migrate` — применяет Drizzle-миграции
+  5. `pm2 reload content-radar --update-env` — graceful reload без даунтайма
 
-**GitHub Secrets**, которые должны быть выставлены:
-- `DEPLOY_HOST` — IP/домен VPS.
-- `DEPLOY_SSH_KEY` — приватный SSH-ключ root-пользователя VPS.
+**GitHub Secrets** (Settings → Secrets and variables → Actions):
+- `VPS_HOST` — IP или домен VPS.
+- `VPS_USER` — SSH-пользователь (обычно `root`).
+- `VPS_SSH_KEY` — приватный SSH-ключ (содержимое `~/.ssh/id_ed25519` или аналогичного).
+- `VPS_DEPLOY_PATH` — полный путь к репо на VPS (например `/root/content-radar`).
 
 Откатить деплой:
 - `git revert <bad-commit>` → push в `main` → новый автоматический деплой с откатом.
-- Или вручную на VPS: `cd /root/content-radar && git checkout <previous-good-sha> && npm ci && npm run build && pm2 restart content-radar`.
+- Или вручную на VPS: `cd /root/content-radar && git checkout <previous-good-sha> && npm ci --omit=dev && npm run build && pm2 reload content-radar --update-env`.
 
 ## Восстановить .env.local на VPS
 

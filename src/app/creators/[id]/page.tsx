@@ -207,14 +207,14 @@ export default function CreatorDetailPage() {
   const d = data;
 
   return (
-    <div className="p-6 flex flex-col gap-6">
+    <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
             onClick={() => router.push("/creators")}
-            className="flex items-center gap-1.5 text-xs transition-colors"
+            className="flex items-center gap-1.5 text-xs transition-colors shrink-0"
             style={{ color: "var(--text-muted)" }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
@@ -222,12 +222,12 @@ export default function CreatorDetailPage() {
             <ArrowLeft className="w-3.5 h-3.5" />
             Назад
           </button>
-          <div className="w-px h-4" style={{ background: "var(--border-default)" }} />
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
+          <div className="w-px h-4 shrink-0" style={{ background: "var(--border-default)" }} />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
               <span className="text-xs font-semibold text-white">{d?.creator?.name?.[0] ?? "?"}</span>
             </div>
-            <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+            <h1 className="text-xl font-semibold truncate" style={{ color: "var(--text-primary)" }}>
               {d?.creator?.name ?? "Загрузка..."}
             </h1>
           </div>
@@ -237,11 +237,11 @@ export default function CreatorDetailPage() {
 
       {/* Stat cards */}
       {loading || !d ? (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {[...Array(4)].map((_, i) => <StatCardSkeleton key={i} />)}
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <StatCard
             title="Прирост просмотров"
             value={formatViews(d.stats.views)}
@@ -278,12 +278,12 @@ export default function CreatorDetailPage() {
 
       {/* Charts row */}
       {loading || !d ? (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ChartSkeleton height={280} />
           <ChartSkeleton height={280} />
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Line chart */}
           <div
             className="rounded-xl p-5"
@@ -304,7 +304,7 @@ export default function CreatorDetailPage() {
                   tick={{ fill: "var(--text-disabled)", fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
-                  interval="preserveStartEnd"
+                  interval={d.byDay.length <= 14 ? 0 : Math.ceil(d.byDay.length / 10) - 1}
                 />
                 <YAxis
                   tickFormatter={formatViews}
@@ -384,14 +384,14 @@ export default function CreatorDetailPage() {
       {/* Products table */}
       {d && (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",
           }}
         >
           <div
-            className="px-5 py-4 flex items-center justify-between gap-3"
+            className="px-5 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
             style={{ borderBottom: "1px solid var(--border-default)" }}
           >
             <h2 className="text-sm font-medium shrink-0" style={{ color: "var(--text-primary)" }}>
@@ -400,7 +400,7 @@ export default function CreatorDetailPage() {
                 {filteredProducts.length}
               </span>
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <Search
                   className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
@@ -411,8 +411,8 @@ export default function CreatorDetailPage() {
                   placeholder="Поиск товара..."
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
-                  className="pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
-                  style={{ ...inputBase, width: "180px" }}
+                  className="w-full sm:w-44 pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
+                  style={inputBase}
                 />
               </div>
               <select
@@ -444,7 +444,7 @@ export default function CreatorDetailPage() {
               </button>
             </div>
           </div>
-          <table className="w-full">
+          <table className="w-full min-w-[500px]">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"
@@ -506,14 +506,14 @@ export default function CreatorDetailPage() {
       {/* Top videos table */}
       {d && d.topVideos.length > 0 && (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-default)",
           }}
         >
           <div
-            className="px-5 py-4 flex items-center justify-between gap-3"
+            className="px-5 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
             style={{ borderBottom: "1px solid var(--border-default)" }}
           >
             <h2 className="text-sm font-medium shrink-0" style={{ color: "var(--text-primary)" }}>
@@ -522,7 +522,7 @@ export default function CreatorDetailPage() {
                 {totalFilteredVideos}
               </span>
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <Search
                   className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
@@ -533,8 +533,8 @@ export default function CreatorDetailPage() {
                   placeholder="Поиск по URL, товару..."
                   value={videoSearch}
                   onChange={(e) => { setVideoSearch(e.target.value); setVideoPage(1); }}
-                  className="pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
-                  style={{ ...inputBase, width: "200px" }}
+                  className="w-full sm:w-48 pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
+                  style={inputBase}
                 />
               </div>
               <select
@@ -583,7 +583,7 @@ export default function CreatorDetailPage() {
               )}
             </div>
           </div>
-          <table className="w-full">
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
                 <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide"

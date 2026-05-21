@@ -100,6 +100,7 @@ def tiktok_count(username: Optional[str]) -> Optional[int] | str:
 
 
 def youtube_count(channel_id: Optional[str]) -> Optional[int] | str:
+    """Count uploads via playlistItems.list (1 unit/call, not search.list at 100)."""
     if not channel_id:
         return None
     try:
@@ -114,29 +115,41 @@ def youtube_count(channel_id: Optional[str]) -> Optional[int] | str:
                 return "no channel"
             channel_id = items[0]["id"]
 
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)).isoformat()
+        uploads_playlist_id = "UU" + channel_id[2:]
+        cutoff = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
         total = 0
         page_token = None
         for _ in range(5):
             params = {
-                "channelId": channel_id, "part": "id", "maxResults": 50,
-                "type": "video", "order": "date", "publishedAfter": cutoff,
+                "playlistId": uploads_playlist_id,
+                "part": "snippet",
+                "maxResults": 50,
                 "key": YOUTUBE_API_KEY,
             }
             if page_token:
                 params["pageToken"] = page_token
             r = requests.get(
-                "https://www.googleapis.com/youtube/v3/search",
+                "https://www.googleapis.com/youtube/v3/playlistItems",
                 params=params,
                 timeout=TIMEOUT,
             )
             if not r.ok:
-                return f"search {r.status_code}"
+                return f"playlistItems {r.status_code}"
             payload = r.json()
-            total += len(payload.get("items", []))
-            page_token = payload.get("nextPageToken")
-            if not page_token:
+            items = payload.get("items", [])
+            all_too_old = True
+            for item in items:
+                published_str = item.get("snippet", {}).get("publishedAt", "")
+                try:
+                    published_at = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+                if published_at >= cutoff:
+                    total += 1
+                    all_too_old = False
+            if all_too_old or not payload.get("nextPageToken"):
                 break
+            page_token = payload["nextPageToken"]
         return total
     except Exception as e:
         return f"exc {e.__class__.__name__}"
@@ -247,6 +260,7 @@ def main() -> int:
 
     total_gap = 0
     total_fail = 0
+    total_ok = 0
     for cid, name, tt, yt, ig, pin in creators:
         db = db_counts(cid)
 
@@ -265,6 +279,7 @@ def main() -> int:
                 total_fail += 1
                 continue
 
+            total_ok += 1
             gap = real - db_n
             if gap >= GAP_WARN_THRESHOLD:
                 logger.warning(
@@ -280,22 +295,39 @@ def main() -> int:
 
     logger.info("Done. Total missing videos: %d. API failures: %d.", total_gap, total_fail)
 
-    # Persist outcome so the health endpoint / Telegram alerting can read it.
-    status = "ok" if (total_gap == 0 and total_fail == 0) else ("partial" if total_fail == 0 else "fail")
-    message = f"missing={total_gap} failures={total_fail}"
+    # Determine status using proportional fail rate so that isolated API
+    # failures (e.g. one platform's key expired) don't permanently freeze
+    # last_success_at and keep health stuck at "degraded" for weeks.
+    total_checks = total_ok + total_fail
+    fail_rate = total_fail / total_checks if total_checks > 0 else 0
+    FAIL_RATE_HARD = 0.5  # majority of checks failing = hard "fail"
+    if total_gap == 0 and total_fail == 0:
+        status = "ok"
+    elif fail_rate < FAIL_RATE_HARD:
+        status = "partial"
+    else:
+        status = "fail"
+
+    # Message format: ok=N fail=M missing=K — parseable by health endpoint's
+    # extractFailRate() which uses /ok=(\d+)/ and /fail=(\d+)/ regexes.
+    message = f"ok={total_ok} fail={total_fail} missing={total_gap}"
+
+    # Advance last_success_at for "ok" or low-fail-rate "partial" — proves
+    # the audit is still running and providing useful coverage signal.
+    advances_success = status == "ok" or (status == "partial" and fail_rate < 0.2)
     now = datetime.now(timezone.utc)
     with _conn() as c2, c2.cursor() as cur2:
         cur2.execute(
             """
             INSERT INTO scraper_state (job_name, last_run_at, last_success_at, last_status, last_message)
-            VALUES ('audit', %s, CASE WHEN %s = 'ok' THEN %s ELSE NULL END, %s, %s)
+            VALUES ('audit', %s, CASE WHEN %s THEN %s ELSE NULL END, %s, %s)
             ON CONFLICT (job_name) DO UPDATE SET
               last_run_at = EXCLUDED.last_run_at,
               last_success_at = COALESCE(EXCLUDED.last_success_at, scraper_state.last_success_at),
               last_status = EXCLUDED.last_status,
               last_message = EXCLUDED.last_message
             """,
-            (now, status, now, status, message),
+            (now, advances_success, now, status, message),
         )
 
     # Exit non-zero on any gap so cron can wire it to Telegram alerting.

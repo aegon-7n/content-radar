@@ -1,22 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { videos, users, creators, products } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { videos, creators, products } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithTenant } from "@/lib/tenant";
 
 const PLATFORM_VALUES = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
-
-// Cache the default user id at module level
-let defaultUserId: string | null = null;
-
-async function getDefaultUserId(): Promise<string> {
-  if (defaultUserId) return defaultUserId;
-  const result = await db.select({ id: users.id }).from(users).limit(1);
-  if (!result.length) throw new Error("No users found in database");
-  defaultUserId = result[0].id;
-  return defaultUserId;
-}
 
 const createVideoSchema = z.object({
   url: z.string().url("URL ролика должен быть валидным"),
@@ -27,8 +16,9 @@ const createVideoSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const denied = await requireAuth(request);
-  if (denied) return denied;
+  const auth = await requireAuthWithTenant(request);
+  if (!auth.ok) return auth.response;
+  const { tenantId, userId } = auth.ctx;
 
   try {
     const body = await request.json();
@@ -43,34 +33,31 @@ export async function POST(request: NextRequest) {
 
     const { url, creatorId, productId, platform, publishedAt } = parsed.data;
 
-    // Verify creator exists
     const creator = await db
       .select({ id: creators.id })
       .from(creators)
-      .where(eq(creators.id, creatorId))
+      .where(and(eq(creators.id, creatorId), eq(creators.tenantId, tenantId)))
       .limit(1);
 
     if (!creator.length) {
       return NextResponse.json({ error: "Креатор не найден" }, { status: 404 });
     }
 
-    // Verify product exists
     const product = await db
       .select({ id: products.id })
       .from(products)
-      .where(eq(products.id, productId))
+      .where(and(eq(products.id, productId), eq(products.tenantId, tenantId)))
       .limit(1);
 
     if (!product.length) {
       return NextResponse.json({ error: "Товар не найден" }, { status: 404 });
     }
 
-    const userId = await getDefaultUserId();
-
     const [video] = await db
       .insert(videos)
       .values({
         userId,
+        tenantId,
         creatorId,
         productId,
         platform,

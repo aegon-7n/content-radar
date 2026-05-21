@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
+import { requireAuth } from "@/lib/auth";
 
 /**
  * GET /api/health — operational overview of the scraper pipeline.
@@ -19,7 +21,10 @@ import { sql } from "drizzle-orm";
  * `status: "error"` so the sidebar can show something instead of
  * crashing the whole render.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = await requireAuth(request);
+  if (authError) return authError;
+
   try {
     const [counts, state] = await Promise.all([
       db.execute(sql`
@@ -86,10 +91,11 @@ export async function GET() {
       const stale = !lastRun || now - lastRun.getTime() > STALE_MS;
       const rawStatus = row?.last_status ?? "unknown";
 
-      // Effective status — same as raw unless it's "partial" with a
-      // fail rate below threshold, in which case we promote to "ok".
+      // Effective status — same as raw unless it's "partial" or "fail" with a
+      // low fail rate (below threshold), in which case we promote to "ok".
+      // "fail" can now carry ok=N fail=M format from audit.py so it's parseable.
       let effectiveStatus = rawStatus;
-      if (rawStatus === "partial") {
+      if (rawStatus === "partial" || rawStatus === "fail") {
         const rate = extractFailRate(row?.last_message ?? null);
         if (rate !== null && rate < PARTIAL_FAIL_RATE_OK) {
           effectiveStatus = "ok";
