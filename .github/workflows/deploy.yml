@@ -18,7 +18,7 @@ jobs:
           script: |
             cd ${{ secrets.VPS_DEPLOY_PATH }}
             git pull origin main
-            npm ci --omit=dev
+            npm ci
             npm run build
             npm run db:migrate
             pm2 reload content-radar --update-env
