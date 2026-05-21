@@ -152,6 +152,13 @@ export default function LoginPage() {
             </button>
           </form>
 
+          <p className="text-xs text-center mt-4" style={{ color: "var(--text-muted)" }}>
+            Нет аккаунта?{" "}
+            <a href="/register" className="underline underline-offset-2 hover:no-underline" style={{ color: "var(--accent-primary)" }}>
+              Зарегистрироваться
+            </a>
+          </p>
+
         </div>
       </div>
     </div>
