@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import {
   LineChart,
   Line,
@@ -18,6 +19,7 @@ import StatCard from "@/components/ui/StatCard";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import { StatCardSkeleton, ChartSkeleton } from "@/components/ui/SkeletonCard";
+import OnboardingWizard from "@/components/ui/OnboardingWizard";
 import { formatViews, formatDate, formatDateShort, formatER, getPlatformColor, getPlatformLabel } from "@/lib/format";
 import { MOCK_DASHBOARD, type DashboardData, type Platform } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,7 @@ const tooltipStyle = {
 };
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
   const [period, setPeriod] = useState<Period>("30d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -38,6 +41,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [allCategories, setAllCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isEmpty, setIsEmpty] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -50,6 +55,7 @@ export default function DashboardPage() {
       .then((d) => {
         d.dailyViews = d.byDay ?? [];
         setData(d);
+        setIsEmpty(d.isEmpty === true);
         if (d.categories?.length > 0) {
           setAllCategories(d.categories);
         }
@@ -58,7 +64,16 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, [period, customFrom, customTo, selectedCategory]);
 
-  const d = data ?? MOCK_DASHBOARD;
+  // Show onboarding wizard for empty tenants that haven't seen it yet
+  useEffect(() => {
+    if (isEmpty && session?.user) {
+      const tenantId = (session.user as { tenantId?: string }).tenantId ?? "";
+      const done = localStorage.getItem(`onboarding_done_${tenantId}`);
+      if (!done) setShowWizard(true);
+    }
+  }, [isEmpty, session]);
+
+  const d = (isEmpty || !data) ? MOCK_DASHBOARD : data;
 
   const donutData = [...(d.byPlatform ?? [])]
     .filter((p) => p.views > 0)
@@ -74,6 +89,15 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
+      {/* Onboarding wizard */}
+      {showWizard && session?.user && (
+        <OnboardingWizard
+          tenantId={(session.user as { tenantId?: string }).tenantId ?? ""}
+          userName={session.user.name ?? ""}
+          onComplete={() => setShowWizard(false)}
+        />
+      )}
+
       {/* Header row */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
@@ -122,6 +146,29 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+
+      {/* Demo banner */}
+      {isEmpty && (
+        <div
+          className="rounded-xl px-4 py-3 flex items-center justify-between gap-4"
+          style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-border)" }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base">🎬</span>
+            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              <strong style={{ color: "var(--accent-primary)" }}>ДЕМО</strong>
+              {" "}— это пример того, как будет выглядеть дашборд с вашими данными.
+            </span>
+          </div>
+          <button
+            onClick={() => setIsEmpty(false)}
+            className="text-xs px-3 py-1.5 rounded-lg shrink-0 transition-colors"
+            style={{ background: "var(--accent-primary)", color: "#fff" }}
+          >
+            Мои данные
+          </button>
+        </div>
+      )}
 
       {/* Stat cards */}
       {loading ? (

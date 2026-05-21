@@ -35,6 +35,10 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+<<<<<<< HEAD
     "/((?!login|invite|forgot-password|reset-password|_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|api/auth|api/health|api/scrape|api/waitlist|api/billing/webhooks).*)",
+=======
+    "/((?!login|register|_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|api/auth|api/health|api/scrape|api/waitlist|api/billing/webhooks).*)",
+>>>>>>> 0e2faf1 (feat(onboarding): self-serve signup + demo overlay + onboarding wizard + empty states [TRU-153])
   ],
 };

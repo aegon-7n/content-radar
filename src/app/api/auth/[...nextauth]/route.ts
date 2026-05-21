@@ -60,7 +60,20 @@ const handler = NextAuth({
         } catch {
           // DB unavailable — fall through.
         }
-        return null;
+
+        // Check non-admin users with bcrypt password_hash
+        const [user] = await db
+          .select({ id: users.id, tenantId: users.tenantId, email: users.email, name: users.name, passwordHash: users.passwordHash })
+          .from(users)
+          .where(eq(users.email, credentials.email))
+          .limit(1);
+
+        if (!user?.passwordHash) return null;
+
+        const valid = await compare(credentials.password, user.passwordHash);
+        if (!valid) return null;
+
+        return { id: user.id, email: user.email, name: user.name, tenantId: user.tenantId };
       },
     }),
   ],
