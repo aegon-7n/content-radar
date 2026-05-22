@@ -43,3 +43,11 @@ jobs:
 
       - name: Syntax check all scraper modules
         run: python -m compileall scraper
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: S13 Unauth smoke
+        run: bash qa/smoke/api-smoke.sh https://contentradar.app
