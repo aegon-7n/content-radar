@@ -57,8 +57,9 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(v => !v)}
-            className="flex items-center gap-2 group"
+            className="flex items-center justify-center w-11 h-11 -mr-1 group"
             type="button"
+            aria-label="Меню пользователя"
           >
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-[10px] font-bold text-white">
               {initials}
