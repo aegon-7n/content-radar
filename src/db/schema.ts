@@ -70,6 +70,8 @@ export const creators = pgTable(
     // Note: Likee discovery was intentionally removed in 2026-04 — see
     // docs/likee-research.md. Manual Likee URL add through Settings →
     // Videos still works and metrics still flow via the Apify actor.
+    // Per-creator video limit (TU allocation). NULL = no personal cap; enforced at tenant-pool level.
+    videoLimit: integer("video_limit"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
