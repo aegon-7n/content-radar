@@ -231,7 +231,7 @@ export default function VideosPage() {
             <span className="text-base">🎬</span>
             <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
               <strong style={{ color: "var(--accent-primary)" }}>ДЕМО</strong>
-              {" "}— примеры роликов. Ваши появятся после первого скрейпинга (~04:00 Bali / 00:00 МСК).
+              {" "}— примеры роликов. Ваши появятся после первого скрейпинга (~00:00 МСК).
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -265,7 +265,7 @@ export default function VideosPage() {
           <div>
             <h3 className="text-base font-medium mb-1" style={{ color: "var(--text-primary)" }}>Пока нет роликов</h3>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              Ролики появятся после первого скрейпинга. Скрейпер запускается раз в сутки около 04:00 Bali (00:00 МСК).
+              Ролики появятся после первого скрейпинга. Скрейпер запускается раз в сутки около 00:00 МСК.
             </p>
           </div>
         </div>

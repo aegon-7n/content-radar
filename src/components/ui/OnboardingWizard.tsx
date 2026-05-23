@@ -182,7 +182,7 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
                   Добавь первого креатора
                 </h2>
                 <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-                  Укажи хотя бы один handle — скрейпер подхватит его ночью (~04:00 Bali / 00:00 МСК).
+                  Укажи хотя бы один handle — скрейпер подхватит его ночью (около 00:00 МСК).
                 </p>
               </div>
 
@@ -322,7 +322,7 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
                 Готово! 🚀
               </h2>
               <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                Данные собираются раз в сутки около 04:00 Bali (00:00 МСК). Завтра утром увидишь прирост за сегодня.
+                Данные собираются раз в сутки около 00:00 МСК. Завтра утром увидишь прирост за сегодня.
                 Пока можешь изучить интерфейс на демо-данных.
               </p>
               <button
