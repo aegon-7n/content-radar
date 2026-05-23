@@ -6,17 +6,26 @@ import { z } from "zod";
 import { requireOwner } from "@/lib/tenant";
 import { getTuPool } from "@/lib/yookassa";
 
+const optionalHandle = z.string().nullable().optional().or(z.literal(""));
+
 const patchCreatorSchema = z.object({
   name: z.string().min(1, "Имя не может быть пустым").optional(),
-  avatarUrl: z.string().url("Некорректный URL аватара").optional().or(z.literal("")).optional(),
-  tiktokUsername: z.string().optional().or(z.literal("")),
-  youtubeChannelId: z
+  avatarUrl: z
     .string()
-    .regex(/^UC[A-Za-z0-9_-]{20,30}$/, "YouTube Channel ID должен начинаться с UC и быть длиной 22–32 символа (пример: UCxxxxxxxxxxxxxxxxxx)")
+    .nullable()
     .optional()
-    .or(z.literal("")),
-  instagramUsername: z.string().optional().or(z.literal("")),
-  pinterestUsername: z.string().optional().or(z.literal("")),
+    .or(z.literal(""))
+    .refine(
+      (v) => !v || /^https?:\/\//.test(v),
+      { message: "Некорректный URL аватара" },
+    ),
+  tiktokUsername: optionalHandle,
+  youtubeChannelId: optionalHandle.refine(
+    (v) => !v || /^UC[A-Za-z0-9_-]{20,30}$/.test(v),
+    { message: "YouTube Channel ID должен начинаться с UC и быть длиной 22–32 символа (пример: UCxxxxxxxxxxxxxxxxxx)" },
+  ),
+  instagramUsername: optionalHandle,
+  pinterestUsername: optionalHandle,
   // Per-creator video cap. null removes the limit.
   videoLimit: z.number().int().min(1).nullable().optional(),
 });

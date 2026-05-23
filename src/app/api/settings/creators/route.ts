@@ -12,17 +12,29 @@ function stripAt(s: string | null | undefined): string | null {
 }
 
 
+// Accept null/undefined/empty/string. Frontend often sends nulls for empty fields;
+// Zod's union default error message ("Invalid input") is unhelpful, so we keep
+// the schema permissive at type level and validate format via .refine for YT.
+const optionalHandle = z.string().nullable().optional().or(z.literal(""));
+
 const createCreatorSchema = z.object({
   name: z.string().min(1, "Имя обязательно"),
-  avatarUrl: z.string().url("Некорректный URL аватара").optional().or(z.literal("")),
-  tiktokUsername: z.string().optional().or(z.literal("")),
-  youtubeChannelId: z
+  avatarUrl: z
     .string()
-    .regex(/^UC[A-Za-z0-9_-]{20,30}$/, "YouTube Channel ID должен начинаться с UC и быть длиной 22–32 символа (пример: UCxxxxxxxxxxxxxxxxxx)")
+    .nullable()
     .optional()
-    .or(z.literal("")),
-  instagramUsername: z.string().optional().or(z.literal("")),
-  pinterestUsername: z.string().optional().or(z.literal("")),
+    .or(z.literal(""))
+    .refine(
+      (v) => !v || /^https?:\/\//.test(v),
+      { message: "Некорректный URL аватара" },
+    ),
+  tiktokUsername: optionalHandle,
+  youtubeChannelId: optionalHandle.refine(
+    (v) => !v || /^UC[A-Za-z0-9_-]{20,30}$/.test(v),
+    { message: "YouTube Channel ID должен начинаться с UC и быть длиной 22–32 символа (пример: UCxxxxxxxxxxxxxxxxxx)" },
+  ),
+  instagramUsername: optionalHandle,
+  pinterestUsername: optionalHandle,
 });
 
 export async function GET(request: NextRequest) {
