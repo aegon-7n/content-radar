@@ -166,23 +166,33 @@ export default function DashboardPage() {
       )}
       {isEmpty && role !== "creator" && (
         <div
-          className="rounded-xl px-4 py-3 flex items-center justify-between gap-4"
+          className="rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
           style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-border)" }}
         >
           <div className="flex items-center gap-2">
             <span className="text-base">🎬</span>
             <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
               <strong style={{ color: "var(--accent-primary)" }}>ДЕМО</strong>
-              {" "}— это пример того, как будет выглядеть дашборд с вашими данными.
+              {" "}— пример того, как будет выглядеть дашборд с вашими данными.
+              Тут вы будете видеть эффективность каждого креатора и товара, какие платформы лучше заходят, и принимать решения.
             </span>
           </div>
-          <button
-            onClick={() => setIsEmpty(false)}
-            className="text-xs px-3 py-1.5 rounded-lg shrink-0 transition-colors"
-            style={{ background: "var(--accent-primary)", color: "#fff" }}
-          >
-            Мои данные
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowWizard(true)}
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
+            >
+              Открыть онбординг
+            </button>
+            <button
+              onClick={() => setIsEmpty(false)}
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: "var(--accent-primary)", color: "#fff" }}
+            >
+              Мои данные
+            </button>
+          </div>
         </div>
       )}
 
@@ -223,7 +233,7 @@ export default function DashboardPage() {
             icon={<LayoutGrid className="w-4 h-4" style={{ color: "#D97706" }} />}
             subtitle="TT, Instagram, YouTube"
             mono={false}
-            help="Сколько платформ из TikTok/YouTube/Instagram/Likee/Pinterest принесли хотя бы один новый просмотр."
+            help="Сколько платформ из TikTok / Instagram / YouTube принесли хотя бы один новый просмотр."
           />
         </div>
       )}
@@ -254,7 +264,7 @@ export default function DashboardPage() {
                   boxShadow: "var(--shadow-card)",
                 }}
               >
-                Данные обновляются раз в сутки утром. Прирост за сегодня появится завтра в районе 04:30 Bali.
+                Данные обновляются раз в сутки. Прирост за сегодня появится завтра около 04:00 Bali (00:00 МСК).
               </div>
             </div>
           </div>

@@ -2,12 +2,24 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpDown, ArrowUp, ArrowDown, Package } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
+import OnboardingWizard from "@/components/ui/OnboardingWizard";
 import { TableSkeleton } from "@/components/ui/SkeletonCard";
 import { formatViews } from "@/lib/format";
 import { MOCK_PRODUCTS, type Platform } from "@/lib/mock-data";
+
+const MOCK_PRODUCT_ROWS = MOCK_PRODUCTS.map((p) => ({
+  id: p.id,
+  name: p.name,
+  wbArticle: p.wbArticle,
+  views: p.totalViews,
+  videos: p.totalVideos,
+  newVideos: 0,
+  byPlatform: p.byPlatform,
+}));
 
 type ProductRow = {
   id: string;
@@ -31,11 +43,16 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 
 export default function ProductsPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role ?? "owner";
   const [period, setPeriod] = useState<Period>("30d");
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("views");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [isEmpty, setIsEmpty] = useState(false);
+  const [showDemo, setShowDemo] = useState(true);
+  const [showWizard, setShowWizard] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -43,22 +60,19 @@ export default function ProductsPage() {
     fetch(`/api/products?from=${from}&to=${to}`)
       .then((r) => r.json())
       .then((d) => {
-        setProducts((d.products ?? []) as ProductRow[]);
+        const list = (d.products ?? []) as ProductRow[];
+        setIsEmpty(list.length === 0);
+        setProducts(list);
       })
       .catch(() => {
-        const fallback = MOCK_PRODUCTS.map((p) => ({
-          id: p.id,
-          name: p.name,
-          wbArticle: p.wbArticle,
-          views: p.totalViews,
-          videos: p.totalVideos,
-          newVideos: 0,
-          byPlatform: p.byPlatform,
-        }));
-        setProducts(fallback);
+        setIsEmpty(true);
+        setProducts([]);
       })
       .finally(() => setLoading(false));
   }, [period]);
+
+  const isDemo = isEmpty && showDemo && role !== "creator";
+  const displayed = isDemo ? MOCK_PRODUCT_ROWS : products;
 
   const handleSort = useCallback(
     (key: SortKey) => {
@@ -72,7 +86,7 @@ export default function ProductsPage() {
     [sortKey]
   );
 
-  const sorted = [...products].sort((a, b) => {
+  const sorted = [...displayed].sort((a, b) => {
     const mul = sortDir === "asc" ? 1 : -1;
     return (a[sortKey] - b[sortKey]) * mul;
   });
@@ -97,25 +111,64 @@ export default function ProductsPage() {
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
+      {showWizard && session?.user && (
+        <OnboardingWizard
+          tenantId={(session.user as { tenantId?: string }).tenantId ?? ""}
+          userName={session.user.name ?? ""}
+          onComplete={() => setShowWizard(false)}
+        />
+      )}
+
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
             Товары
           </h1>
           <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-            {products.length} товаров
+            {isDemo ? `${MOCK_PRODUCT_ROWS.length} товаров (ДЕМО)` : `${products.length} товаров`}
           </p>
         </div>
         <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
+      {isDemo && (
+        <div
+          className="rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+          style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-border)" }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base">🎬</span>
+            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              <strong style={{ color: "var(--accent-primary)" }}>ДЕМО</strong>
+              {" "}— пример того, как тут будут видны ваши товары и их продвижение. Товары автоматически появятся после первого скрейпинга роликов.
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowWizard(true)}
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
+            >
+              Открыть онбординг
+            </button>
+            <button
+              onClick={() => setShowDemo(false)}
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: "var(--accent-primary)", color: "#fff" }}
+            >
+              Мои данные
+            </button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <TableSkeleton rows={8} />
-      ) : products.length === 0 ? (
+      ) : displayed.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
             style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-border)" }}>
-            <Package className="w-7 h-7" style={{ color: "var(--accent-primary)" }} />
+            <span className="text-base">🎬</span>
           </div>
           <div>
             <h3 className="text-base font-medium mb-1" style={{ color: "var(--text-primary)" }}>Пока нет товаров</h3>
@@ -168,9 +221,9 @@ export default function ProductsPage() {
               {sorted.map((product) => (
                 <tr
                   key={product.id}
-                  className="cursor-pointer transition-colors last:border-0"
+                  className={`transition-colors last:border-0 ${isDemo ? "" : "cursor-pointer"}`}
                   style={{ borderBottom: "1px solid var(--border-subtle)" }}
-                  onClick={() => router.push(`/products/${product.id}?period=${period}`)}
+                  onClick={() => { if (!isDemo) router.push(`/products/${product.id}?period=${period}`); }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >

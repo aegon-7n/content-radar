@@ -2,12 +2,25 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpDown, ArrowUp, ArrowDown, Users } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
+import OnboardingWizard from "@/components/ui/OnboardingWizard";
 import { TableSkeleton } from "@/components/ui/SkeletonCard";
 import { formatViews, formatPercent } from "@/lib/format";
 import { MOCK_CREATORS, type Platform } from "@/lib/mock-data";
+
+const MOCK_CREATOR_ROWS = MOCK_CREATORS.map((c) => ({
+  id: c.id,
+  name: c.name,
+  views: c.totalViews,
+  videos: c.totalVideos,
+  newVideos: 0,
+  avgViews: c.avgViewsPerVideo,
+  viewsChange: c.viewsChange ?? null,
+  byPlatform: c.byPlatform,
+}));
 
 type CreatorRow = {
   id: string;
@@ -32,11 +45,16 @@ function SortIcon({ active, dir }: { col?: string; active: boolean; dir: SortDir
 
 export default function CreatorsPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role ?? "owner";
   const [period, setPeriod] = useState<Period>("30d");
   const [creators, setCreators] = useState<CreatorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("views");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [isEmpty, setIsEmpty] = useState(false);
+  const [showDemo, setShowDemo] = useState(true);
+  const [showWizard, setShowWizard] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -45,24 +63,18 @@ export default function CreatorsPage() {
       .then((r) => r.json())
       .then((d) => {
         const list = (d.creators ?? []) as CreatorRow[];
+        setIsEmpty(list.length === 0);
         setCreators(list);
       })
       .catch(() => {
-        // Fallback only for dev when API is down; mock uses old shape.
-        const fallback = MOCK_CREATORS.map((c) => ({
-          id: c.id,
-          name: c.name,
-          views: c.totalViews,
-          videos: c.totalVideos,
-          newVideos: 0,
-          avgViews: c.avgViewsPerVideo,
-          viewsChange: c.viewsChange ?? null,
-          byPlatform: c.byPlatform,
-        }));
-        setCreators(fallback);
+        setIsEmpty(true);
+        setCreators([]);
       })
       .finally(() => setLoading(false));
   }, [period]);
+
+  const isDemo = isEmpty && showDemo && role !== "creator";
+  const displayed = isDemo ? MOCK_CREATOR_ROWS : creators;
 
   const handleSort = useCallback((key: SortKey) => {
     if (sortKey === key) {
@@ -73,7 +85,7 @@ export default function CreatorsPage() {
     }
   }, [sortKey]);
 
-  const sorted = [...creators].sort((a, b) => {
+  const sorted = [...displayed].sort((a, b) => {
     const mul = sortDir === "asc" ? 1 : -1;
     const av = a[sortKey] ?? 0;
     const bv = b[sortKey] ?? 0;
@@ -110,6 +122,14 @@ export default function CreatorsPage() {
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
+      {showWizard && session?.user && (
+        <OnboardingWizard
+          tenantId={(session.user as { tenantId?: string }).tenantId ?? ""}
+          userName={session.user.name ?? ""}
+          onComplete={() => setShowWizard(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
@@ -117,27 +137,59 @@ export default function CreatorsPage() {
             Креаторы
           </h1>
           <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-            {creators.length} креаторов
+            {isDemo ? `${MOCK_CREATOR_ROWS.length} креаторов (ДЕМО)` : `${creators.length} креаторов`}
           </p>
         </div>
         <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
+      {isDemo && (
+        <div
+          className="rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+          style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-border)" }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base">🎬</span>
+            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              <strong style={{ color: "var(--accent-primary)" }}>ДЕМО</strong>
+              {" "}— пример того, как тут будет видна эффективность ваших креаторов. Добавьте своих, чтобы сравнивать.
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowWizard(true)}
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
+            >
+              Открыть онбординг
+            </button>
+            <button
+              onClick={() => setShowDemo(false)}
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: "var(--accent-primary)", color: "#fff" }}
+            >
+              Мои данные
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       {loading ? (
         <TableSkeleton rows={3} />
-      ) : creators.length === 0 ? (
+      ) : displayed.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
             style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-border)" }}>
-            <Users className="w-7 h-7" style={{ color: "var(--accent-primary)" }} />
+            <span className="text-base">🎬</span>
           </div>
           <div>
             <h3 className="text-base font-medium mb-1" style={{ color: "var(--text-primary)" }}>Пока нет креаторов</h3>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
               Добавь первого креатора в{" "}
               <a href="/settings" style={{ color: "var(--accent-primary)" }} className="hover:underline">Настройках</a>
-              {" "}или через мастер первого запуска.
+              {" "}или открой{" "}
+              <button onClick={() => setShowWizard(true)} style={{ color: "var(--accent-primary)" }} className="hover:underline inline">мастер первого запуска</button>.
             </p>
           </div>
         </div>
@@ -186,9 +238,9 @@ export default function CreatorsPage() {
               {sorted.map((creator) => (
                 <tr
                   key={creator.id}
-                  className="cursor-pointer transition-colors last:border-0"
+                  className={`transition-colors last:border-0 ${isDemo ? "" : "cursor-pointer"}`}
                   style={{ borderBottom: "1px solid var(--border-subtle)" }}
-                  onClick={() => router.push(`/creators/${creator.id}?period=${period}`)}
+                  onClick={() => { if (!isDemo) router.push(`/creators/${creator.id}?period=${period}`); }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >

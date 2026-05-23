@@ -16,7 +16,11 @@ const createCreatorSchema = z.object({
   name: z.string().min(1, "Имя обязательно"),
   avatarUrl: z.string().url("Некорректный URL аватара").optional().or(z.literal("")),
   tiktokUsername: z.string().optional().or(z.literal("")),
-  youtubeChannelId: z.string().optional().or(z.literal("")),
+  youtubeChannelId: z
+    .string()
+    .regex(/^UC[A-Za-z0-9_-]{20,30}$/, "YouTube Channel ID должен начинаться с UC и быть длиной 22–32 символа (пример: UCxxxxxxxxxxxxxxxxxx)")
+    .optional()
+    .or(z.literal("")),
   instagramUsername: z.string().optional().or(z.literal("")),
   pinterestUsername: z.string().optional().or(z.literal("")),
 });
@@ -71,8 +75,10 @@ export async function POST(request: NextRequest) {
     const parsed = createCreatorSchema.safeParse(body);
 
     if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
+      const message = firstIssue?.message || "Ошибка валидации";
       return NextResponse.json(
-        { error: "Ошибка валидации", details: parsed.error.issues },
+        { error: message, details: parsed.error.issues },
         { status: 400 }
       );
     }

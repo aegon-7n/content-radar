@@ -105,22 +105,20 @@ export const MOCK_DASHBOARD: DashboardData = {
   activeVideos: 115,
   newVideos: 42,
   avgPerVideo: 51_497,
-  activePlatforms: 5,
+  activePlatforms: 3,
   viewsChange: 65.99,
   newVideosChange: 12.4,
   dailyViews: generateDailyViews(30, 197_405),
   byPlatform: [
     { platform: "tiktok", views: 1_400_000, videos: 23 },
-    { platform: "instagram", views: 254_647, videos: 23 },
-    { platform: "pinterest", views: 287_000, videos: 23 },
-    { platform: "youtube", views: 182_232, videos: 23 },
-    { platform: "likee", views: 163_800, videos: 23 },
+    { platform: "instagram", views: 541_647, videos: 23 },
+    { platform: "youtube", views: 346_032, videos: 23 },
   ],
   topVideos: [
     {
       id: "v1",
       platform: "tiktok",
-      url: "https://www.tiktok.com/@polina/video/7341234567890",
+      url: "https://www.tiktok.com/explore",
       views: 420_000,
       likes: 0, comments: 0, shares: 0, saves: 0,
       creatorName: "Полина",
@@ -130,7 +128,7 @@ export const MOCK_DASHBOARD: DashboardData = {
     {
       id: "v2",
       platform: "tiktok",
-      url: "https://www.tiktok.com/@katya_ezh/video/7349876543210",
+      url: "https://www.tiktok.com/explore",
       views: 380_000,
       likes: 0, comments: 0, shares: 0, saves: 0,
       creatorName: "Катя Ежикова",
@@ -140,7 +138,7 @@ export const MOCK_DASHBOARD: DashboardData = {
     {
       id: "v3",
       platform: "instagram",
-      url: "https://www.instagram.com/reel/C4xAbcDeFgH/",
+      url: "https://www.instagram.com/explore/",
       views: 254_647,
       likes: 0, comments: 0, shares: 0, saves: 0,
       creatorName: "Полина",
@@ -150,7 +148,7 @@ export const MOCK_DASHBOARD: DashboardData = {
     {
       id: "v4",
       platform: "youtube",
-      url: "https://www.youtube.com/shorts/dQw4w9WgXcQ",
+      url: "https://www.youtube.com/feed/trending",
       views: 182_232,
       likes: 0, comments: 0, shares: 0, saves: 0,
       creatorName: "Катя ДДД",
@@ -159,8 +157,8 @@ export const MOCK_DASHBOARD: DashboardData = {
     },
     {
       id: "v5",
-      platform: "pinterest",
-      url: "https://www.pinterest.ru/pin/12345678901234/",
+      platform: "instagram",
+      url: "https://www.instagram.com/explore/",
       views: 287_000,
       likes: 0, comments: 0, shares: 0, saves: 0,
       creatorName: "Катя Ежикова",
@@ -180,10 +178,8 @@ export const MOCK_CREATORS: Creator[] = [
     viewsChange: 65.99,
     byPlatform: [
       { platform: "tiktok", views: 1_400_000, videos: 23 },
-      { platform: "youtube", views: 182_232, videos: 23 },
-      { platform: "likee", views: 163_800, videos: 23 },
-      { platform: "pinterest", views: 287_000, videos: 23 },
-      { platform: "instagram", views: 254_647, videos: 23 },
+      { platform: "instagram", views: 541_647, videos: 23 },
+      { platform: "youtube", views: 346_032, videos: 23 },
     ],
   },
   {
@@ -208,8 +204,7 @@ export const MOCK_CREATORS: Creator[] = [
     viewsChange: -8.2,
     byPlatform: [
       { platform: "tiktok", views: 620_000, videos: 9 },
-      { platform: "youtube", views: 184_274, videos: 6 },
-      { platform: "likee", views: 300_000, videos: 6 },
+      { platform: "youtube", views: 484_274, videos: 12 },
     ],
   },
 ];
@@ -273,7 +268,7 @@ export const MOCK_PRODUCTS: Product[] = [
     totalVideos: 18,
     byPlatform: [
       { platform: "tiktok", views: 1_580_000, videos: 9 },
-      { platform: "likee", views: 210_000, videos: 5 },
+      { platform: "instagram", views: 210_000, videos: 5 },
       { platform: "youtube", views: 210_000, videos: 4 },
     ],
   },
@@ -297,8 +292,8 @@ export const MOCK_PRODUCTS: Product[] = [
     totalVideos: 12,
     byPlatform: [
       { platform: "tiktok", views: 372_000, videos: 6 },
-      { platform: "pinterest", views: 232_000, videos: 4 },
-      { platform: "likee", views: 140_000, videos: 2 },
+      { platform: "instagram", views: 232_000, videos: 4 },
+      { platform: "youtube", views: 140_000, videos: 2 },
     ],
   },
   {
@@ -332,7 +327,7 @@ export const MOCK_PRODUCTS: Product[] = [
     totalVideos: 6,
     byPlatform: [
       { platform: "tiktok", views: 150_000, videos: 3 },
-      { platform: "likee", views: 100_000, videos: 3 },
+      { platform: "instagram", views: 100_000, videos: 3 },
     ],
   },
   {
@@ -394,7 +389,7 @@ export const MOCK_VIDEOS: Video[] = [
   {
     id: "v1",
     platform: "tiktok",
-    url: "https://www.tiktok.com/@polina/video/7341234567890",
+    url: "https://www.tiktok.com/explore",
     views: 420_000,
     likes: 18_400,
     comments: 920,
@@ -407,7 +402,7 @@ export const MOCK_VIDEOS: Video[] = [
   {
     id: "v2",
     platform: "tiktok",
-    url: "https://www.tiktok.com/@katya_ezh/video/7349876543210",
+    url: "https://www.tiktok.com/explore",
     views: 380_000,
     likes: 15_600,
     comments: 780,
@@ -420,7 +415,7 @@ export const MOCK_VIDEOS: Video[] = [
   {
     id: "v3",
     platform: "instagram",
-    url: "https://www.instagram.com/reel/C4xAbcDeFgH/",
+    url: "https://www.instagram.com/explore/",
     views: 254_647,
     likes: 9_200,
     comments: 340,
@@ -433,7 +428,7 @@ export const MOCK_VIDEOS: Video[] = [
   {
     id: "v4",
     platform: "youtube",
-    url: "https://www.youtube.com/shorts/dQw4w9WgXcQ",
+    url: "https://www.youtube.com/feed/trending",
     views: 182_232,
     likes: 7_800,
     comments: 430,
@@ -445,8 +440,8 @@ export const MOCK_VIDEOS: Video[] = [
   },
   {
     id: "v5",
-    platform: "pinterest",
-    url: "https://www.pinterest.ru/pin/12345678901234/",
+    platform: "instagram",
+    url: "https://www.instagram.com/explore/",
     views: 287_000,
     likes: 4_300,
     comments: 120,
@@ -459,7 +454,7 @@ export const MOCK_VIDEOS: Video[] = [
   {
     id: "v6",
     platform: "tiktok",
-    url: "https://www.tiktok.com/@katya_ddd/video/7338765432190",
+    url: "https://www.tiktok.com/explore",
     views: 163_800,
     likes: 6_700,
     comments: 290,
@@ -471,8 +466,8 @@ export const MOCK_VIDEOS: Video[] = [
   },
   {
     id: "v7",
-    platform: "likee",
-    url: "https://likee.video/@polina/video/9012345678",
+    platform: "youtube",
+    url: "https://www.youtube.com/feed/trending",
     views: 163_800,
     likes: 5_400,
     comments: 210,
@@ -485,7 +480,7 @@ export const MOCK_VIDEOS: Video[] = [
   {
     id: "v8",
     platform: "tiktok",
-    url: "https://www.tiktok.com/@katya_ezh/video/7356789012345",
+    url: "https://www.tiktok.com/explore",
     views: 613_000,
     likes: 28_000,
     comments: 1_400,
@@ -498,7 +493,7 @@ export const MOCK_VIDEOS: Video[] = [
   {
     id: "v9",
     platform: "youtube",
-    url: "https://www.youtube.com/shorts/xKTIJ3S9Y1c",
+    url: "https://www.youtube.com/feed/trending",
     views: 174_274,
     likes: 6_200,
     comments: 380,
@@ -511,7 +506,7 @@ export const MOCK_VIDEOS: Video[] = [
   {
     id: "v10",
     platform: "tiktok",
-    url: "https://www.tiktok.com/@polina/video/7332109876543",
+    url: "https://www.tiktok.com/explore",
     views: 310_000,
     likes: 13_500,
     comments: 670,
@@ -524,7 +519,7 @@ export const MOCK_VIDEOS: Video[] = [
   {
     id: "v11",
     platform: "instagram",
-    url: "https://www.instagram.com/reel/C5yBcdEfGhI/",
+    url: "https://www.instagram.com/explore/",
     views: 89_400,
     likes: 3_200,
     comments: 145,
@@ -537,7 +532,7 @@ export const MOCK_VIDEOS: Video[] = [
   {
     id: "v12",
     platform: "tiktok",
-    url: "https://www.tiktok.com/@katya_ddd/video/7329876543210",
+    url: "https://www.tiktok.com/explore",
     views: 456_200,
     likes: 19_800,
     comments: 950,

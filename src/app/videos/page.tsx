@@ -1,21 +1,25 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Search, X, ChevronLeft, ChevronRight, Download, Video as VideoIcon } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { Search, X, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
+import OnboardingWizard from "@/components/ui/OnboardingWizard";
 import { TableSkeleton } from "@/components/ui/SkeletonCard";
 import { formatViews, formatDate, formatER, getPlatformLabel } from "@/lib/format";
 import { MOCK_VIDEOS, type Video, type Platform } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
-const PLATFORMS = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
+const PLATFORMS = ["tiktok", "instagram", "youtube"] as const;
 const PAGE_SIZE = 10;
 
 type SortKey = "views" | "publishedAt";
 type SortDir = "asc" | "desc";
 
 export default function VideosPage() {
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role ?? "owner";
   const [period, setPeriod] = useState<Period>("30d");
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +31,9 @@ export default function VideosPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const [page, setPage] = useState(1);
+  const [isEmpty, setIsEmpty] = useState(false);
+  const [showDemo, setShowDemo] = useState(true);
+  const [showWizard, setShowWizard] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -36,13 +43,23 @@ export default function VideosPage() {
     params.set("limit", "1000");
     fetch(`/api/videos?${params}`)
       .then((r) => r.json())
-      .then((d) => setVideos(d.videos ?? d))
-      .catch(() => setVideos(MOCK_VIDEOS))
+      .then((d) => {
+        const list = (d.videos ?? d) as Video[];
+        setIsEmpty(Array.isArray(list) && list.length === 0);
+        setVideos(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        setIsEmpty(true);
+        setVideos([]);
+      })
       .finally(() => setLoading(false));
   }, [period, platformFilter]);
 
+  const isDemo = isEmpty && showDemo && role !== "creator";
+  const displayedVideos: Video[] = isDemo ? MOCK_VIDEOS : videos;
+
   const filtered = useMemo(() => {
-    let result = [...videos];
+    let result = [...displayedVideos];
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -58,7 +75,7 @@ export default function VideosPage() {
       return (new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime()) * mul;
     });
     return result;
-  }, [videos, search, sortKey, sortDir]);
+  }, [displayedVideos, search, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -89,6 +106,14 @@ export default function VideosPage() {
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 md:gap-6">
+      {showWizard && session?.user && (
+        <OnboardingWizard
+          tenantId={(session.user as { tenantId?: string }).tenantId ?? ""}
+          userName={session.user.name ?? ""}
+          onComplete={() => setShowWizard(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
@@ -104,7 +129,7 @@ export default function VideosPage() {
                 borderColor: "var(--border-default)",
               }}
             >
-              {filtered.length.toLocaleString("ru-RU")} роликов
+              {filtered.length.toLocaleString("ru-RU")} роликов{isDemo ? " (ДЕМО)" : ""}
             </span>
           </div>
           <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
@@ -197,19 +222,50 @@ export default function VideosPage() {
         )}
       </div>
 
+      {isDemo && !loading && (
+        <div
+          className="rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+          style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-border)" }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base">🎬</span>
+            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              <strong style={{ color: "var(--accent-primary)" }}>ДЕМО</strong>
+              {" "}— примеры роликов. Ваши появятся после первого скрейпинга (~04:00 Bali / 00:00 МСК).
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowWizard(true)}
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
+            >
+              Открыть онбординг
+            </button>
+            <button
+              onClick={() => setShowDemo(false)}
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: "var(--accent-primary)", color: "#fff" }}
+            >
+              Мои данные
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       {loading ? (
         <TableSkeleton rows={10} />
-      ) : videos.length === 0 ? (
+      ) : displayedVideos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
             style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-border)" }}>
-            <VideoIcon className="w-7 h-7" style={{ color: "var(--accent-primary)" }} />
+            <span className="text-base">🎬</span>
           </div>
           <div>
             <h3 className="text-base font-medium mb-1" style={{ color: "var(--text-primary)" }}>Пока нет роликов</h3>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              Ролики появятся после первого скрейпинга. Скрейпер запускается каждый день в 04:00 по Bali.
+              Ролики появятся после первого скрейпинга. Скрейпер запускается раз в сутки около 04:00 Bali (00:00 МСК).
             </p>
           </div>
         </div>
