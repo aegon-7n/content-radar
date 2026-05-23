@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, HelpCircle } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { ToastState } from "./Toast";
 
@@ -11,7 +11,6 @@ interface Creator {
   tiktokUsername: string | null;
   youtubeChannelId: string | null;
   instagramUsername: string | null;
-  pinterestUsername: string | null;
   videoCount: number;
 }
 
@@ -24,7 +23,6 @@ const EMPTY_FORM = {
   tiktokUsername: "",
   youtubeChannelId: "",
   instagramUsername: "",
-  pinterestUsername: "",
 };
 
 const inputClass = "w-full rounded-lg px-3 py-2 text-sm focus:outline-none transition-colors";
@@ -77,7 +75,6 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
       tiktokUsername: c.tiktokUsername ?? "",
       youtubeChannelId: c.youtubeChannelId ?? "",
       instagramUsername: c.instagramUsername ?? "",
-      pinterestUsername: c.pinterestUsername ?? "",
     });
     setModalOpen(true);
   }
@@ -98,7 +95,6 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
           tiktokUsername: form.tiktokUsername.trim().replace(/^@/, "") || null,
           youtubeChannelId: form.youtubeChannelId.trim() || null,
           instagramUsername: form.instagramUsername.trim().replace(/^@/, "") || null,
-          pinterestUsername: form.pinterestUsername.trim().replace(/^@/, "") || null,
         }),
       });
       const data = await res.json();
@@ -134,12 +130,12 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4 gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <h2 className="text-sm font-medium shrink-0" style={{ color: "var(--text-muted)" }}>
             {loading ? "..." : `${filteredCreators.length} из ${creators.length} креаторов`}
           </h2>
-          <div className="relative">
+          <div className="relative flex-1 sm:flex-initial min-w-0">
             <Search
               className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
               style={{ color: "var(--text-disabled)" }}
@@ -149,19 +145,18 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
               placeholder="Поиск..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none"
+              className="pl-7 pr-3 py-1.5 rounded-lg text-xs focus:outline-none w-full sm:w-40"
               style={{
                 background: "var(--surface-2)",
                 border: "1px solid var(--border-default)",
                 color: "var(--text-primary)",
-                width: "160px",
               }}
             />
           </div>
         </div>
         <button
           onClick={openAdd}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+          className="flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-xs font-medium rounded-lg transition-colors w-full sm:w-auto"
           style={{
             background: "var(--accent-primary)",
             color: "#fff",
@@ -193,10 +188,10 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
           <table className="w-full min-w-[800px]">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
-                {["Имя", "TikTok", "YouTube", "Instagram", "Pinterest", "Роликов", "Действия"].map((h, i) => (
+                {["Имя", "TikTok", "YouTube", "Instagram", "Роликов", "Действия"].map((h, i) => (
                   <th
                     key={h}
-                    className={`px-4 py-2.5 text-xs font-medium uppercase tracking-wide ${i === 6 ? "text-right" : "text-left"}`}
+                    className={`px-4 py-2.5 text-xs font-medium uppercase tracking-wide ${i === 5 ? "text-right" : "text-left"}`}
                     style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}
                   >
                     {h}
@@ -207,7 +202,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
             <tbody>
               {filteredCreators.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
                     Креаторы не найдены
                   </td>
                 </tr>
@@ -232,9 +227,6 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
                   </td>
                   <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
                     {c.instagramUsername ? `@${c.instagramUsername}` : <span style={{ color: "var(--text-disabled)" }}>—</span>}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
-                    {c.pinterestUsername ? `@${c.pinterestUsername}` : <span style={{ color: "var(--text-disabled)" }}>—</span>}
                   </td>
                   <td className="px-4 py-3 text-sm font-mono" style={{ color: "var(--text-muted)" }}>
                     {c.videoCount}
@@ -298,15 +290,50 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
             </p>
             <div className="flex flex-col gap-3">
               {[
-                { key: "tiktokUsername", label: "TikTok", placeholder: "@username", help: "" },
-                { key: "youtubeChannelId", label: "YouTube", placeholder: "@handle или UCxxx...", help: "" },
-                { key: "instagramUsername", label: "Instagram", placeholder: "@username", help: "" },
-                { key: "pinterestUsername", label: "Pinterest", placeholder: "username", help: "" },
-              ].map(({ key, label, placeholder, help }) => (
+                {
+                  key: "tiktokUsername",
+                  label: "TikTok",
+                  placeholder: "@username",
+                  help: "Скопируй ник из ссылки tiktok.com/@username",
+                  hasTooltip: false,
+                },
+                {
+                  key: "youtubeChannelId",
+                  label: "YouTube Channel ID",
+                  placeholder: "UC...",
+                  help: "Channel ID начинается с UC. Найди на странице канала в адресной строке: youtube.com/channel/UC…",
+                  hasTooltip: true,
+                },
+                {
+                  key: "instagramUsername",
+                  label: "Instagram",
+                  placeholder: "@username",
+                  help: "Скопируй ник из ссылки instagram.com/username",
+                  hasTooltip: false,
+                },
+              ].map(({ key, label, placeholder, help, hasTooltip }) => (
                 <div key={key}>
-                  <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
-                    {label}
-                  </label>
+                  <div className="flex items-center gap-1 mb-1.5">
+                    <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
+                      {label}
+                    </label>
+                    {hasTooltip && (
+                      <div className="relative group">
+                        <HelpCircle className="w-3.5 h-3.5 cursor-help" style={{ color: "var(--accent-primary)" }} />
+                        <div
+                          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 max-w-[240px] w-max rounded-lg px-3 py-2 text-xs leading-relaxed pointer-events-none"
+                          style={{
+                            background: "var(--surface-1)",
+                            border: "1px solid var(--border-default)",
+                            color: "var(--text-secondary)",
+                            boxShadow: "var(--shadow-card)",
+                          }}
+                        >
+                          Найди на странице канала: youtube.com/channel/<strong>UC…</strong>. Начинается с «UC».
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={form[key as keyof typeof form]}
