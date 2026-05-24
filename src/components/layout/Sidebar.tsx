@@ -22,7 +22,7 @@ const allNavItems = [
   { href: "/products", label: "Товары", icon: Package, ownerOnly: false, adminOnly: false },
   { href: "/videos", label: "Ролики", icon: Video, ownerOnly: false, adminOnly: false },
   { href: "/settings", label: "Настройки", icon: Settings, ownerOnly: true, adminOnly: false },
-  { href: "/settings/team", label: "Команда", icon: UsersRound, ownerOnly: true, adminOnly: false },
+  { href: "/settings/team", label: "Команда", icon: UsersRound, ownerOnly: true, adminOnly: true },
   { href: "/admin/waitlist", label: "Waitlist", icon: Inbox, ownerOnly: true, adminOnly: true },
 ];
 

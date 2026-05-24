@@ -24,24 +24,34 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
   const [error, setError] = useState<string | null>(null);
   const [showYtTip, setShowYtTip] = useState(false);
 
-  // Escape key closes wizard
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleComplete();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  function persistState(state: "skipped" | "completed") {
+    // Fire-and-forget — don't block UI on DB write
+    fetch("/api/onboarding/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state }),
+    }).catch(() => {});
+  }
 
-  function handleComplete() {
+  function handleComplete(isCompleted = false) {
     localStorage.setItem(`onboarding_done_${tenantId}`, "1");
+    persistState(isCompleted ? "completed" : "skipped");
     if (creatorAdded) {
       window.location.reload();
     } else {
       onComplete();
     }
   }
+
+  // Escape key closes wizard (treated as skip)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleComplete(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSubmitCreator(e: React.FormEvent) {
     e.preventDefault();
@@ -88,7 +98,7 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
-      onClick={handleComplete}
+      onClick={() => handleComplete(false)}
     >
       <div
         className="relative w-full max-w-md rounded-2xl shadow-2xl"
@@ -120,7 +130,7 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
 
           {/* Close button */}
           <button
-            onClick={handleComplete}
+            onClick={() => handleComplete(false)}
             className="p-0.5 rounded transition-colors"
             style={{ color: "var(--text-disabled)" }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
@@ -143,8 +153,10 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
                 ContentRadar собирает аналитику с TikTok, Instagram и YouTube раз в сутки.
               </p>
               <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                Тут вы увидите эффективность каждого <strong>креатора</strong> и каждого <strong>товара</strong>:
-                сколько просмотров, какие платформы лучше заходят, кто из креаторов растёт.
+                «Тут ты увидишь эффективность каждого креатора и каждого товара: сколько просмотров,
+                какие платформы лучше заходят, кто из креаторов растёт.»
+              </p>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
                 Можно принимать решения — кому добавить бюджет, кого убрать, какой товар продвигать.
               </p>
               <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
@@ -159,7 +171,7 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
                   Поехали →
                 </button>
                 <button
-                  onClick={handleComplete}
+                  onClick={() => handleComplete(false)}
                   className="w-full py-2.5 rounded-lg text-sm transition-colors"
                   style={{ color: "var(--text-muted)", background: "transparent" }}
                   onMouseEnter={(e) =>
@@ -340,7 +352,7 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
                 Пока можешь изучить интерфейс на демо-данных.
               </p>
               <button
-                onClick={handleComplete}
+                onClick={() => handleComplete(true)}
                 className="w-full py-2.5 rounded-lg text-sm font-medium transition-colors"
                 style={{ background: "var(--accent-primary)", color: "#fff" }}
               >
