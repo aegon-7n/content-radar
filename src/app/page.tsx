@@ -75,11 +75,19 @@ function DashboardInner() {
 
   // Show onboarding wizard for empty owner tenants that haven't seen it yet.
   // Creators get a simpler "no videos yet" banner, not the full setup wizard.
+  // Uses DB state (not localStorage) so cross-device/incognito behaviour is correct.
   useEffect(() => {
     if (isEmpty && session?.user && role !== "creator") {
-      const tenantId = (session.user as { tenantId?: string }).tenantId ?? "";
-      const done = localStorage.getItem(`onboarding_done_${tenantId}`);
-      if (!done) setShowWizard(true);
+      fetch("/api/onboarding/state")
+        .then((r) => r.json())
+        .then(({ state }: { state: string | null }) => {
+          if (!state) setShowWizard(true);
+        })
+        .catch(() => {
+          const tenantId = (session.user as { tenantId?: string }).tenantId ?? "";
+          const done = localStorage.getItem(`onboarding_done_${tenantId}`);
+          if (!done) setShowWizard(true);
+        });
     }
   }, [isEmpty, session, role]);
 
