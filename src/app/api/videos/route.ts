@@ -142,6 +142,7 @@ export async function GET(request: NextRequest) {
     }));
 
     return NextResponse.json({
+      isEmpty: videosList.length === 0 && total === 0,
       videos: videosList,
       total,
       page,

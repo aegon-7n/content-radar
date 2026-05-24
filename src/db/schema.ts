@@ -46,6 +46,10 @@ export const users = pgTable("users", {
   // null = bootstrapped owner whose auth still goes through ADMIN_EMAIL/ADMIN_PASSWORD env var.
   // Set on first invite-accept or self-serve signup.
   passwordHash: text("password_hash"),
+  // Tracks whether the user has completed or skipped the onboarding wizard.
+  // NULL = not yet seen, 'skipped' = dismissed, 'completed' = finished all steps.
+  onboardingState: text("onboarding_state"),
+  onboardingUpdatedAt: timestamp("onboarding_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -309,3 +313,17 @@ export const inviteTokens = pgTable(
 
 export type InviteToken = typeof inviteTokens.$inferSelect;
 export type NewInviteToken = typeof inviteTokens.$inferInsert;
+
+// ── Password reset tokens ─────────────────────────────────────────────────────
+// Single-use tokens for resetting owner passwords. TTL: 1 hour.
+// Global table — not per-tenant (password resets cross tenant context).
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  token: text("token").primaryKey(),
+  email: text("email").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type NewPasswordResetToken = typeof passwordResetTokens.$inferInsert;

@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
       byPlatform: platformMap.get(row.product_id) ?? [],
     }));
 
-    return NextResponse.json({ products: productsList });
+    return NextResponse.json({ isEmpty: productsList.length === 0, products: productsList });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

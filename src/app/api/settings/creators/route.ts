@@ -29,7 +29,10 @@ const createCreatorSchema = z.object({
       (v) => !v || /^https?:\/\//.test(v),
       { message: "Некорректный URL аватара" },
     ),
-  tiktokUsername: optionalHandle,
+  tiktokUsername: z.string().nullable().optional().or(z.literal("")).refine(
+    (v) => !v || /^[A-Za-z0-9_.]+$/.test(v.replace(/^@/, "")),
+    { message: "TikTok @username должен быть на латинице" },
+  ),
   // Accept @handle, full URL, or raw UC-ID — actual format check happens
   // in resolveYouTubeChannelId at runtime, which also turns it into UC...
   youtubeChannelId: optionalHandle,
