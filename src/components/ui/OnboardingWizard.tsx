@@ -22,6 +22,7 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
   const [youtubeChannelId, setYoutubeChannelId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showYtTip, setShowYtTip] = useState(false);
 
   // Escape key closes wizard
   useEffect(() => {
@@ -250,32 +251,45 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
                 />
               </div>
 
-              {/* YouTube Channel ID */}
+              {/* YouTube канал */}
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-1">
                   <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                    YouTube Channel ID
+                    YouTube канал
                   </label>
-                  <div className="relative group">
+                  <button
+                    type="button"
+                    aria-label="Подсказка по YouTube каналу"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowYtTip((v) => !v);
+                    }}
+                    onMouseEnter={() => setShowYtTip(true)}
+                    onMouseLeave={() => setShowYtTip(false)}
+                    className="relative inline-flex items-center justify-center"
+                  >
                     <HelpCircle className="w-4 h-4 cursor-help" style={{ color: "var(--accent-primary)" }} />
-                    <div
-                      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 max-w-[240px] w-max rounded-lg px-3 py-2 text-xs leading-relaxed pointer-events-none"
-                      style={{
-                        background: "var(--surface-1)",
-                        border: "1px solid var(--border-default)",
-                        color: "var(--text-secondary)",
-                        boxShadow: "var(--shadow-card)",
-                      }}
-                    >
-                      Найди на странице канала: youtube.com/channel/<strong>UC…</strong>. Начинается с «UC».
-                    </div>
-                  </div>
+                    {showYtTip && (
+                      <span
+                        role="tooltip"
+                        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 max-w-[260px] w-max rounded-lg px-3 py-2 text-xs leading-relaxed pointer-events-none text-left"
+                        style={{
+                          background: "var(--surface-1)",
+                          border: "1px solid var(--border-default)",
+                          color: "var(--text-secondary)",
+                          boxShadow: "var(--shadow-card)",
+                        }}
+                      >
+                        Подойдёт <strong>@handle</strong>, ссылка на канал <strong>youtube.com/@…</strong> или Channel&nbsp;ID&nbsp;<strong>UC…</strong>. Мы сами найдём правильный ID.
+                      </span>
+                    )}
+                  </button>
                 </div>
                 <input
                   type="text"
                   value={youtubeChannelId}
                   onChange={(e) => setYoutubeChannelId(e.target.value)}
-                  placeholder="UC..."
+                  placeholder="@handle, ссылка или UC..."
                   className="px-3 py-2 rounded-lg text-sm outline-none transition-colors"
                   style={{
                     background: "var(--surface-2)",

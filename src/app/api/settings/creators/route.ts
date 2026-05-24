@@ -4,6 +4,7 @@ import { creators, videos } from "@/db/schema";
 import { eq, count } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthWithTenant } from "@/lib/tenant";
+import { resolveYouTubeChannelId, YouTubeResolveError } from "@/lib/youtube";
 
 function stripAt(s: string | null | undefined): string | null {
   if (!s) return null;
@@ -29,10 +30,9 @@ const createCreatorSchema = z.object({
       { message: "Некорректный URL аватара" },
     ),
   tiktokUsername: optionalHandle,
-  youtubeChannelId: optionalHandle.refine(
-    (v) => !v || /^UC[A-Za-z0-9_-]{20,30}$/.test(v),
-    { message: "YouTube Channel ID должен начинаться с UC и быть длиной 22–32 символа (пример: UCxxxxxxxxxxxxxxxxxx)" },
-  ),
+  // Accept @handle, full URL, or raw UC-ID — actual format check happens
+  // in resolveYouTubeChannelId at runtime, which also turns it into UC...
+  youtubeChannelId: optionalHandle,
   instagramUsername: optionalHandle,
   pinterestUsername: optionalHandle,
 });
@@ -104,6 +104,19 @@ export async function POST(request: NextRequest) {
       pinterestUsername,
     } = parsed.data;
 
+    let resolvedYoutubeChannelId: string | null = null;
+    if (youtubeChannelId && youtubeChannelId.trim()) {
+      try {
+        resolvedYoutubeChannelId = await resolveYouTubeChannelId(youtubeChannelId);
+      } catch (err) {
+        const message =
+          err instanceof YouTubeResolveError
+            ? err.message
+            : "Не удалось распознать YouTube канал";
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
+    }
+
     const [creator] = await db
       .insert(creators)
       .values({
@@ -112,7 +125,7 @@ export async function POST(request: NextRequest) {
         name,
         avatarUrl: avatarUrl || null,
         tiktokUsername: stripAt(tiktokUsername),
-        youtubeChannelId: youtubeChannelId || null,
+        youtubeChannelId: resolvedYoutubeChannelId,
         instagramUsername: stripAt(instagramUsername),
         pinterestUsername: pinterestUsername || null,
       })

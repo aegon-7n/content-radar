@@ -5,6 +5,7 @@ import { eq, and, count, sum, ne } from "drizzle-orm";
 import { z } from "zod";
 import { requireOwner } from "@/lib/tenant";
 import { getTuPool } from "@/lib/yookassa";
+import { resolveYouTubeChannelId, YouTubeResolveError } from "@/lib/youtube";
 
 const optionalHandle = z.string().nullable().optional().or(z.literal(""));
 
@@ -20,10 +21,9 @@ const patchCreatorSchema = z.object({
       { message: "Некорректный URL аватара" },
     ),
   tiktokUsername: optionalHandle,
-  youtubeChannelId: optionalHandle.refine(
-    (v) => !v || /^UC[A-Za-z0-9_-]{20,30}$/.test(v),
-    { message: "YouTube Channel ID должен начинаться с UC и быть длиной 22–32 символа (пример: UCxxxxxxxxxxxxxxxxxx)" },
-  ),
+  // Accept @handle, full URL, or raw UC-ID — resolveYouTubeChannelId
+  // validates and converts to UC... at runtime.
+  youtubeChannelId: optionalHandle,
   instagramUsername: optionalHandle,
   pinterestUsername: optionalHandle,
   // Per-creator video cap. null removes the limit.
@@ -105,7 +105,20 @@ export async function PATCH(
       updates.tiktokUsername = parsed.data.tiktokUsername === "" ? null : parsed.data.tiktokUsername;
     }
     if (parsed.data.youtubeChannelId !== undefined) {
-      updates.youtubeChannelId = parsed.data.youtubeChannelId === "" ? null : parsed.data.youtubeChannelId;
+      const raw = parsed.data.youtubeChannelId;
+      if (!raw || (typeof raw === "string" && raw.trim() === "")) {
+        updates.youtubeChannelId = null;
+      } else {
+        try {
+          updates.youtubeChannelId = await resolveYouTubeChannelId(raw);
+        } catch (err) {
+          const message =
+            err instanceof YouTubeResolveError
+              ? err.message
+              : "Не удалось распознать YouTube канал";
+          return NextResponse.json({ error: message }, { status: 400 });
+        }
+      }
     }
     if (parsed.data.instagramUsername !== undefined) {
       updates.instagramUsername = parsed.data.instagramUsername === "" ? null : parsed.data.instagramUsername;
