@@ -63,7 +63,7 @@ export default function CreatorsPage() {
       .then((r) => r.json())
       .then((d) => {
         const list = (d.creators ?? []) as CreatorRow[];
-        setIsEmpty(list.length === 0);
+        setIsEmpty(d.isEmpty === true || list.length === 0);
         setCreators(list);
       })
       .catch(() => {
@@ -157,7 +157,7 @@ export default function CreatorsPage() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => setShowWizard(true)}
+              onClick={() => { window.location.href = "/?openOnboarding=1"; }}
               className="text-xs px-3 py-1.5 rounded-lg transition-colors"
               style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
             >
