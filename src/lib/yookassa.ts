@@ -26,14 +26,14 @@ export const TIER_CONFIG: Record<
   BillingTier,
   { priceKopecks: number; creatorLimit: number; tuPool: number; label: string; trialDays: number }
 > = {
-  solo: { priceKopecks: 490_000, creatorLimit: 5, tuPool: 200, label: "Starter", trialDays: 14 },
-  pro: { priceKopecks: 990_000, creatorLimit: 10, tuPool: 800, label: "Growth", trialDays: 14 },
-  studio: { priceKopecks: 1_590_000, creatorLimit: 20, tuPool: 3_000, label: "Brand", trialDays: 14 },
+  solo: { priceKopecks: 490_000, creatorLimit: 5, tuPool: 1_000, label: "Starter", trialDays: 14 },
+  pro: { priceKopecks: 990_000, creatorLimit: 10, tuPool: 4_000, label: "Growth", trialDays: 14 },
+  studio: { priceKopecks: 1_590_000, creatorLimit: 20, tuPool: 15_000, label: "Brand", trialDays: 14 },
 };
 
 export function getTuPool(tier: string | null | undefined): number {
-  if (!tier) return 200;
-  return (TIER_CONFIG[tier as BillingTier]?.tuPool) ?? 200;
+  if (!tier) return 1_000;
+  return (TIER_CONFIG[tier as BillingTier]?.tuPool) ?? 1_000;
 }
 
 // ── ЮKassa API types ─────────────────────────────────────────────────────────
