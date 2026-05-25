@@ -76,6 +76,9 @@ export async function POST(request: NextRequest) {
     return { tenant, user };
   });
 
+  // Fire-and-forget TG notification — skips internal smoke/QA traffic.
+  void notifySignup({ email, name, companyName });
+
   return NextResponse.json(
     {
       tenant: { id: result.tenant.id, name: result.tenant.name, slug: result.tenant.slug },
@@ -83,4 +86,37 @@ export async function POST(request: NextRequest) {
     },
     { status: 201 },
   );
+}
+
+async function notifySignup(s: { email: string; name: string; companyName: string }): Promise<void> {
+  // Internal smoke emails — keep TG quiet
+  if (/^(krab[-+]|e2e\+|test@|\S+@contentradar\.local$)/i.test(s.email)) return;
+
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) {
+    console.warn("[register] TELEGRAM_BOT_TOKEN/_CHAT_ID not set, skip signup notification");
+    return;
+  }
+
+  const text =
+    `🟢 <b>Новая регистрация</b>\n` +
+    `Имя: <code>${escapeHtml(s.name)}</code>\n` +
+    `Email: <code>${escapeHtml(s.email)}</code>\n` +
+    `Бренд: <code>${escapeHtml(s.companyName)}</code>`;
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+    });
+    if (!res.ok) console.error("[register] Telegram error", res.status, await res.text().catch(() => ""));
+  } catch (err) {
+    console.error("[register] Telegram fetch failed", err);
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
