@@ -26,9 +26,9 @@ export const TIER_CONFIG: Record<
   BillingTier,
   { priceKopecks: number; creatorLimit: number; tuPool: number; label: string; trialDays: number }
 > = {
-  solo: { priceKopecks: 590_000, creatorLimit: 5, tuPool: 200, label: "Starter", trialDays: 14 },
+  solo: { priceKopecks: 490_000, creatorLimit: 5, tuPool: 200, label: "Starter", trialDays: 14 },
   pro: { priceKopecks: 990_000, creatorLimit: 10, tuPool: 800, label: "Growth", trialDays: 14 },
-  studio: { priceKopecks: 1_490_000, creatorLimit: 20, tuPool: 3_000, label: "Brand", trialDays: 14 },
+  studio: { priceKopecks: 1_590_000, creatorLimit: 20, tuPool: 3_000, label: "Brand", trialDays: 14 },
 };
 
 export function getTuPool(tier: string | null | undefined): number {
