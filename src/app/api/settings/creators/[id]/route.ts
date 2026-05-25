@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { creators, videos, subscriptions } from "@/db/schema";
-import { eq, and, count, sum, ne } from "drizzle-orm";
+import { eq, and, count, sum, ne, gte } from "drizzle-orm";
 import { z } from "zod";
 import { requireOwner } from "@/lib/tenant";
-import { getTuPool } from "@/lib/yookassa";
+import { getTuPool, getCurrentPeriodStart } from "@/lib/yookassa";
 import { resolveYouTubeChannelId, YouTubeResolveError } from "@/lib/youtube";
 
 const optionalHandle = z.string().nullable().optional().or(z.literal(""));
@@ -61,15 +61,20 @@ export async function PATCH(
     if (parsed.data.videoLimit !== undefined && parsed.data.videoLimit !== null) {
       const newLimit = parsed.data.videoLimit;
 
-      // C3: new limit must not be below creator's current video count.
+      // C3: new monthly limit must not be below creator's usage in the current period.
+      const periodStart = getCurrentPeriodStart();
       const [creatorCount] = await db
         .select({ count: count() })
         .from(videos)
-        .where(and(eq(videos.creatorId, id), eq(videos.tenantId, tenantId)));
+        .where(and(
+          eq(videos.creatorId, id),
+          eq(videos.tenantId, tenantId),
+          gte(videos.createdAt, periodStart),
+        ));
       const currentUsed = Number(creatorCount?.count ?? 0);
       if (newLimit < currentUsed) {
         return NextResponse.json(
-          { error: `Нельзя снизить лимит ниже текущего количества роликов (${currentUsed})` },
+          { error: `Нельзя снизить лимит ниже использованного в этом месяце (${currentUsed})` },
           { status: 422 }
         );
       }

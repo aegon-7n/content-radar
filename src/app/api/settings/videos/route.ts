@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { videos, creators, products, subscriptions } from "@/db/schema";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and, count, gte } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthWithTenant } from "@/lib/tenant";
-import { getTuPool } from "@/lib/yookassa";
+import { getTuPool, getCurrentPeriodStart } from "@/lib/yookassa";
 
 const PLATFORM_VALUES = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
 
@@ -44,21 +44,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Креатор не найден" }, { status: 404 });
     }
 
-    // Soft-cap: check per-creator limit and tenant-level TU pool.
+    // Monthly cap: TU usage counts ONLY videos added in the current billing
+    // period (calendar month, UTC). Resets at 00:00 UTC on the 1st.
+    const periodStart = getCurrentPeriodStart();
+
     const [creatorVideoCount] = await db
       .select({ count: count() })
       .from(videos)
-      .where(and(eq(videos.creatorId, creatorId), eq(videos.tenantId, tenantId)));
+      .where(and(
+        eq(videos.creatorId, creatorId),
+        eq(videos.tenantId, tenantId),
+        gte(videos.createdAt, periodStart),
+      ));
     const creatorUsed = Number(creatorVideoCount?.count ?? 0);
 
     if (creator.videoLimit !== null && creatorUsed >= creator.videoLimit) {
       return NextResponse.json(
-        { error: `Лимит роликов для этого креатора достигнут (${creator.videoLimit})` },
+        { error: `Месячный лимит роликов для этого креатора достигнут (${creator.videoLimit})` },
         { status: 422 }
       );
     }
 
-    // Tenant-level TU pool check.
+    // Tenant-level TU pool check (monthly).
     const [sub] = await db
       .select({ tier: subscriptions.tier })
       .from(subscriptions)
@@ -69,12 +76,15 @@ export async function POST(request: NextRequest) {
     const [tenantVideoCount] = await db
       .select({ count: count() })
       .from(videos)
-      .where(eq(videos.tenantId, tenantId));
+      .where(and(
+        eq(videos.tenantId, tenantId),
+        gte(videos.createdAt, periodStart),
+      ));
     const tenantUsed = Number(tenantVideoCount?.count ?? 0);
 
     if (tenantUsed >= tuPool) {
       return NextResponse.json(
-        { error: `Достигнут лимит роликов тарифного плана (${tuPool} видео). Обновите тариф.` },
+        { error: `Достигнут месячный лимит роликов тарифа (${tuPool} в месяц). Счётчик обнулится 1-го числа, либо обновите тариф.` },
         { status: 422 }
       );
     }

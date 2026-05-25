@@ -36,6 +36,14 @@ export function getTuPool(tier: string | null | undefined): number {
   return (TIER_CONFIG[tier as BillingTier]?.tuPool) ?? 1_000;
 }
 
+// Start of the current billing period. Calendar month for now —
+// resets at 00:00 UTC on the 1st. When per-subscription billing periods land,
+// pass the subscription's `currentPeriodStart` and short-circuit.
+export function getCurrentPeriodStart(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
 // ── ЮKassa API types ─────────────────────────────────────────────────────────
 
 export interface YookassaPayment {

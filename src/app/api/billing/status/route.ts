@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, desc, count, and } from "drizzle-orm";
+import { eq, desc, count, and, gte } from "drizzle-orm";
 import { requireAuthWithTenant } from "@/lib/tenant";
 import { db } from "@/db";
 import { subscriptions, payments, creators, videos } from "@/db/schema";
-import { getTuPool } from "@/lib/yookassa";
+import { getTuPool, getCurrentPeriodStart } from "@/lib/yookassa";
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuthWithTenant(request);
@@ -32,10 +32,11 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(payments.createdAt))
       .limit(10);
 
-    // TU pool: total allowed active videos for this tenant (from subscription tier).
+    // TU pool: monthly allowance for this tenant (from subscription tier).
     const tuPool = getTuPool(subscription?.tier);
+    const periodStart = getCurrentPeriodStart();
 
-    // Per-creator TU usage = count of active videos (fail_streak < 3).
+    // Per-creator usage = videos added in the current calendar month.
     const creatorRows = await db
       .select({
         id: creators.id,
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
             and(
               eq(videos.creatorId, c.id),
               eq(videos.tenantId, tenantId),
+              gte(videos.createdAt, periodStart),
             )
           );
         const used = Number(row?.count ?? 0);
