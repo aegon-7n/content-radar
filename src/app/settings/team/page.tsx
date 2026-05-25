@@ -257,8 +257,10 @@ export default function TeamPage() {
         )}
       </div>
 
-      {/* TU quota panel */}
-      {tuData && (
+      {/* TU quota panel — temporarily hidden until we collect 1-2 weeks of real
+          usage data (см. договорённость 2026-05-25). Backend monthly cap живёт,
+          просто не показываем юзеру счётчик чтобы не пугать раньше времени. */}
+      {false && tuData && (
         <div className="rounded-xl p-5" style={cardStyle}>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
