@@ -40,6 +40,10 @@ type TuData = {
   byCreator: CreatorQuota[];
 };
 
+// Feature flag: TU quota UI is hidden until we collect 1-2 weeks of usage data
+// post-launch (2026-05-25 decision). Backend cap is live regardless.
+const SHOW_TU_QUOTA = false;
+
 export default function TeamPage() {
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -259,8 +263,9 @@ export default function TeamPage() {
 
       {/* TU quota panel — temporarily hidden until we collect 1-2 weeks of real
           usage data (см. договорённость 2026-05-25). Backend monthly cap живёт,
-          просто не показываем юзеру счётчик чтобы не пугать раньше времени. */}
-      {false && tuData && (
+          просто не показываем юзеру счётчик чтобы не пугать раньше времени.
+          Вернуть: поменять SHOW_TU_QUOTA на true (или удалить условие). */}
+      {SHOW_TU_QUOTA && tuData && (
         <div className="rounded-xl p-5" style={cardStyle}>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
