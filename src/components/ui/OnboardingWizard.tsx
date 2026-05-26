@@ -333,10 +333,15 @@ export default function OnboardingWizard({ tenantId, userName, onComplete }: Pro
           {step === 3 && (
             <div className="flex flex-col gap-4">
               <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-                Готово! 🚀
+                Готово!
               </h2>
               <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                Данные собираются раз в сутки около 00:00 МСК. Завтра утром увидишь прирост за сегодня.
+                Ночью соберём все ролики креатора за последние 3 недели — утром в дашборде увидишь их с текущим числом просмотров.
+              </p>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                «Прирост за день» и графики динамики появятся со следующего дня — нам нужно 2 точки замера, чтобы посчитать дельту.
+              </p>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--text-disabled)" }}>
                 Пока можешь изучить интерфейс на демо-данных.
               </p>
               <button

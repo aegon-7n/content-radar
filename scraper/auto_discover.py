@@ -39,12 +39,13 @@ _DEFAULT_TIMEOUT = (10, 30)  # (connect, read)
 
 WB_ARTICLE_RE = re.compile(r"\b(\d{5,})\b")  # 5+ цифр подряд = артикул WB
 
-# Minimum lookback on a normal daily run — we always look at least 7 days back
-# even if the previous run was 10 minutes ago, in case something slipped.
-MIN_LOOKBACK_HOURS = 168
-
-# Safety cap so a really old last_success_at does not blow up API quotas.
-MAX_LOOKBACK_HOURS = 24 * 30  # 30 days
+# Unified horizon: 3 weeks (21 days). Каждый день смотрим назад на 21 день —
+# даже если последний run был 10 минут назад. Это покрывает (a) новых креаторов
+# у которых ещё нет истории и им нужен initial-scan за весь горизонт, и
+# (b) обычную ежедневную дельту. Если cron отстал — cap не даёт разогнаться
+# выше 21 дня, чтобы один пропущенный день не утроил API-расход.
+MIN_LOOKBACK_HOURS = 24 * 21  # 504h = 21d
+MAX_LOOKBACK_HOURS = 24 * 21  # cap = the same — горизонт един для всего
 
 # Extra buffer added on top of "gap since last success". Prevents off-by-one
 # when the previous run finished a few minutes before a new publish.

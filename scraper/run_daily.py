@@ -1,15 +1,13 @@
 """
 Ежедневный скрапер — запускается кроном.
-Собирает метрики для видео моложе SCRAPE_HORIZON_DAYS (по умолчанию 30 дней).
+Собирает метрики для всех видео моложе SCRAPE_HORIZON_DAYS (21 день).
+Каждое подходящее видео скрейпится один раз в сутки — это и есть
+непрерывная timeseries для «динамики по дням» в дашборде.
 
-Adaptive scraping cadence (Variant A from the cost analysis):
-  Свежие (≤ FRESH_DAYS, по умолчанию 14) — скрейпим каждый день. Это период
-    самого активного роста просмотров (медиана падает почти до нуля к 14 дню).
-  Старые (FRESH_DAYS … SCRAPE_HORIZON_DAYS) — скрейпим раз в STALE_GAP_DAYS+1
-    дней (по умолчанию каждые 3 дня). Просто пропускаем ролик, если последний
-    снимок < STALE_GAP_DAYS дней назад.
-  Старше SCRAPE_HORIZON_DAYS — не скрейпим вовсе.
-  Все пороги настраиваются env-переменными FRESH_DAYS и STALE_GAP_DAYS.
+2026-05-26: убрана adaptive cadence (FRESH_DAYS / STALE_GAP_DAYS) — теперь
+всё в горизонте 21 день скрейпится каждый день. Раньше старые (14-30д)
+скрейпились раз в 3 дня, что давало пунктирную динамику для роликов
+старше двух недель.
 
 Exit code policy:
   0  — status='ok' OR status='partial' with fail_rate < FAIL_RATE_THRESHOLD.
@@ -29,11 +27,6 @@ FAIL_RATE_THRESHOLD = 0.20
 # Minimum total to consider fail_rate meaningful — below this a single
 # failure skews percentages and we don't want to spam.
 FAIL_RATE_MIN_TOTAL = 10
-
-# Adaptive cadence: ролики ≤ FRESH_DAYS дней — скрейпим каждый день. Старше —
-# раз в (STALE_GAP_DAYS + 1) дней. Цифры по умолчанию из cost-analysis отчёта.
-FRESH_DAYS = int(os.getenv("FRESH_DAYS", "14"))
-STALE_GAP_DAYS = int(os.getenv("STALE_GAP_DAYS", "2"))
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -60,67 +53,33 @@ def main():
     # Только видео моложе SCRAPE_HORIZON_DAYS — старые не трогаем.
     # Видео с fail_streak >= 3 считаются permanently_unavailable —
     # пропускаем их чтобы не тратить API quota каждую ночь.
-    # Adaptive cadence: для роликов старше FRESH_DAYS пропускаем те, что
-    # скрейпили в последние STALE_GAP_DAYS дней — они почти не растут.
+    # Все живые ролики в горизонте берутся каждый день (без adaptive cadence).
     MAX_FAIL_STREAK = 3
     now = datetime.now(tz=timezone.utc)
     horizon = now - timedelta(days=SCRAPE_HORIZON_DAYS)
-    fresh_cutoff = now - timedelta(days=FRESH_DAYS)
-    stale_recent_cutoff = now - timedelta(days=STALE_GAP_DAYS)
 
     cur.execute(
         """
         SELECT v.id, v.platform, v.url
         FROM videos v
-        LEFT JOIN LATERAL (
-            SELECT MAX(scraped_at) AS last_scraped
-            FROM video_metrics
-            WHERE video_id = v.id
-        ) m ON TRUE
         WHERE v.published_at >= %s
           AND v.fail_streak < %s
-          AND (
-            v.published_at >= %s
-            OR m.last_scraped IS NULL
-            OR m.last_scraped < %s
-          )
         ORDER BY v.created_at
         """,
-        (horizon, MAX_FAIL_STREAK, fresh_cutoff, stale_recent_cutoff),
+        (horizon, MAX_FAIL_STREAK),
     )
     videos = cur.fetchall()
 
-    # Counters for visibility — чтобы видеть "сколько отрезали кадансом".
+    # Counter for visibility — сколько роликов помечены permanently_unavailable.
     cur.execute(
         "SELECT COUNT(*) FROM videos WHERE published_at >= %s AND fail_streak >= %s",
         (horizon, MAX_FAIL_STREAK),
     )
     perm_unavail = cur.fetchone()[0]
 
-    cur.execute(
-        """
-        SELECT COUNT(*)
-        FROM videos v
-        LEFT JOIN LATERAL (
-            SELECT MAX(scraped_at) AS last_scraped
-            FROM video_metrics
-            WHERE video_id = v.id
-        ) m ON TRUE
-        WHERE v.published_at >= %s
-          AND v.fail_streak < %s
-          AND v.published_at < %s
-          AND m.last_scraped IS NOT NULL
-          AND m.last_scraped >= %s
-        """,
-        (horizon, MAX_FAIL_STREAK, fresh_cutoff, stale_recent_cutoff),
-    )
-    skipped_by_cadence = cur.fetchone()[0]
-
     logger.info(
-        "Found %d videos to scrape (horizon=%dd, fresh<=%dd, stale every %dd, "
-        "skipped by cadence: %d, permanently unavailable: %d)",
-        len(videos), SCRAPE_HORIZON_DAYS, FRESH_DAYS, STALE_GAP_DAYS + 1,
-        skipped_by_cadence, perm_unavail,
+        "Found %d videos to scrape (horizon=%dd, permanently unavailable: %d)",
+        len(videos), SCRAPE_HORIZON_DAYS, perm_unavail,
     )
 
     scrapers = {
