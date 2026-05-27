@@ -56,12 +56,10 @@ export default function TrialBanner() {
           <span>
             Пробный период закончился.{" "}
             <a
-              href="https://t.me/trushkof_support"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/settings?tab=billing"
               className="font-medium underline underline-offset-2"
             >
-              Написать для подключения тарифа →
+              Выбрать тариф →
             </a>
           </span>
         ) : (
@@ -70,9 +68,7 @@ export default function TrialBanner() {
               ? "Последний день пробного периода."
               : `Пробный период заканчивается через ${trial.daysLeft} дн.`}{" "}
             <a
-              href="https://t.me/trushkof_support"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/settings?tab=billing"
               className="font-medium underline underline-offset-2"
             >
               Выбрать тариф →
