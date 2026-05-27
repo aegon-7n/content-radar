@@ -206,6 +206,57 @@ pm2 save
 4. **Перезапустить фронт**: `pm2 restart content-radar --update-env`.
 5. Git history: можно почистить через `git filter-repo` / BFG, но при ротации ключей это необязательно — старые ключи бесполезны.
 
+## TLS сертификаты
+
+Сертификаты на VPS выдаёт Let's Encrypt через certbot. Срок жизни — 90 дней. Certbot автоматически обновляет сертификаты если настроен systemd timer или cron-задача.
+
+### Проверка auto-renewal
+
+SSH на VPS:
+```bash
+# Проверить systemd timer (Ubuntu 20+/22+):
+systemctl status certbot.timer
+
+# Или: cron-задача:
+cat /etc/cron.d/certbot
+crontab -l | grep certbot
+
+# Dry-run (убедиться что certbot видит домены и может обновить):
+certbot renew --dry-run
+```
+
+### Если auto-renewal НЕ настроен
+
+```bash
+# Обновить прямо сейчас (все домены в certbot):
+certbot renew
+
+# Включить systemd timer (правильный способ на Ubuntu 20+):
+systemctl enable --now certbot.timer
+
+# Или добавить cron если нет systemd (legacy):
+echo "0 3 * * * root certbot renew --quiet" > /etc/cron.d/certbot
+chmod 644 /etc/cron.d/certbot
+```
+
+### Мониторинг срока истечения
+
+```bash
+# Проверить все сертификаты certbot:
+certbot certificates
+
+# Проверить конкретный домен (quick check):
+openssl s_client -connect app.contentradar.app:443 2>/dev/null | openssl x509 -noout -dates
+```
+
+### Домены на VPS
+
+| Домен | Назначение | Certbot expected |
+|---|---|---|
+| `app.contentradar.app` | Основная платформа (Next.js + PM2) | Да |
+
+Let's Encrypt выдаёт сертификаты на 90 дней. Auto-renewal срабатывает когда остаётся < 30 дней. Certbot timer обычно установлен при `apt install certbot`, но стоит убедиться один раз вручную.
+
 ## Бэкапы
 
 **Сейчас бэкапов автоматических нет.** На single-tenant с 3 креаторами это терпимо, но при росте бизнеса — заводить:

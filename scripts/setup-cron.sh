@@ -32,6 +32,7 @@ TG_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 TG_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 
 chmod +x "$APP_DIR/scripts/notify-telegram.sh"
+chmod +x "$APP_DIR/scripts/check-tls.sh"
 
 cat > /etc/cron.d/content-radar << EOF
 SHELL=/bin/bash
@@ -47,6 +48,10 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # Аудит охвата — каждый день в 01:00 МСК (22:00 UTC), после auto_discover/run_daily.
 # Exit != 0 означает пропуски или API failures — сразу идёт алерт в Telegram.
 0 22 * * * root cd $APP_DIR && DATABASE_URL='$DB_URL' TIKAPI_KEY='$TT_KEY' YOUTUBE_API_KEY='$YT_KEY' HIKERAPI_KEY='$HK_KEY' APIFY_TOKEN='$AP_TOKEN' SOCKS_PROXY='$SOCKS' $PYTHON -m scraper.audit >> $LOG_DIR/audit.log 2>&1 || TELEGRAM_BOT_TOKEN='$TG_BOT_TOKEN' TELEGRAM_CHAT_ID='$TG_CHAT_ID' $APP_DIR/scripts/notify-telegram.sh "audit detected gaps" $LOG_DIR/audit.log
+
+# TLS cert expiry check — каждый понедельник в 09:00 МСК (06:00 UTC).
+# Отправляет Telegram-предупреждение если до истечения < 30 дней.
+0 6 * * 1 root TELEGRAM_BOT_TOKEN='$TG_BOT_TOKEN' TELEGRAM_CHAT_ID='$TG_CHAT_ID' bash $APP_DIR/scripts/check-tls.sh >> $LOG_DIR/tls-check.log 2>&1
 EOF
 
 chmod 644 /etc/cron.d/content-radar
@@ -56,6 +61,7 @@ echo ""
 echo "Задачи:"
 echo "  00:00 МСК — scraper.auto_discover (новые ролики)"
 echo "  00:10 МСК — scraper.run_daily     (метрики)"
+echo "  09:00 МСК пн — check-tls         (проверка TLS-сертификатов)"
 echo "  01:00 МСК — scraper.audit         (проверка пропусков)"
 echo ""
 echo "Логи: $LOG_DIR/"
