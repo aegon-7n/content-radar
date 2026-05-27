@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
         v.url,
         v.platform,
         v.published_at,
+        v.fail_streak,
         COALESCE(lm.views, 0)::bigint AS views,
         COALESCE(lm.likes, 0)::int AS likes,
         COALESCE(lm.comments, 0)::int AS comments,
@@ -80,6 +81,7 @@ export async function GET(request: NextRequest) {
       url: string;
       platform: string;
       published_at: string;
+      fail_streak: number;
       views: string;
       likes: number;
       comments: number;
@@ -92,7 +94,7 @@ export async function GET(request: NextRequest) {
 
     const rows = videosResult as unknown as VideoRow[];
 
-    const csvHeader = "url,platform,views,likes,comments,shares,saves,creator,product,wb_article,published_at";
+    const csvHeader = "url,platform,views,likes,comments,shares,saves,creator,product,wb_article,published_at,status";
 
     const escapeField = (value: string | number): string => {
       const str = String(value);
@@ -116,6 +118,7 @@ export async function GET(request: NextRequest) {
         escapeField(row.product_name),
         escapeField(row.wb_article),
         escapeField(new Date(row.published_at).toISOString()),
+        escapeField(Number(row.fail_streak ?? 0) >= 3 ? "недоступен" : ""),
       ].join(",")
     );
 
