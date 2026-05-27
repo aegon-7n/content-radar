@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/db";
 import { tenants, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { sendWelcomeEmail } from "@/lib/email/welcome";
 
 const RegisterSchema = z.object({
   email: z.string().email("Некорректный email"),
@@ -76,8 +77,11 @@ export async function POST(request: NextRequest) {
     return { tenant, user };
   });
 
-  // Fire-and-forget TG notification — skips internal smoke/QA traffic.
+  // Fire-and-forget: TG notification + welcome email. Skips internal smoke/QA traffic.
   void notifySignup({ email, name, companyName });
+  if (!/^(krab[-+]|e2e\+|test@|\S+@contentradar\.local$)/i.test(email)) {
+    void sendWelcomeEmail({ email, firstName: name });
+  }
 
   return NextResponse.json(
     {
