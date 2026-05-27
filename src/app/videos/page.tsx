@@ -373,6 +373,19 @@ export default function VideosPage() {
                       >
                         {v.url.replace(/^https?:\/\//, "").slice(0, 40)}
                       </a>
+                      {(v.failStreak ?? 0) >= 3 && (
+                        <span
+                          className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium"
+                          style={{
+                            color: "var(--error-text, #f87171)",
+                            background: "var(--error-bg, rgba(248,113,113,0.1))",
+                            border: "1px solid var(--error-border, rgba(248,113,113,0.2))",
+                          }}
+                          title="Ролик недоступен: удалён или приватный. Скрейпер пропускает его."
+                        >
+                          недоступен
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>

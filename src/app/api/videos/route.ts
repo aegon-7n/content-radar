@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
         v.published_at,
         v.creator_id,
         v.product_id,
+        v.fail_streak,
         COALESCE(lm.views, 0)::bigint AS views,
         COALESCE(lm.likes, 0)::int AS likes,
         COALESCE(lm.comments, 0)::int AS comments,
@@ -114,6 +115,7 @@ export async function GET(request: NextRequest) {
       published_at: string;
       creator_id: string | null;
       product_id: string | null;
+      fail_streak: number;
       views: string;
       likes: number;
       comments: number;
@@ -133,6 +135,7 @@ export async function GET(request: NextRequest) {
       comments: Number(row.comments),
       shares: Number(row.shares),
       saves: Number(row.saves),
+      failStreak: Number(row.fail_streak ?? 0),
       creatorId: row.creator_id ?? "",
       creatorName: row.creator_name ?? "—",
       productId: row.product_id ?? "",

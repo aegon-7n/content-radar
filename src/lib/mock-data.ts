@@ -77,6 +77,8 @@ export interface Video {
   likes: number;
   comments: number;
   shares: number;
+  saves?: number;
+  failStreak?: number;
   creatorName: string;
   productName: string;
   wbArticle: string;
