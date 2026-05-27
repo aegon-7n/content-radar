@@ -1,24 +1,31 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Users, Package, Film, Upload } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { Users, Package, Film, Upload, CreditCard } from "lucide-react";
 import Toast, { ToastState } from "./_components/Toast";
 import CreatorsTab from "./_components/CreatorsTab";
 import ProductsTab from "./_components/ProductsTab";
 import VideosTab from "./_components/VideosTab";
 import ImportTab from "./_components/ImportTab";
+import BillingTab from "./_components/BillingTab";
 
-type TabId = "creators" | "products" | "videos" | "import";
+type TabId = "creators" | "products" | "videos" | "import" | "billing";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "creators", label: "Креаторы", icon: <Users className="w-3.5 h-3.5" /> },
   { id: "products", label: "Товары", icon: <Package className="w-3.5 h-3.5" /> },
   { id: "videos", label: "Ролики", icon: <Film className="w-3.5 h-3.5" /> },
   { id: "import", label: "Импорт CSV", icon: <Upload className="w-3.5 h-3.5" /> },
+  { id: "billing", label: "Подписка", icon: <CreditCard className="w-3.5 h-3.5" /> },
 ];
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("creators");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    const tab = searchParams.get("tab");
+    return (tab === "billing" ? "billing" : "creators") as TabId;
+  });
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const showToast = useCallback((message: string, type: ToastState["type"]) => {
@@ -26,6 +33,13 @@ export default function SettingsPage() {
   }, []);
 
   const dismissToast = useCallback(() => setToast(null), []);
+
+  // Show payment success toast when redirected back from YooKassa
+  useEffect(() => {
+    if (searchParams.get("status") === "success") {
+      showToast("Платёж получен — подписка будет активирована автоматически", "success");
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
@@ -77,6 +91,7 @@ export default function SettingsPage() {
         {activeTab === "products" && <ProductsTab showToast={showToast} />}
         {activeTab === "videos" && <VideosTab showToast={showToast} />}
         {activeTab === "import" && <ImportTab showToast={showToast} />}
+        {activeTab === "billing" && <BillingTab />}
       </div>
 
       {/* Toast */}
