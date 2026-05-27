@@ -6,5 +6,7 @@ CREATE TABLE IF NOT EXISTS referral_codes (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Track which referral code was used on each waitlist signup
-ALTER TABLE waitlist_signups ADD COLUMN IF NOT EXISTS referral_code TEXT REFERENCES referral_codes(code);
+-- Track which referral code was used on each waitlist signup.
+-- No FK constraint — store raw code from URL param; invalid codes are accepted
+-- gracefully and simply won't match any referral_codes row.
+ALTER TABLE waitlist_signups ADD COLUMN IF NOT EXISTS referral_code TEXT;
