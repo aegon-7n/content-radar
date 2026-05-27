@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, desc, count, and, gte } from "drizzle-orm";
 import { requireAuthWithTenant } from "@/lib/tenant";
 import { db } from "@/db";
-import { subscriptions, payments, creators, videos } from "@/db/schema";
-import { getTuPool, getCurrentPeriodStart } from "@/lib/yookassa";
+import { subscriptions, payments, creators, videos, tenants } from "@/db/schema";
+import { getTuPool, getCurrentPeriodStart, TIER_CONFIG } from "@/lib/yookassa";
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuthWithTenant(request);
@@ -11,11 +11,10 @@ export async function GET(request: NextRequest) {
   const { tenantId } = auth.ctx;
 
   try {
-    const [subscription] = await db
-      .select()
-      .from(subscriptions)
-      .where(eq(subscriptions.tenantId, tenantId))
-      .limit(1);
+    const [[tenant], [subscription]] = await Promise.all([
+      db.select({ createdAt: tenants.createdAt }).from(tenants).where(eq(tenants.id, tenantId)).limit(1),
+      db.select().from(subscriptions).where(eq(subscriptions.tenantId, tenantId)).limit(1),
+    ]);
 
     const recentPayments = await db
       .select({
@@ -72,9 +71,23 @@ export async function GET(request: NextRequest) {
     const totalUsed = byCreator.reduce((s, c) => s + c.videosUsed, 0);
     const poolUsedPct = tuPool > 0 ? Math.round((totalUsed / tuPool) * 100) : 0;
 
+    const TRIAL_DAYS = TIER_CONFIG.solo.trialDays; // 14
+    const tenantCreatedAt = tenant?.createdAt ?? new Date();
+    const trialEndsAt = new Date(tenantCreatedAt.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+    const now = Date.now();
+    const trialDaysLeft = Math.max(0, Math.ceil((trialEndsAt.getTime() - now) / (24 * 60 * 60 * 1000)));
+    const trialActive = !subscription && trialDaysLeft > 0;
+    const trialExpired = !subscription && trialDaysLeft === 0;
+
     return NextResponse.json({
       subscription: subscription ?? null,
       payments: recentPayments,
+      trial: {
+        active: trialActive,
+        expired: trialExpired,
+        daysLeft: trialDaysLeft,
+        endsAt: trialEndsAt.toISOString(),
+      },
       tu: {
         pool: tuPool,
         used: totalUsed,
