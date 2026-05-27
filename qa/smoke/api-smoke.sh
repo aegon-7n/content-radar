@@ -3,7 +3,7 @@
 # Verifies that protected /api/* routes return 401 when called without a session,
 # and that allowlisted public routes remain accessible.
 #
-# Usage: BASE_URL=https://app.contentreader.ai ./api-smoke.sh
+# Usage: BASE_URL=https://app.contentradar.app ./api-smoke.sh
 #        BASE_URL=http://localhost:3000 ./api-smoke.sh
 
 set -euo pipefail
