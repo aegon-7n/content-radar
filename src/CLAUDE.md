@@ -19,7 +19,7 @@ types/       глобальные .d.ts
 - **`/creators`**, **`/creators/[id]`** — список и детальная.
 - **`/products`**, **`/products/[id]`** — список и детальная.
 - **`/videos`**, **`/videos/[id]`** — список с фильтрами/сортировкой/пагинацией и детальная.
-- **`/settings`** — четыре таба: `CreatorsTab`, `ProductsTab`, `VideosTab`, `ImportTab`. Сабкомпоненты — в `app/settings/_components/`.
+- **`/settings`** — пять табов: `CreatorsTab`, `ProductsTab`, `VideosTab`, `ImportTab`, `BillingTab`. Сабкомпоненты — в `app/settings/_components/`. `?tab=billing` открывает сразу вкладку подписки; `?status=success` показывает тост после редиректа из ЮKassa.
 - **`/settings/team`** — список пользователей тенанта (owner + creators), кнопка «Пригласить», отзыв доступа. Только для owner.
 - **`/login`** — форма, NextAuth `signIn("credentials")`, редирект на `/`.
 - **`/invite/[token]`** — публичная страница принятия инвайта. Creator вводит имя/пароль и создаёт аккаунт в тенанте owner-а. Исключена из middleware guard.
