@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
+import TrialBanner from "@/components/ui/TrialBanner";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -22,8 +23,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
       <div className="flex-1 flex flex-col md:ml-60">
         <Header onMenuToggle={toggleSidebar} />
+        <div className="mt-14">
+          <TrialBanner />
+        </div>
         <main
-          className="flex-1 overflow-auto mt-14"
+          className="flex-1 overflow-auto"
           style={{ background: "var(--bg-base)" }}
         >
           {children}
