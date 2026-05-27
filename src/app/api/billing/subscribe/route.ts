@@ -36,7 +36,14 @@ export async function POST(request: NextRequest) {
   const { tier } = parsed.data;
   const config = TIER_CONFIG[tier as BillingTier];
 
-  const returnUrl = `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/settings?tab=billing&status=success`;
+  // Derive origin from request so returnUrl works even if NEXTAUTH_URL still
+  // points to an old domain (e.g. contentradar.app vs app.contentradar.app).
+  const proto = request.headers.get("x-forwarded-proto") ?? "https";
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
+  const appOrigin = host
+    ? `${proto}://${host}`
+    : (process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const returnUrl = `${appOrigin}/settings?tab=billing&status=success`;
 
   try {
     const yookassaPayment = await createPayment({

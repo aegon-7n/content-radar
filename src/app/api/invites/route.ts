@@ -63,7 +63,12 @@ export async function POST(req: NextRequest) {
 
   await db.insert(inviteTokens).values({ token, tenantId, invitedByUserId: userId, email: email ?? null, creatorId: creatorId ?? null, expiresAt });
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? "https://contentradar.app";
+  // Derive origin from request header — same fix as TRU-226 (NEXTAUTH_URL mismatch).
+  const proto = req.headers.get("x-forwarded-proto") ?? "https";
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
+  const baseUrl = host
+    ? `${proto}://${host}`
+    : (process.env.NEXTAUTH_URL ?? "https://app.contentradar.app");
   const inviteUrl = `${baseUrl}/invite/${token}`;
 
   // Send invite email if email was provided and Resend is configured.
