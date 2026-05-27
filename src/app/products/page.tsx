@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import PlatformBadge from "@/components/ui/PlatformBadge";
@@ -61,7 +62,7 @@ export default function ProductsPage() {
       .then((r) => r.json())
       .then((d) => {
         const list = (d.products ?? []) as ProductRow[];
-        setIsEmpty(list.length === 0);
+        setIsEmpty(d.isEmpty === true || list.length === 0);
         setProducts(list);
       })
       .catch(() => {
@@ -145,7 +146,7 @@ export default function ProductsPage() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => setShowWizard(true)}
+              onClick={() => { window.location.href = "/?openOnboarding=1"; }}
               className="text-xs px-3 py-1.5 rounded-lg transition-colors"
               style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
             >
@@ -174,7 +175,7 @@ export default function ProductsPage() {
             <h3 className="text-base font-medium mb-1" style={{ color: "var(--text-primary)" }}>Пока нет товаров</h3>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
               Товары появятся автоматически после первого скрейпинга, или добавь вручную в{" "}
-              <a href="/settings" style={{ color: "var(--accent-primary)" }} className="hover:underline">Настройках</a>.
+              <Link href="/settings" style={{ color: "var(--accent-primary)" }} className="hover:underline">Настройках</Link>.
             </p>
           </div>
         </div>

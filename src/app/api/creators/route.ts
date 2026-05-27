@@ -181,7 +181,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ creators });
+    return NextResponse.json({ isEmpty: creators.length === 0, creators });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   LineChart,
@@ -22,7 +23,6 @@ import { StatCardSkeleton, ChartSkeleton } from "@/components/ui/SkeletonCard";
 import OnboardingWizard from "@/components/ui/OnboardingWizard";
 import { formatViews, formatDate, formatDateShort, formatER, getPlatformColor, getPlatformLabel } from "@/lib/format";
 import { MOCK_DASHBOARD, type DashboardData, type Platform } from "@/lib/mock-data";
-import { cn } from "@/lib/utils";
 
 const tooltipStyle = {
   backgroundColor: "var(--surface-1)",
@@ -32,9 +32,10 @@ const tooltipStyle = {
   fontSize: "12px",
 };
 
-export default function DashboardPage() {
+function DashboardInner() {
   const { data: session } = useSession();
   const role = (session?.user as { role?: string } | undefined)?.role ?? "owner";
+  const searchParams = useSearchParams();
   const [period, setPeriod] = useState<Period>("30d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -44,6 +45,13 @@ export default function DashboardPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isEmpty, setIsEmpty] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+
+  // Auto-open onboarding wizard when redirected with ?openOnboarding=1
+  useEffect(() => {
+    if (searchParams.get("openOnboarding") === "1") {
+      setShowWizard(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     setLoading(true);
@@ -67,11 +75,19 @@ export default function DashboardPage() {
 
   // Show onboarding wizard for empty owner tenants that haven't seen it yet.
   // Creators get a simpler "no videos yet" banner, not the full setup wizard.
+  // Uses DB state (not localStorage) so cross-device/incognito behaviour is correct.
   useEffect(() => {
     if (isEmpty && session?.user && role !== "creator") {
-      const tenantId = (session.user as { tenantId?: string }).tenantId ?? "";
-      const done = localStorage.getItem(`onboarding_done_${tenantId}`);
-      if (!done) setShowWizard(true);
+      fetch("/api/onboarding/state")
+        .then((r) => r.json())
+        .then(({ state }: { state: string | null }) => {
+          if (!state) setShowWizard(true);
+        })
+        .catch(() => {
+          const tenantId = (session.user as { tenantId?: string }).tenantId ?? "";
+          const done = localStorage.getItem(`onboarding_done_${tenantId}`);
+          if (!done) setShowWizard(true);
+        });
     }
   }, [isEmpty, session, role]);
 
@@ -413,16 +429,22 @@ export default function DashboardPage() {
                   </span>
                   <PlatformBadge platform={v.platform as Platform} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <a
-                      href={v.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs transition-colors truncate block"
-                      style={{ color: "var(--text-muted)" }}
-                      title={v.url}
-                    >
-                      {v.url.replace(/^https?:\/\//, "").slice(0, 36)}…
-                    </a>
+                    {isEmpty ? (
+                      <span className="text-xs truncate block" style={{ color: "var(--text-muted)" }}>
+                        🎬 ДЕМО
+                      </span>
+                    ) : (
+                      <a
+                        href={v.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs transition-colors truncate block"
+                        style={{ color: "var(--text-muted)" }}
+                        title={v.url}
+                      >
+                        {v.url.replace(/^https?:\/\//, "").slice(0, 36)}…
+                      </a>
+                    )}
                     <span className="text-[10px]" style={{ color: "var(--text-disabled)" }}>
                       {v.creatorName}
                     </span>
@@ -446,5 +468,13 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardInner />
+    </Suspense>
   );
 }
