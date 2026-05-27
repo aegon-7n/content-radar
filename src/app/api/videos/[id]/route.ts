@@ -23,6 +23,7 @@ export async function GET(
         v.published_at,
         v.creator_id,
         v.product_id,
+        v.fail_streak,
         c.name AS creator_name,
         p.name AS product_name,
         p.wb_article
@@ -43,6 +44,7 @@ export async function GET(
       published_at: string;
       creator_id: string;
       product_id: string;
+      fail_streak: number;
       creator_name: string;
       product_name: string;
       wb_article: string;
@@ -124,6 +126,7 @@ export async function GET(
         productId: row.product_id,
         productName: row.product_name,
         wbArticle: row.wb_article,
+        failStreak: Number(row.fail_streak ?? 0),
       },
       latest,
       history,

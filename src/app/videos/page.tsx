@@ -11,7 +11,7 @@ import { formatViews, formatDate, formatER, getPlatformLabel } from "@/lib/forma
 import { MOCK_VIDEOS, type Video, type Platform } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
-const PLATFORMS = ["tiktok", "instagram", "youtube"] as const;
+const PLATFORMS = ["tiktok", "instagram", "youtube", "likee", "pinterest"] as const;
 const PAGE_SIZE = 10;
 
 type SortKey = "views" | "publishedAt";
@@ -66,7 +66,8 @@ export default function VideosPage() {
         (v) =>
           v.url.toLowerCase().includes(q) ||
           v.creatorName.toLowerCase().includes(q) ||
-          v.productName.toLowerCase().includes(q)
+          v.productName.toLowerCase().includes(q) ||
+          (v.wbArticle ?? "").toLowerCase().includes(q)
       );
     }
     result.sort((a, b) => {
@@ -174,7 +175,7 @@ export default function VideosPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "var(--text-disabled)" }} />
           <input
             type="text"
-            placeholder="Поиск по URL, автору, товару..."
+            placeholder="Поиск по URL, автору, товару, артикулу..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="w-full pl-9 pr-4 py-2 rounded-lg text-xs focus:outline-none transition-colors"
@@ -373,6 +374,19 @@ export default function VideosPage() {
                       >
                         {v.url.replace(/^https?:\/\//, "").slice(0, 40)}
                       </a>
+                      {(v.failStreak ?? 0) >= 3 && (
+                        <span
+                          className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium"
+                          style={{
+                            color: "var(--error-text, #f87171)",
+                            background: "var(--error-bg, rgba(248,113,113,0.1))",
+                            border: "1px solid var(--error-border, rgba(248,113,113,0.2))",
+                          }}
+                          title="Ролик недоступен: удалён или приватный. Скрейпер пропускает его."
+                        >
+                          недоступен
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>

@@ -39,6 +39,7 @@ interface VideoDetail {
     productId: string;
     productName: string;
     wbArticle: string;
+    failStreak?: number;
   };
   latest: {
     views: number;
@@ -385,6 +386,20 @@ export default function VideoDetailPage() {
         <ArrowLeft className="w-3.5 h-3.5" />
         Назад к роликам
       </Link>
+
+      {/* Unavailability banner */}
+      {(video.failStreak ?? 0) >= 3 && (
+        <div
+          className="rounded-xl px-4 py-3 text-sm"
+          style={{
+            color: "var(--error-text, #f87171)",
+            background: "var(--error-bg, rgba(248,113,113,0.08))",
+            border: "1px solid var(--error-border, rgba(248,113,113,0.2))",
+          }}
+        >
+          Ролик недоступен — удалён или переведён в приватный режим. Скрейпер перестал обновлять метрики. Последние данные могут быть устаревшими.
+        </div>
+      )}
 
       {/* Title */}
       <div className="flex items-start justify-between gap-4">
