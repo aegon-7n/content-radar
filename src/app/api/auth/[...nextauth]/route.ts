@@ -111,4 +111,15 @@ const handler = NextAuth({
   secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production",
 });
 
-export { handler as GET, handler as POST };
+const POST = async (req: Request, ctx: unknown) => {
+  try {
+    return await (handler as (req: Request, ctx: unknown) => Promise<Response>)(req, ctx);
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      return Response.json({ error: "Invalid JSON in request body" }, { status: 400 });
+    }
+    throw err;
+  }
+};
+
+export { handler as GET, POST };
