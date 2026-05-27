@@ -14,6 +14,7 @@ import {
   Inbox,
   X,
   UsersRound,
+  Link2,
 } from "lucide-react";
 
 const allNavItems = [
@@ -24,6 +25,7 @@ const allNavItems = [
   { href: "/settings", label: "Настройки", icon: Settings, ownerOnly: true, adminOnly: false },
   { href: "/settings/team", label: "Команда", icon: UsersRound, ownerOnly: true, adminOnly: true },
   { href: "/admin/waitlist", label: "Waitlist", icon: Inbox, ownerOnly: true, adminOnly: true },
+  { href: "/admin/referrals", label: "Рефералы", icon: Link2, ownerOnly: true, adminOnly: true },
 ];
 
 function formatLastSync(iso: string | null): string {

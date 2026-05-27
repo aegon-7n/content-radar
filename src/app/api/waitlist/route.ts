@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { timingSafeEqual } from "node:crypto";
 import { db } from "@/db";
-import { waitlistSignups } from "@/db/schema";
+import { waitlistSignups, referralCodes } from "@/db/schema";
+import { eq, sql as drizzleSql } from "drizzle-orm";
 
 // ─── Rate limiting (in-memory, per IP) ───────────────────────────────────────
 // 5 requests per minute per IP. Resets rolling per-minute window.
@@ -59,6 +60,7 @@ const SubmitSchema = z.object({
   utmContent: z.string().max(128).optional().nullable(),
   utmTerm: z.string().max(128).optional().nullable(),
   referrer: z.string().max(2048).optional().nullable(),
+  referralCode: z.string().max(64).optional().nullable(),
   consent: z.literal(true),
   consentAcceptedAt: z.string().datetime().optional(),
 });
@@ -147,7 +149,8 @@ async function sendTelegramNotification(
   creatorsRange: string,
   source: string | null | undefined,
   utmCampaign: string | null | undefined,
-  insertedId: number
+  insertedId: number,
+  referralCode: string | null | undefined
 ): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -167,6 +170,7 @@ async function sendTelegramNotification(
     `Креаторов: <code>${creatorsRange}</code>\n` +
     `Источник: <code>${source ?? "—"}</code>\n` +
     `Кампания: <code>${utmCampaign ?? "—"}</code>\n` +
+    (referralCode ? `Промокод: <code>${referralCode}</code>\n` : "") +
     `ID: #${insertedId}`;
 
   const res = await fetch(
@@ -243,6 +247,7 @@ export async function POST(request: NextRequest) {
   const {
     email, phone, brand, creatorsRange, source,
     utmSource, utmMedium, utmCampaign, utmContent, utmTerm, referrer,
+    referralCode,
     consentAcceptedAt,
   } = parsed.data;
 
@@ -250,6 +255,9 @@ export async function POST(request: NextRequest) {
   const consentAt = consentAcceptedAt
     ? new Date(consentAcceptedAt)
     : new Date();
+
+  // Normalise referral code — uppercase, trim whitespace
+  const normalizedCode = referralCode ? referralCode.trim().toUpperCase() : null;
 
   const [inserted] = await db
     .insert(waitlistSignups)
@@ -265,17 +273,27 @@ export async function POST(request: NextRequest) {
       utmContent: utmContent ?? null,
       utmTerm: utmTerm ?? null,
       referrer: referrer ?? null,
+      referralCode: normalizedCode,
       consentAcceptedAt: consentAt,
       status: "new",
     })
     .returning({ id: waitlistSignups.id });
+
+  // Increment used_count for the referral code if it exists
+  if (normalizedCode) {
+    await db
+      .update(referralCodes)
+      .set({ usedCount: drizzleSql`${referralCodes.usedCount} + 1` })
+      .where(eq(referralCodes.code, normalizedCode))
+      .catch((err: Error) => console.warn("[waitlist] referral code increment failed:", err.message));
+  }
 
   const insertedId = inserted.id;
 
   // 5 & 6. Notify — both in parallel, wait for both (lids are rare, latency ok)
   await Promise.allSettled([
     sendConfirmationEmail(email, brand),
-    sendTelegramNotification(email, phone, brand, creatorsRange, source, utmCampaign, insertedId),
+    sendTelegramNotification(email, phone, brand, creatorsRange, source, utmCampaign, insertedId, normalizedCode),
   ]);
 
   return NextResponse.json({ ok: true });
