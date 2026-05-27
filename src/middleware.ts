@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 
 const SECRET = process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production";
 
-const KNOWN_PAGE_ROUTES = /^\/($|dashboard$|creators(\/[^/]+)?$|products(\/[^/]+)?$|videos(\/[^/]+)?$|settings(\/team)?$|admin\/waitlist$)/;
+const KNOWN_PAGE_ROUTES = /^\/($|dashboard$|creators(\/[^/]+)?$|products(\/[^/]+)?$|videos(\/[^/]+)?$|settings(\/team)?$|admin\/waitlist$|admin\/referrals$)/;
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

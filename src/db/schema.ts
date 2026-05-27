@@ -159,6 +159,19 @@ export const scraperState = pgTable("scraper_state", {
   lastMessage: text("last_message"),
 });
 
+// ── Referral codes ────────────────────────────────────────────────────────────
+// One row per partner. The code is a short human-readable string (e.g. "TIMOFEY30").
+// used_count is incremented each time a waitlist signup is attributed to the code.
+export const referralCodes = pgTable("referral_codes", {
+  code: text("code").primaryKey(), // e.g. "TIMOFEY30"
+  partnerName: text("partner_name").notNull(), // e.g. "Тимофей"
+  usedCount: integer("used_count").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ReferralCode = typeof referralCodes.$inferSelect;
+export type NewReferralCode = typeof referralCodes.$inferInsert;
+
 // Lead capture from the public landing page. Not linked to users — pre-signup.
 // Append-only: one row per submission, duplicates by email are intentional
 // (a prospect may re-submit with corrected data).
@@ -177,6 +190,7 @@ export const waitlistSignups = pgTable(
     utmContent: text("utm_content"),
     utmTerm: text("utm_term"),
     referrer: text("referrer"),
+    referralCode: text("referral_code"), // optional partner referral code
     consentAcceptedAt: timestamp("consent_accepted_at", {
       withTimezone: true,
     }).notNull(),
