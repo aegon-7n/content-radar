@@ -93,13 +93,69 @@ tail -f /var/log/content-radar/audit.log     # сверка
 3. Если да и расход аномальный → читай [scraper/CLAUDE.md](../scraper/CLAUDE.md) раздел «Известные ловушки».
 4. Вре́менный fix: уменьшить `SCRAPE_HORIZON_DAYS` через env (например, 14 вместо 30).
 
-### «GitHub Actions деплой упал»
+### «GitHub Actions деплой упал / не запустился»
 1. github.com/aegon-7n/content-radar/actions → последний run на `main`.
-2. Какая job упала?
+2. Если у коммита вообще 0 check-runs — GitHub Actions не запустился:
+   - Проверь Settings → Actions → General → убедись что Actions включены.
+   - Проверь Billing → Actions → остаток минут (private repo Free plan = 2000 мин/месяц).
+   - Если минуты кончились: либо апгрейд плана, либо активировать webhook-deploy (см. ниже).
+3. Какая job упала?
    - **`build`** — TypeScript-ошибка или Next.js build provoked. Локально: `npm run build` чтобы воспроизвести.
    - **`python`** — синтаксическая ошибка в `scraper/`. Локально: `python -m compileall scraper`.
-   - **`deploy`** — SSH/rsync не дотянулся до VPS. Проверь GitHub Secrets `DEPLOY_HOST` и `DEPLOY_SSH_KEY`, и что VPS поднят.
-3. Если build на VPS провалился, но Actions показал успех — SSH на VPS, `pm2 logs content-radar --lines 100`.
+   - **`deploy`** — SSH/rsync не дотянулся до VPS. Проверь GitHub Secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_DEPLOY_PATH`, и что VPS поднят.
+4. Если build на VPS провалился, но Actions показал успех — SSH на VPS, `pm2 logs content-radar --lines 100`.
+5. **Ручной деплой как fallback** (выполняется на VPS):
+   ```bash
+   cd /root/content-radar
+   git pull origin main
+   npm ci
+   npm run build
+   npm run db:migrate
+   pm2 reload content-radar --update-env
+   ```
+
+### Деплой через webhook (альтернатива GitHub Actions)
+
+`scripts/webhook-deploy.js` — отдельный Node.js-процесс, который слушает GitHub push-события и запускает деплой. Не требует GitHub Actions minutes и SSH-секретов.
+
+**Первичная настройка (один раз):**
+
+1. Сгенерировать секрет: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+2. Добавить в `/root/content-radar/.env.local`:
+   ```
+   DEPLOY_WEBHOOK_SECRET=<generated-secret>
+   DEPLOY_WEBHOOK_PORT=3001
+   DEPLOY_PATH=/root/content-radar
+   ```
+3. Запустить webhook-сервер как отдельный pm2-процесс:
+   ```bash
+   cd /root/content-radar
+   pm2 start scripts/webhook-deploy.js --name deploy-webhook
+   pm2 save
+   ```
+4. Открыть порт 3001 (если есть firewall):
+   ```bash
+   ufw allow 3001/tcp
+   ```
+5. В GitHub → репо Settings → Webhooks → Add webhook:
+   - Payload URL: `http://<VPS_IP>:3001/webhook`
+   - Content type: `application/json`
+   - Secret: `<DEPLOY_WEBHOOK_SECRET>`
+   - Events: Just the push event ✓
+6. Проверить: `curl http://<VPS_IP>:3001/health` → `{"status":"ok","deploying":false}`
+
+**Мониторинг webhook-деплоя:**
+```bash
+pm2 logs deploy-webhook         # real-time
+tail -f /var/log/content-radar/webhook-deploy.log
+```
+
+**Отключить (если GitHub Actions снова работает):**
+```bash
+pm2 stop deploy-webhook
+pm2 delete deploy-webhook
+pm2 save
+```
 
 ### «Фронт на проде вернул 500»
 1. SSH на VPS → `pm2 logs content-radar --err --lines 100`.
@@ -176,12 +232,14 @@ tail -f /var/log/content-radar/audit.log     # сверка
 
 ## Деплой фронта
 
+### Основной путь: GitHub Actions
+
 GitHub Actions разделён на два воркфлоу:
 
 - **[ci.yml](../.github/workflows/ci.yml)** — запускается на push и PR в `main`: `npm run build` + `python -m compileall scraper`. Не деплоит.
 - **[deploy.yml](../.github/workflows/deploy.yml)** — запускается только на push в `main` (или вручную через `workflow_dispatch`). Деплоит на VPS через SSH:
   1. `git pull origin main`
-  2. `npm ci --omit=dev`
+  2. `npm ci`
   3. `npm run build`
   4. `npm run db:migrate` — применяет Drizzle-миграции
   5. `pm2 reload content-radar --update-env` — graceful reload без даунтайма
@@ -191,6 +249,8 @@ GitHub Actions разделён на два воркфлоу:
 - `VPS_USER` — SSH-пользователь (обычно `root`).
 - `VPS_SSH_KEY` — приватный SSH-ключ (содержимое `~/.ssh/id_ed25519` или аналогичного).
 - `VPS_DEPLOY_PATH` — полный путь к репо на VPS (например `/root/content-radar`).
+
+**Если Actions не запускается** (0 check-runs на merge-коммите) — проверь Settings → Actions, и что Actions-минуты не исчерпаны. Альтернатива: webhook-deploy (см. выше «Деплой через webhook»).
 
 Откатить деплой:
 - `git revert <bad-commit>` → push в `main` → новый автоматический деплой с откатом.
