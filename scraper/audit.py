@@ -250,7 +250,7 @@ def main() -> int:
     with _conn() as c, c.cursor() as cur:
         cur.execute("""
             SELECT id, name,
-                   tiktok_username, youtube_channel_id, instagram_username, pinterest_username
+                   tiktok_username, youtube_channel_id, instagram_username
             FROM creators
             ORDER BY name
         """)
@@ -261,14 +261,16 @@ def main() -> int:
     total_gap = 0
     total_fail = 0
     total_ok = 0
-    for cid, name, tt, yt, ig, pin in creators:
+    # Pinterest is excluded — its RSS feed is frequently blocked and it is not
+    # a production-scraped platform; counting its failures inflated fail_rate
+    # above the hard-fail threshold and kept health stuck at "degraded".
+    for cid, name, tt, yt, ig in creators:
         db = db_counts(cid)
 
         for platform, real in (
             ("tiktok",    tiktok_count(tt)),
             ("youtube",   youtube_count(yt)),
             ("instagram", instagram_count(ig)),
-            ("pinterest", pinterest_count(pin)),
         ):
             db_n = db.get(platform, 0)
 
