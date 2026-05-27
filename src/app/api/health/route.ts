@@ -117,17 +117,20 @@ export async function GET(request: NextRequest) {
 
     const healthy = jobs.every((j) => j.status === "ok" && !j.stale);
 
-    return NextResponse.json({
-      status: healthy ? "ok" : "degraded",
-      totals: {
-        videos: c.total_videos,
-        creators: c.total_creators,
-        products: c.total_products,
+    return NextResponse.json(
+      {
+        status: healthy ? "ok" : "degraded",
+        totals: {
+          videos: c.total_videos,
+          creators: c.total_creators,
+          products: c.total_products,
+        },
+        lastMetricAt: c.last_metric_at,
+        jobs,
+        now: new Date().toISOString(),
       },
-      lastMetricAt: c.last_metric_at,
-      jobs,
-      now: new Date().toISOString(),
-    });
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     console.error("[health] error:", error);
     return NextResponse.json(
