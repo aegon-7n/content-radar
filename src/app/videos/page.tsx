@@ -66,7 +66,8 @@ export default function VideosPage() {
         (v) =>
           v.url.toLowerCase().includes(q) ||
           v.creatorName.toLowerCase().includes(q) ||
-          v.productName.toLowerCase().includes(q)
+          v.productName.toLowerCase().includes(q) ||
+          (v.wbArticle ?? "").toLowerCase().includes(q)
       );
     }
     result.sort((a, b) => {
@@ -174,7 +175,7 @@ export default function VideosPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "var(--text-disabled)" }} />
           <input
             type="text"
-            placeholder="Поиск по URL, автору, товару..."
+            placeholder="Поиск по URL, автору, товару, артикулу..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="w-full pl-9 pr-4 py-2 rounded-lg text-xs focus:outline-none transition-colors"
