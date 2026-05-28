@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { Suspense, useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Users, Package, Film, Upload, CreditCard } from "lucide-react";
 import Toast, { ToastState } from "./_components/Toast";
@@ -21,6 +21,17 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function SettingsPage() {
+  // useSearchParams() must be wrapped in <Suspense> to avoid the CSR-bailout
+  // prerender error in Next.js 14 App Router. Without this, the build fails
+  // to emit .next/prerender-manifest.json and the prod app refuses to start.
+  return (
+    <Suspense fallback={null}>
+      <SettingsContent />
+    </Suspense>
+  );
+}
+
+function SettingsContent() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     const tab = searchParams.get("tab");
