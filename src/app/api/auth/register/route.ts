@@ -86,67 +86,79 @@ export async function POST(request: NextRequest) {
 
   const { email, name, companyName, password } = parsed.data;
 
-  const existing = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
-
-  if (existing.length > 0) {
-    return NextResponse.json(
-      { error: "Пользователь с таким email уже существует" },
-      { status: 409 },
-    );
-  }
-
-  const passwordHash = await bcrypt.hash(password, 12);
-
-  const slug = slugify(companyName) || `tenant-${Date.now()}`;
-
-  let result: { tenant: (typeof tenants)["$inferSelect"]; user: (typeof users)["$inferSelect"] };
   try {
-    result = await db.transaction(async (tx) => {
-      const [tenant] = await tx
-        .insert(tenants)
-        .values({ name: companyName, slug })
-        .returning();
+    const existing = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
 
-      const [user] = await tx
-        .insert(users)
-        .values({
-          tenantId: tenant.id,
-          email,
-          name,
-          role: "owner",
-          passwordHash,
-        })
-        .returning();
-
-      return { tenant, user };
-    });
-  } catch (err) {
-    if (isUniqueViolation(err)) {
+    if (existing.length > 0) {
       return NextResponse.json(
-        { error: "Компания с таким названием уже зарегистрирована" },
+        { error: "Пользователь с таким email уже существует" },
         { status: 409 },
       );
     }
-    throw err;
-  }
 
-  // Fire-and-forget: TG notification + welcome email. Skips internal smoke/QA traffic.
-  void notifySignup({ email, name, companyName });
-  if (!/^(krab[-+]|e2e\+|test@|\S+@contentradar\.local$)/i.test(email)) {
-    void sendWelcomeEmail({ email, firstName: name });
-  }
+    const passwordHash = await bcrypt.hash(password, 12);
 
-  return NextResponse.json(
-    {
-      tenant: { id: result.tenant.id, name: result.tenant.name, slug: result.tenant.slug },
-      user: { id: result.user.id, email: result.user.email, name: result.user.name, role: result.user.role },
-    },
-    { status: 201 },
-  );
+    const slug = slugify(companyName) || `tenant-${Date.now()}`;
+
+    let result: { tenant: (typeof tenants)["$inferSelect"]; user: (typeof users)["$inferSelect"] };
+    try {
+      result = await db.transaction(async (tx) => {
+        const [tenant] = await tx
+          .insert(tenants)
+          .values({ name: companyName, slug })
+          .returning();
+
+        const [user] = await tx
+          .insert(users)
+          .values({
+            tenantId: tenant.id,
+            email,
+            name,
+            role: "owner",
+            passwordHash,
+          })
+          .returning();
+
+        return { tenant, user };
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        return NextResponse.json(
+          { error: "Компания с таким названием уже зарегистрирована" },
+          { status: 409 },
+        );
+      }
+      console.error("[register] DB error:", err);
+      return NextResponse.json(
+        { error: "Ошибка при создании аккаунта. Попробуйте позже." },
+        { status: 500 },
+      );
+    }
+
+    // Fire-and-forget: TG notification + welcome email. Skips internal smoke/QA traffic.
+    void notifySignup({ email, name, companyName });
+    if (!/^(krab[-+]|e2e\+|test@|\S+@contentradar\.local$)/i.test(email)) {
+      void sendWelcomeEmail({ email, firstName: name });
+    }
+
+    return NextResponse.json(
+      {
+        tenant: { id: result.tenant.id, name: result.tenant.name, slug: result.tenant.slug },
+        user: { id: result.user.id, email: result.user.email, name: result.user.name, role: result.user.role },
+      },
+      { status: 201 },
+    );
+  } catch (err) {
+    console.error("[register] Unexpected error:", err);
+    return NextResponse.json(
+      { error: "Ошибка при создании аккаунта. Попробуйте позже." },
+      { status: 500 },
+    );
+  }
 }
 
 async function notifySignup(s: { email: string; name: string; companyName: string }): Promise<void> {
