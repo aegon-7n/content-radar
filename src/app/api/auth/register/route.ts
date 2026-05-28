@@ -202,10 +202,14 @@ function escapeHtml(s: string): string {
 }
 
 function isUniqueViolation(err: unknown): boolean {
+  return isPgUniqueError(err) || isPgUniqueError((err as { cause?: unknown })?.cause);
+}
+
+function isPgUniqueError(e: unknown): boolean {
   return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code: unknown }).code === "23505"
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code: unknown }).code === "23505"
   );
 }
