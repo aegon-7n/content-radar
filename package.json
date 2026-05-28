@@ -11,7 +11,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed": "npx tsx src/db/seed.ts",
-    "onboard": "npx tsx scripts/onboard-tenant.ts"
+    "onboard": "npx tsx scripts/onboard-tenant.ts",
+    "db:seed-qa": "npx tsx scripts/seed-qa-smoke-tenant.ts"
   },
   "keywords": [],
   "author": "",
