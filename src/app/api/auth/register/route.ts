@@ -6,6 +6,40 @@ import { tenants, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { sendWelcomeEmail } from "@/lib/email/welcome";
 
+// ─── Rate limiting for registration (OWASP A07:2021) ─────────────────────────
+// 5 attempts per 15 minutes per IP. Registration is rarer than login, so
+// threshold is lower to prevent account-spam without CAPTCHA.
+const registerRateLimitMap = new Map<string, { count: number; windowStart: number }>();
+const REGISTER_RATE_LIMIT_MAX = 5;
+const REGISTER_RATE_LIMIT_WINDOW_MS = 15 * 60_000;
+
+function checkRegisterRateLimit(ip: string): { allowed: boolean; retryAfterSecs?: number } {
+  const now = Date.now();
+
+  if (Math.random() < 0.02) {
+    for (const [key, entry] of registerRateLimitMap) {
+      if (now - entry.windowStart > REGISTER_RATE_LIMIT_WINDOW_MS * 2) {
+        registerRateLimitMap.delete(key);
+      }
+    }
+  }
+
+  const entry = registerRateLimitMap.get(ip);
+
+  if (!entry || now - entry.windowStart > REGISTER_RATE_LIMIT_WINDOW_MS) {
+    registerRateLimitMap.set(ip, { count: 1, windowStart: now });
+    return { allowed: true };
+  }
+
+  if (entry.count >= REGISTER_RATE_LIMIT_MAX) {
+    const retryAfterSecs = Math.ceil((entry.windowStart + REGISTER_RATE_LIMIT_WINDOW_MS - now) / 1000);
+    return { allowed: false, retryAfterSecs };
+  }
+
+  entry.count += 1;
+  return { allowed: true };
+}
+
 const RegisterSchema = z.object({
   email: z.string().email("Некорректный email"),
   name: z.string().min(1, "Имя обязательно"),
@@ -23,6 +57,18 @@ function slugify(name: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  const ip =
+    request.headers.get("x-real-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "unknown";
+  const { allowed, retryAfterSecs } = checkRegisterRateLimit(ip);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "too many requests" },
+      { status: 429, headers: { "Retry-After": String(retryAfterSecs ?? REGISTER_RATE_LIMIT_WINDOW_MS / 1000) } },
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
