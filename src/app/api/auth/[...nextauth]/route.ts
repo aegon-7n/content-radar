@@ -5,6 +5,40 @@ import { db } from "@/db";
 import { adminSettings, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
+// ─── Rate limiting for credential login (OWASP A07:2021) ─────────────────────
+// 10 attempts per 15 minutes per IP. Stops headless-browser brute-force that
+// bypasses CSRF (attacker has valid cookie from same origin).
+const authRateLimitMap = new Map<string, { count: number; windowStart: number }>();
+const AUTH_RATE_LIMIT_MAX = 10;
+const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60_000;
+
+function checkAuthRateLimit(ip: string): { allowed: boolean; retryAfterSecs?: number } {
+  const now = Date.now();
+
+  if (Math.random() < 0.02) {
+    for (const [key, entry] of authRateLimitMap) {
+      if (now - entry.windowStart > AUTH_RATE_LIMIT_WINDOW_MS * 2) {
+        authRateLimitMap.delete(key);
+      }
+    }
+  }
+
+  const entry = authRateLimitMap.get(ip);
+
+  if (!entry || now - entry.windowStart > AUTH_RATE_LIMIT_WINDOW_MS) {
+    authRateLimitMap.set(ip, { count: 1, windowStart: now });
+    return { allowed: true };
+  }
+
+  if (entry.count >= AUTH_RATE_LIMIT_MAX) {
+    const retryAfterSecs = Math.ceil((entry.windowStart + AUTH_RATE_LIMIT_WINDOW_MS - now) / 1000);
+    return { allowed: false, retryAfterSecs };
+  }
+
+  entry.count += 1;
+  return { allowed: true };
+}
+
 const handler = NextAuth({
   providers: [
     CredentialsProvider({
@@ -112,6 +146,21 @@ const handler = NextAuth({
 });
 
 const POST = async (req: Request, ctx: unknown) => {
+  const url = new URL(req.url);
+  if (url.pathname === "/api/auth/callback/credentials") {
+    const ip =
+      req.headers.get("x-real-ip") ??
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      "unknown";
+    const { allowed, retryAfterSecs } = checkAuthRateLimit(ip);
+    if (!allowed) {
+      return Response.json(
+        { error: "too many requests" },
+        { status: 429, headers: { "Retry-After": String(retryAfterSecs ?? AUTH_RATE_LIMIT_WINDOW_MS / 1000) } }
+      );
+    }
+  }
+
   try {
     return await (handler as (req: Request, ctx: unknown) => Promise<Response>)(req, ctx);
   } catch (err) {
