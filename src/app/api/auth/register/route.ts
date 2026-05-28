@@ -150,8 +150,15 @@ export async function POST(request: NextRequest) {
 }
 
 async function notifySignup(s: { email: string; name: string; companyName: string }): Promise<void> {
-  // Internal smoke emails — keep TG quiet
-  if (/^(krab[-+]|e2e\+|test@|\S+@contentradar\.local$)/i.test(s.email)) return;
+  // Internal smoke / QA traffic — keep TG quiet
+  const email = s.email.toLowerCase();
+  // (1) test/disposable domains: anything on example/example.com/mailinator etc.
+  const TEST_DOMAINS = ["example.com", "example.org", "example.net", "mailinator.com", "ex.com", "contentradar.local", "test.local"];
+  if (TEST_DOMAINS.some((d) => email.endsWith("@" + d))) return;
+  // (2) prefix / pattern based: Krab's smoke, agent QA, rate-limit probes
+  if (/^(krab[-+.]|e2e[-+.]|prelaunch[-+.]|garry[-+.]|harry[-+.]|debug\d*[-+_.@]|ratetest\d*[-+_.@]|rltest\d*[-+_.@]|usera[-+_.@\d]|userb[-+_.@\d]|smoke[-+_.@]|qa[-+.@]|test@|test[-+.])/i.test(email)) return;
+  // (3) name contains explicit test-marker (helps when bots use real-looking emails)
+  if (/\b(smoke|rate[\s_-]?test|qa[\s_-]?test|debug[\s_-]?test)\b/i.test(s.name)) return;
 
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
