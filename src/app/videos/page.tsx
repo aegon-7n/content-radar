@@ -11,7 +11,7 @@ import { formatViews, formatDate, formatER, getPlatformLabel } from "@/lib/forma
 import { MOCK_VIDEOS, type Video, type Platform } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
-const PLATFORMS = ["tiktok", "instagram", "youtube", "likee", "pinterest"] as const;
+const PLATFORMS = ["tiktok", "instagram", "youtube"] as const;
 const PAGE_SIZE = 10;
 
 type SortKey = "views" | "publishedAt";
