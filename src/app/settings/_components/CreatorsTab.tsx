@@ -301,8 +301,8 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
                 {
                   key: "youtubeChannelId",
                   label: "YouTube канал",
-                  placeholder: "@handle, ссылка или UC...",
-                  help: "Подойдёт @handle, ссылка youtube.com/@… или Channel ID UC… — мы сами найдём правильный ID.",
+                  placeholder: "UC...",
+                  help: "Channel ID канала — формат UC… Найти: YouTube Studio → Настройки → Сведения о канале.",
                   hasTooltip: true,
                 },
                 {
