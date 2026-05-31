@@ -1,0 +1,38 @@
+name: Seed QA Smoke Account
+
+# One-shot manual trigger to create/update the qa-smoke@contentradar.app account on prod.
+# SSHs to VPS, runs the idempotent seed script, prints credentials to job summary.
+# After running: copy QA_SMOKE_EMAIL + QA_SMOKE_PASSWORD from the summary to GitHub Secrets.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rotate_password:
+        description: "Rotate password even if QA_SMOKE_PASSWORD secret is set (true/false)"
+        required: false
+        default: "false"
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: SSH to VPS and run seed script
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd ${{ secrets.VPS_DEPLOY_PATH || '/root/content-radar' }}
+
+            # If QA_SMOKE_PASSWORD secret exists and rotation not requested, pass it through
+            # to keep the password stable across CI runs.
+            if [ -n "$QA_SMOKE_PASSWORD" ] && [ "$ROTATE" != "true" ]; then
+              export QA_SMOKE_PASSWORD="$QA_SMOKE_PASSWORD"
+            fi
+
+            npm run db:seed-qa
+        env:
+          QA_SMOKE_PASSWORD: ${{ secrets.QA_SMOKE_PASSWORD }}
+          ROTATE: ${{ inputs.rotate_password }}
