@@ -8,7 +8,7 @@
 
 - [ ] **CI/CD**: push в main → GitHub Actions build → auto-deploy на сервер (SSH + PM2 restart). Убрать ручной scp.
 - [x] **Auto-rescrape retry**: если видео failed 3 ночи подряд → пометить `permanently_unavailable`, не тратить API calls. _(failStreak реализован в scraper; `>= 3` → пропуск; UI: тег «недоступен»)_
-- [ ] **UI для ru_cross_border_block**: показывать недоступные видео в `/videos` с тегом "недоступно в регионе". _(отличается от failStreak — это geo-блок, не удаление ролика)_
+- [x] **UI для ru_cross_border_block**: показывать недоступные видео в `/videos` с тегом "недоступно в регионе". _(отличается от failStreak — это geo-блок, не удаление ролика)_ _(PR #52, TRU-276)_
 
 ## Высокий приоритет (блокирует монетизацию)
 
