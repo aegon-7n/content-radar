@@ -9,7 +9,7 @@ app/         маршруты (страницы + API)
 components/  переиспользуемая UI (layout, ui-kit, providers)
 db/          drizzle-схема и подключение (см. src/db/CLAUDE.md)
 lib/         утилиты форматирования, моки, helpers
-middleware.ts  next-auth guard на все маршруты кроме /login, /api/auth, /api/health, /api/forgot-password, /api/reset-password, /api/scrape, /api/waitlist, /api/billing/webhooks, статика
+middleware.ts  next-auth guard на все маршруты кроме /login, /api/auth, /api/forgot-password, /api/reset-password, /api/scrape, /api/waitlist, /api/billing/webhooks, статика
 types/       глобальные .d.ts
 ```
 
@@ -78,7 +78,7 @@ types/       глобальные .d.ts
 **Получение данных.** Страницы **никогда** не ходят в БД напрямую — только через `fetch('/api/...')`. Вся работа с Drizzle живёт в `app/api/*/route.ts`. На сетевой ошибке UI падает на `mock-data.ts` чтобы не показывать пустоту в деве.
 
 **Аутентификация (defense in depth).** Два слоя:
-1. [middleware.ts](middleware.ts) — `getToken` из `next-auth/jwt`, fail-closed (try/catch → 401). Все маршруты требуют JWT-токен, кроме allowlist: `/login`, `/invite`, `/forgot-password`, `/reset-password`, `/robots.txt`, `/sitemap.xml`, `/api/auth`, `/api/health`, `/api/forgot-password`, `/api/reset-password`, `/api/scrape`, `/api/waitlist`, `/api/billing/webhooks`, статика.
+1. [middleware.ts](middleware.ts) — `getToken` из `next-auth/jwt`, fail-closed (try/catch → 401). Все маршруты требуют JWT-токен, кроме allowlist: `/login`, `/invite`, `/forgot-password`, `/reset-password`, `/robots.txt`, `/sitemap.xml`, `/api/auth`, `/api/forgot-password`, `/api/reset-password`, `/api/scrape`, `/api/waitlist`, `/api/billing/webhooks`, статика.
 2. Route-level guard — каждый API handler вызывает `requireAuthWithTenant(request)` из `lib/tenant.ts` перед любой логикой. Возвращает `{ userId, tenantId }`. Если middleware упадёт/пропустит, хендлер сам вернёт 401. `tenant_id` берётся из JWT (запекается при логине) — per-request DB lookup не нужен.
 
 Новые API-маршруты **обязаны** вызвать `requireAuthWithTenant` (из `lib/tenant.ts`) в каждом экспортируемом handler и скоупить все запросы по `tenantId`. Для owner-only маршрутов используй `requireOwner(request)` из того же файла — проверяет `role === 'owner'` из JWT. Для публичного маршрута — добавить в `config.matcher` allowlist и не вызывать `requireAuthWithTenant`.
