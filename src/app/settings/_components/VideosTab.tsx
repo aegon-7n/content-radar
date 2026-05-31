@@ -125,6 +125,7 @@ export default function VideosTab({ showToast }: VideosTabProps) {
     const publishedAt = new Date().toISOString();
     let successCount = 0;
     let errorCount = 0;
+    let quotaNearLimit = false;
 
     for (let i = 0; i < parsedUrls.length; i++) {
       const { url, platform } = parsedUrls[i];
@@ -141,8 +142,13 @@ export default function VideosTab({ showToast }: VideosTabProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url, platform, creatorId, productId, publishedAt }),
         });
-        if (res.ok) successCount++;
-        else errorCount++;
+        if (res.ok) {
+          successCount++;
+          const data = await res.json().catch(() => ({}));
+          if (data?.quota?.nearLimit) quotaNearLimit = true;
+        } else {
+          errorCount++;
+        }
       } catch {
         errorCount++;
       }
@@ -153,6 +159,7 @@ export default function VideosTab({ showToast }: VideosTabProps) {
 
     if (errorCount === 0) {
       showToast(`Добавлено ${successCount} ${successCount === 1 ? "ролик" : successCount < 5 ? "ролика" : "роликов"}`, "success");
+      if (quotaNearLimit) showToast("Использовано 80%+ лимита роликов для этого креатора", "error");
       setUrlsText("");
       setCreatorId("");
       setProductId("");

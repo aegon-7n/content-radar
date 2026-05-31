@@ -58,12 +58,14 @@ export async function GET(request: NextRequest) {
             )
           );
         const used = Number(row?.count ?? 0);
+        const lim = c.videoLimit ?? null;
         return {
           id: c.id,
           name: c.name,
-          videoLimit: c.videoLimit ?? null,
+          videoLimit: lim,
           videosUsed: used,
-          atLimit: c.videoLimit !== null && used >= c.videoLimit,
+          nearLimit: lim !== null && used >= Math.floor(lim * 0.8) && used < lim,
+          atLimit: lim !== null && used >= lim,
         };
       })
     );
