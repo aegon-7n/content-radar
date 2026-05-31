@@ -11,6 +11,7 @@ const querySchema = z.object({
   creatorId: z.string().uuid().optional(),
   productId: z.string().uuid().optional(),
   platform: z.enum(PLATFORM_VALUES).optional(),
+  format: z.enum(["csv", "xlsx"]).optional().default("csv"),
 });
 
 export async function GET(request: NextRequest) {
@@ -94,11 +95,57 @@ export async function GET(request: NextRequest) {
 
     const rows = videosResult as unknown as VideoRow[];
 
+    const exportDate = new Date().toISOString().slice(0, 10);
+
+    const statusLabel = (row: VideoRow) =>
+      Number(row.fail_streak ?? 0) >= 3
+        ? row.platform === "tiktok"
+          ? "недоступно в регионе"
+          : "недоступен"
+        : "";
+
+    if (params.format === "xlsx") {
+      const XLSX = await import("xlsx");
+
+      const header = [
+        "url", "platform", "views", "likes", "comments", "shares", "saves",
+        "creator", "product", "wb_article", "published_at", "status",
+      ];
+
+      const data = rows.map((row) => [
+        row.url,
+        row.platform,
+        Number(row.views),
+        Number(row.likes),
+        Number(row.comments),
+        Number(row.shares),
+        Number(row.saves),
+        row.creator_name,
+        row.product_name,
+        row.wb_article,
+        new Date(row.published_at).toISOString(),
+        statusLabel(row),
+      ]);
+
+      const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Videos");
+
+      const arr = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as Uint8Array;
+
+      return new NextResponse(arr.buffer as ArrayBuffer, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="videos-export-${exportDate}.xlsx"`,
+        },
+      });
+    }
+
     const csvHeader = "url,platform,views,likes,comments,shares,saves,creator,product,wb_article,published_at,status";
 
     const escapeField = (value: string | number): string => {
       const str = String(value);
-      // Wrap in quotes if the field contains comma, quote, or newline
       if (str.includes(",") || str.includes('"') || str.includes("\n")) {
         return `"${str.replace(/"/g, '""')}"`;
       }
@@ -118,16 +165,12 @@ export async function GET(request: NextRequest) {
         escapeField(row.product_name),
         escapeField(row.wb_article),
         escapeField(new Date(row.published_at).toISOString()),
-        escapeField(Number(row.fail_streak ?? 0) >= 3
-          ? (row.platform === "tiktok" ? "недоступно в регионе" : "недоступен")
-          : ""),
+        escapeField(statusLabel(row)),
       ].join(",")
     );
 
     // BOM + header + rows
-    const csvContent = "\uFEFF" + [csvHeader, ...csvRows].join("\n");
-
-    const exportDate = new Date().toISOString().slice(0, 10);
+    const csvContent = "﻿" + [csvHeader, ...csvRows].join("\n");
 
     return new NextResponse(csvContent, {
       status: 200,
