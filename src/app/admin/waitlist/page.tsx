@@ -106,22 +106,19 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 interface PageProps {
-  searchParams: Promise<{ status?: string; campaign?: string; ref?: string }>;
+  searchParams: Promise<{ status?: string; campaign?: string }>;
 }
 
 export default async function WaitlistPage({ searchParams }: PageProps) {
-  const { status: statusFilter, campaign: campaignFilter, ref: refFilter } = await searchParams;
+  const { status: statusFilter, campaign: campaignFilter } = await searchParams;
 
-  // Build query — filter by status, utm_campaign, and/or referral_code
+  // Build query — filter by status and/or utm_campaign
   const conditions = [];
   if (statusFilter && isValidStatus(statusFilter)) {
     conditions.push(eq(waitlistSignups.status, statusFilter));
   }
   if (campaignFilter) {
     conditions.push(eq(waitlistSignups.utmCampaign, campaignFilter));
-  }
-  if (refFilter) {
-    conditions.push(eq(waitlistSignups.referralCode, refFilter));
   }
 
   const rows: WaitlistSignup[] = conditions.length > 0
@@ -154,16 +151,6 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
     .orderBy(waitlistSignups.utmCampaign);
   const campaigns = campaignRows
     .map((r) => r.campaign)
-    .filter((c): c is string => c !== null);
-
-  // Distinct referral codes for filter
-  const refCodeRows = await db
-    .selectDistinct({ code: waitlistSignups.referralCode })
-    .from(waitlistSignups)
-    .where(isNotNull(waitlistSignups.referralCode))
-    .orderBy(waitlistSignups.referralCode);
-  const refCodes = refCodeRows
-    .map((r) => r.code)
     .filter((c): c is string => c !== null);
 
   const total = totals?.total ?? 0;
@@ -225,7 +212,6 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
             const params = new URLSearchParams();
             if (tab.value) params.set("status", tab.value);
             if (campaignFilter) params.set("campaign", campaignFilter);
-            if (refFilter) params.set("ref", refFilter);
             const qs = params.toString();
             const href = `/admin/waitlist${qs ? `?${qs}` : ""}`;
             return (
@@ -264,7 +250,6 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
                   const params = new URLSearchParams();
                   if (statusFilter) params.set("status", statusFilter);
                   if (tab.value) params.set("campaign", tab.value);
-                  if (refFilter) params.set("ref", refFilter);
                   const qs = params.toString();
                   const href = `/admin/waitlist${qs ? `?${qs}` : ""}`;
                   return (
@@ -287,47 +272,6 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
           </div>
         )}
 
-        {/* Referral code filter */}
-        {refCodes.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Реферал:
-            </span>
-            <div
-              className="flex items-center gap-1 p-1 rounded-xl w-fit"
-              style={{
-                background: "var(--surface-1)",
-                border: "1px solid var(--border-default)",
-              }}
-            >
-              {[{ value: "", label: "Все" }, ...refCodes.map((c) => ({ value: c, label: c }))].map(
-                (tab) => {
-                  const isActive = (refFilter ?? "") === tab.value;
-                  const params = new URLSearchParams();
-                  if (statusFilter) params.set("status", statusFilter);
-                  if (campaignFilter) params.set("campaign", campaignFilter);
-                  if (tab.value) params.set("ref", tab.value);
-                  const qs = params.toString();
-                  const href = `/admin/waitlist${qs ? `?${qs}` : ""}`;
-                  return (
-                    <a
-                      key={tab.value}
-                      href={href}
-                      className="px-3.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all"
-                      style={{
-                        background: isActive ? "var(--surface-3)" : "transparent",
-                        color: isActive ? "var(--accent-text)" : "var(--text-muted)",
-                        textDecoration: "none",
-                      }}
-                    >
-                      {tab.label}
-                    </a>
-                  );
-                },
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Table / empty state */}
@@ -375,7 +319,6 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
                     "Бренд",
                     "Креаторов",
                     "Источник",
-                    "Реферал",
                     "Кампания",
                     "Статус",
                   ].map((h) => (
@@ -449,14 +392,6 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
                       style={{ color: "var(--text-muted)" }}
                     >
                       {row.source ?? "—"}
-                    </td>
-
-                    {/* Referral code */}
-                    <td
-                      className="px-4 py-3 whitespace-nowrap text-xs font-mono"
-                      style={{ color: row.referralCode ? "var(--accent-text)" : "var(--text-muted)" }}
-                    >
-                      {row.referralCode ?? "—"}
                     </td>
 
                     {/* UTM Campaign */}

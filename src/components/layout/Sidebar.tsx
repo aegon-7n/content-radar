@@ -14,7 +14,6 @@ import {
   Inbox,
   X,
   UsersRound,
-  Link2,
 } from "lucide-react";
 
 const allNavItems = [
