@@ -389,16 +389,29 @@ export default function VideoDetailPage() {
 
       {/* Unavailability banner */}
       {(video.failStreak ?? 0) >= 3 && (
-        <div
-          className="rounded-xl px-4 py-3 text-sm"
-          style={{
-            color: "var(--error-text, #f87171)",
-            background: "var(--error-bg, rgba(248,113,113,0.08))",
-            border: "1px solid var(--error-border, rgba(248,113,113,0.2))",
-          }}
-        >
-          Ролик недоступен — удалён или переведён в приватный режим. Скрейпер перестал обновлять метрики. Последние данные могут быть устаревшими.
-        </div>
+        video.platform === "tiktok" ? (
+          <div
+            className="rounded-xl px-4 py-3 text-sm"
+            style={{
+              color: "#f59e0b",
+              background: "rgba(245,158,11,0.08)",
+              border: "1px solid rgba(245,158,11,0.2)",
+            }}
+          >
+            Ролик недоступен из региона — TikTok блокирует российские IP без VPN-туннеля. Скрейпер не обновляет метрики. Последние данные могут быть устаревшими.
+          </div>
+        ) : (
+          <div
+            className="rounded-xl px-4 py-3 text-sm"
+            style={{
+              color: "var(--error-text, #f87171)",
+              background: "var(--error-bg, rgba(248,113,113,0.08))",
+              border: "1px solid var(--error-border, rgba(248,113,113,0.2))",
+            }}
+          >
+            Ролик недоступен — удалён или переведён в приватный режим. Скрейпер перестал обновлять метрики. Последние данные могут быть устаревшими.
+          </div>
+        )
       )}
 
       {/* Title */}
