@@ -11,7 +11,6 @@ import {
   Video,
   Settings,
   Radio,
-  Inbox,
   X,
   UsersRound,
 } from "lucide-react";
@@ -22,7 +21,7 @@ const allNavItems = [
   { href: "/products", label: "Товары", icon: Package, ownerOnly: false, adminOnly: false },
   { href: "/videos", label: "Ролики", icon: Video, ownerOnly: false, adminOnly: false },
   { href: "/settings", label: "Настройки", icon: Settings, ownerOnly: true, adminOnly: false },
-  { href: "/settings/team", label: "Команда", icon: UsersRound, ownerOnly: true, adminOnly: true },
+  { href: "/settings/team", label: "Команда", icon: UsersRound, ownerOnly: true, adminOnly: false },
   // Admin/Waitlist и Admin/Рефералы скрыты из sidebar по решению Глеба 2026-05-31:
   // фичи Гарри добавил без согласования, нужно сначала обсудить нужны ли вообще.
   // Страницы остаются доступными по прямой ссылке (admin-only middleware).
