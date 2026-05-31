@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { creators, videos } from "@/db/schema";
-import { eq, count } from "drizzle-orm";
+import { eq, count, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthWithTenant } from "@/lib/tenant";
 import { resolveYouTubeChannelId, YouTubeResolveError } from "@/lib/youtube";
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         videoCount: count(videos.id),
       })
       .from(creators)
-      .where(eq(creators.tenantId, tenantId))
+      .where(and(eq(creators.tenantId, tenantId), isNull(creators.archivedAt)))
       .leftJoin(videos, eq(videos.creatorId, creators.id))
       .groupBy(
         creators.id,

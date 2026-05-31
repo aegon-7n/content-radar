@@ -89,10 +89,13 @@ def get_creators(cur) -> list[dict]:
                c.pinterest_username
         FROM creators c
         JOIN users u ON u.id = c.user_id
-        WHERE c.tiktok_username IS NOT NULL
-           OR c.youtube_channel_id IS NOT NULL
-           OR c.instagram_username IS NOT NULL
-           OR c.pinterest_username IS NOT NULL
+        WHERE c.archived_at IS NULL
+          AND (
+               c.tiktok_username IS NOT NULL
+            OR c.youtube_channel_id IS NOT NULL
+            OR c.instagram_username IS NOT NULL
+            OR c.pinterest_username IS NOT NULL
+          )
     """)
     return [dict(r) for r in cur.fetchall()]
 

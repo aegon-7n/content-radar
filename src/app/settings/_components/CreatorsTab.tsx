@@ -114,7 +114,11 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
   }
 
   async function handleDelete(c: Creator) {
-    if (!window.confirm(`Удалить "${c.name}"?`)) return;
+    const hasVideos = (c.videoCount ?? 0) > 0;
+    const prompt = hasVideos
+      ? `У "${c.name}" уже есть ролики в истории — они останутся для аналитики, но креатор уйдёт из активного списка и со скрейпера. Продолжить?`
+      : `Удалить "${c.name}"?`;
+    if (!window.confirm(prompt)) return;
     try {
       const res = await fetch(`/api/settings/creators/${c.id}`, { method: "DELETE" });
       const data = await res.json();
@@ -122,7 +126,7 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
         showToast(data.error ?? "Ошибка удаления", "error");
         return;
       }
-      showToast("Креатор удалён", "success");
+      showToast(data.archived ? "Креатор архивирован (история сохранена)" : "Креатор удалён", "success");
       load();
     } catch {
       showToast("Ошибка сети", "error");

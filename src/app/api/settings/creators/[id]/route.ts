@@ -173,11 +173,14 @@ export async function DELETE(
       .from(videos)
       .where(eq(videos.creatorId, id));
 
+    // Soft-delete if videos exist (preserves history + frees handles like
+    // youtube_channel_id for a new creator on the same channel).
     if (Number(videoCount[0].count) > 0) {
-      return NextResponse.json(
-        { error: "Нельзя удалить: есть ролики" },
-        { status: 409 }
-      );
+      await db
+        .update(creators)
+        .set({ archivedAt: new Date() })
+        .where(and(eq(creators.id, id), eq(creators.tenantId, tenantId)));
+      return NextResponse.json({ success: true, archived: true });
     }
 
     await db.delete(creators).where(and(eq(creators.id, id), eq(creators.tenantId, tenantId)));

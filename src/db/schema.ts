@@ -76,6 +76,9 @@ export const creators = pgTable(
     // Videos still works and metrics still flow via the Apify actor.
     // Per-creator video limit (TU allocation). NULL = no personal cap; enforced at tenant-pool level.
     videoLimit: integer("video_limit"),
+    // Soft-delete: set when "deleted" while videos still reference the creator.
+    // active queries (UI list, scraper) must filter `archived_at IS NULL`.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
