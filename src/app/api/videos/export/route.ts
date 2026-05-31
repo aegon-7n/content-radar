@@ -11,6 +11,7 @@ const querySchema = z.object({
   creatorId: z.string().uuid().optional(),
   productId: z.string().uuid().optional(),
   platform: z.enum(PLATFORM_VALUES).optional(),
+  format: z.enum(["csv", "xlsx"]).optional().default("csv"),
 });
 
 export async function GET(request: NextRequest) {
@@ -94,11 +95,52 @@ export async function GET(request: NextRequest) {
 
     const rows = videosResult as unknown as VideoRow[];
 
+    const exportDate = new Date().toISOString().slice(0, 10);
+
+    if (params.format === "xlsx") {
+      const { utils, write } = await import("xlsx");
+
+      const sheetData: (string | number)[][] = [
+        ["url", "platform", "views", "likes", "comments", "shares", "saves", "creator", "product", "wb_article", "published_at", "status"],
+        ...rows.map((row) => [
+          row.url,
+          row.platform,
+          Number(row.views),
+          Number(row.likes),
+          Number(row.comments),
+          Number(row.shares),
+          Number(row.saves),
+          row.creator_name,
+          row.product_name,
+          row.wb_article,
+          new Date(row.published_at).toISOString(),
+          Number(row.fail_streak ?? 0) >= 3 ? "недоступен" : "",
+        ]),
+      ];
+
+      const wb = utils.book_new();
+      const ws = utils.aoa_to_sheet(sheetData);
+      utils.book_append_sheet(wb, ws, "Videos");
+
+      const rawBuffer = write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+      const arrayBuffer: ArrayBuffer = rawBuffer.buffer.slice(
+        rawBuffer.byteOffset,
+        rawBuffer.byteOffset + rawBuffer.byteLength
+      ) as ArrayBuffer;
+
+      return new NextResponse(arrayBuffer, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="videos-export-${exportDate}.xlsx"`,
+        },
+      });
+    }
+
     const csvHeader = "url,platform,views,likes,comments,shares,saves,creator,product,wb_article,published_at,status";
 
     const escapeField = (value: string | number): string => {
       const str = String(value);
-      // Wrap in quotes if the field contains comma, quote, or newline
       if (str.includes(",") || str.includes('"') || str.includes("\n")) {
         return `"${str.replace(/"/g, '""')}"`;
       }
@@ -123,9 +165,7 @@ export async function GET(request: NextRequest) {
     );
 
     // BOM + header + rows
-    const csvContent = "\uFEFF" + [csvHeader, ...csvRows].join("\n");
-
-    const exportDate = new Date().toISOString().slice(0, 10);
+    const csvContent = "﻿" + [csvHeader, ...csvRows].join("\n");
 
     return new NextResponse(csvContent, {
       status: 200,
