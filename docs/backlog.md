@@ -30,7 +30,7 @@
 - [ ] **Обработка permanently_unavailable в UI**: показывать недоступные видео в `/videos` с тегом, не скрывать их.
 - [x] **Вынос секретов из setup-cron.sh**: ~~сейчас API-ключи захардкожены в скрипте~~ — теперь читает из `.env.local`. Старые ключи в git history, нужна ротация.
 - [x] **Обработка permanently_unavailable в UI**: тег «недоступен» на `/videos` (список + детальная + CSV), banner на детальной. _(реализовано в PR#41)_
-- [ ] **Экспорт в Excel**: /api/export?format=xlsx&period=30d. Клиент раньше вёл Excel-таблицы, может хотеть автосгенерированные.
+- [x] **Экспорт в Excel**: `/api/videos/export?format=xlsx` — параметр `format=csv|xlsx` (default csv), xlsx через пакет `xlsx`. _(TRU-278)_
 - [ ] **Исторические графики >30 дней**: сейчас delta-model считает max 30д. Для "покажи рост за 3 месяца" — нужна отдельная агрегация.
 - [ ] **Pinterest official API**: если клиент пришлёт developer credentials. Пока RSS + scraper (метрики пинов не парсятся из HTML с 2026, нужен API или Apify actor).
 - [ ] **TikTok proxy**: если клиент жалуется на ru_cross_border_block. Residential proxy ~$5-15/мес через US/EU.

@@ -40,7 +40,7 @@ types/       глобальные .d.ts
 - `dashboard` — агрегаты + delta-модель за период (`?from=&to=&category=`).
 - `creators`, `creators/[id]` — список и детали.
 - `products`, `products/[id]`.
-- `videos`, `videos/[id]`, `videos/export` (CSV).
+- `videos`, `videos/[id]`, `videos/export` (CSV по умолчанию; `?format=xlsx` возвращает Excel через пакет `xlsx`).
 - `last-sync` — `MAX(scraped_at)` из `video_metrics`.
 - `health` — статус трёх scraper-джобов из `scraper_state`.
 
