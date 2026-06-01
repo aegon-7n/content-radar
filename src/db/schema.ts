@@ -169,10 +169,17 @@ export const waitlistSignups = pgTable(
   "waitlist_signups",
   {
     id: serial("id").primaryKey(),
+    name: text("name"),                     // beta-form: applicant name
     email: text("email").notNull(),
     phone: text("phone"),
-    brand: text("brand").notNull(),
-    creatorsRange: text("creators_range").notNull(), // "1-5" | "6-20" | "20+"
+    telegramHandle: text("telegram_handle"), // beta-form: required for screening
+    brand: text("brand").notNull(),          // brand + WB niche
+    creatorsRange: text("creators_range").notNull(), // "3-5" | "6-10" | "11-20" | "20+"
+    videoVolume: text("video_volume"),       // approx videos/month
+    marketplace: text("marketplace"),        // "WB" | "WB+Ozon" | "другие"
+    excelHours: text("excel_hours"),         // hours/month on manual analytics
+    feedbackCommitment: text("feedback_commitment"), // "yes" | "no" — hard-filter
+    goal: text("goal"),                      // what applicant wants from system
     source: text("source"),
     utmSource: text("utm_source"),
     utmMedium: text("utm_medium"),
@@ -183,7 +190,9 @@ export const waitlistSignups = pgTable(
     consentAcceptedAt: timestamp("consent_accepted_at", {
       withTimezone: true,
     }).notNull(),
-    status: text("status").notNull().default("new"), // "new" | "contacted" | "onboarded" | "rejected"
+    // status: "new" | "in_cohort" | "rejected" | "awaiting_call"
+    // "rejected" also covers feedback_commitment="no" hard-filter rejections
+    status: text("status").notNull().default("new"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
