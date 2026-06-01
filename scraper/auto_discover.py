@@ -39,13 +39,13 @@ _DEFAULT_TIMEOUT = (10, 30)  # (connect, read)
 
 WB_ARTICLE_RE = re.compile(r"\b(\d{5,})\b")  # 5+ цифр подряд = артикул WB
 
-# Unified horizon: 3 weeks (21 days). Каждый день смотрим назад на 21 день —
-# даже если последний run был 10 минут назад. Это покрывает (a) новых креаторов
-# у которых ещё нет истории и им нужен initial-scan за весь горизонт, и
-# (b) обычную ежедневную дельту. Если cron отстал — cap не даёт разогнаться
-# выше 21 дня, чтобы один пропущенный день не утроил API-расход.
-MIN_LOOKBACK_HOURS = 24 * 21  # 504h = 21d
-MAX_LOOKBACK_HOURS = 24 * 21  # cap = the same — горизонт един для всего
+# Unified horizon: 3 weeks (21 days) for daily cron. ENV-override позволяет
+# делать one-shot backfill с большим окном — например для нового креатора,
+# которому канал прописали позже, чем существовали ролики на канале:
+#   MIN_LOOKBACK_HOURS=2160 MAX_LOOKBACK_HOURS=2160 python auto_discover.py
+# (2160h = 90d). cron оставляет defaults 504/504, не задевает.
+MIN_LOOKBACK_HOURS = int(os.getenv("MIN_LOOKBACK_HOURS", str(24 * 21)))
+MAX_LOOKBACK_HOURS = int(os.getenv("MAX_LOOKBACK_HOURS", str(24 * 21)))
 
 # Extra buffer added on top of "gap since last success". Prevents off-by-one
 # when the previous run finished a few minutes before a new publish.
