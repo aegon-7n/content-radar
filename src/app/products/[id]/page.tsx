@@ -39,7 +39,8 @@ type ProductDetail = {
   }>;
 };
 
-const PLATFORMS = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
+// Core платформы для UI-фильтров. Likee + Pinterest скрыты — не в нашем ICP.
+const PLATFORMS = ["tiktok", "youtube", "instagram"] as const;
 
 type VideoSortKey = "views" | "likes" | "comments" | "er" | "publishedAt";
 type SortDir = "asc" | "desc";

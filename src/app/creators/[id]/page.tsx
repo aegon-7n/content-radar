@@ -53,7 +53,10 @@ type CreatorDetail = {
   }>;
 };
 
-const PLATFORMS = ["tiktok", "youtube", "instagram", "likee", "pinterest"] as const;
+// Core платформы для UI-фильтров. Likee + Pinterest скрыты: Likee частично
+// сломан (docs/likee-research.md), Pinterest не в нашем ICP. Видео по этим
+// платформам если есть — продолжают скрейпиться, просто фильтра по ним нет.
+const PLATFORMS = ["tiktok", "youtube", "instagram"] as const;
 
 type VideoSortKey = "views" | "publishedAt" | "er";
 type SortDir = "asc" | "desc";
