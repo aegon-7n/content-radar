@@ -113,9 +113,11 @@ export async function PATCH(
       const raw = parsed.data.youtubeChannelId;
       if (!raw || (typeof raw === "string" && raw.trim() === "")) {
         updates.youtubeChannelId = null;
+        updates.youtubeHandle = null;
       } else {
         try {
           updates.youtubeChannelId = await resolveYouTubeChannelId(raw);
+          updates.youtubeHandle = raw.trim();
         } catch (err) {
           const message =
             err instanceof YouTubeResolveError

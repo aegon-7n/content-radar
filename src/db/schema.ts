@@ -69,6 +69,10 @@ export const creators = pgTable(
     avatarUrl: text("avatar_url"),
     tiktokUsername: text("tiktok_username"),
     youtubeChannelId: text("youtube_channel_id"),
+    // Raw YouTube input как ввёл юзер (handle, URL или UC). Для UI-отображения,
+    // чтобы не показывать пользователю сырой UC, если он ввёл @handle.
+    // youtube_channel_id всегда хранит резолвленный UC для скрапера.
+    youtubeHandle: text("youtube_handle"),
     instagramUsername: text("instagram_username"),
     pinterestUsername: text("pinterest_username"),
     // Note: Likee discovery was intentionally removed in 2026-04 — see

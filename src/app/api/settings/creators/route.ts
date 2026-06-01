@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
         avatarUrl: creators.avatarUrl,
         tiktokUsername: creators.tiktokUsername,
         youtubeChannelId: creators.youtubeChannelId,
+        youtubeHandle: creators.youtubeHandle,
         instagramUsername: creators.instagramUsername,
         pinterestUsername: creators.pinterestUsername,
         createdAt: creators.createdAt,
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest) {
         creators.avatarUrl,
         creators.tiktokUsername,
         creators.youtubeChannelId,
+        creators.youtubeHandle,
         creators.instagramUsername,
         creators.pinterestUsername,
         creators.createdAt,
@@ -108,9 +110,11 @@ export async function POST(request: NextRequest) {
     } = parsed.data;
 
     let resolvedYoutubeChannelId: string | null = null;
+    let youtubeHandle: string | null = null;
     if (youtubeChannelId && youtubeChannelId.trim()) {
       try {
         resolvedYoutubeChannelId = await resolveYouTubeChannelId(youtubeChannelId);
+        youtubeHandle = youtubeChannelId.trim();
       } catch (err) {
         const message =
           err instanceof YouTubeResolveError
@@ -129,6 +133,7 @@ export async function POST(request: NextRequest) {
         avatarUrl: avatarUrl || null,
         tiktokUsername: stripAt(tiktokUsername),
         youtubeChannelId: resolvedYoutubeChannelId,
+        youtubeHandle,
         instagramUsername: stripAt(instagramUsername),
         pinterestUsername: pinterestUsername || null,
       })

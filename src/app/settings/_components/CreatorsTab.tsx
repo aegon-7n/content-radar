@@ -10,6 +10,7 @@ interface Creator {
   name: string;
   tiktokUsername: string | null;
   youtubeChannelId: string | null;
+  youtubeHandle: string | null;
   instagramUsername: string | null;
   videoCount: number;
 }
@@ -74,7 +75,8 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
     setForm({
       name: c.name,
       tiktokUsername: c.tiktokUsername ?? "",
-      youtubeChannelId: c.youtubeChannelId ?? "",
+      // Показываем handle если есть (то что юзер ввёл), иначе сырой UC.
+      youtubeChannelId: c.youtubeHandle ?? c.youtubeChannelId ?? "",
       instagramUsername: c.instagramUsername ?? "",
     });
     setModalOpen(true);
@@ -226,8 +228,8 @@ export default function CreatorsTab({ showToast }: CreatorsTabProps) {
                     {c.tiktokUsername ? `@${c.tiktokUsername}` : <span style={{ color: "var(--text-disabled)" }}>—</span>}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
-                    {c.youtubeChannelId ? (
-                      <span className="truncate block max-w-[120px]">{c.youtubeChannelId}</span>
+                    {(c.youtubeHandle || c.youtubeChannelId) ? (
+                      <span className="truncate block max-w-[120px]" title={c.youtubeChannelId ?? undefined}>{c.youtubeHandle ?? c.youtubeChannelId}</span>
                     ) : <span style={{ color: "var(--text-disabled)" }}>—</span>}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
