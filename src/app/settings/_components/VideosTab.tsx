@@ -29,8 +29,10 @@ function detectPlatform(url: string): Platform | null {
     if (hostname.includes("tiktok.com")) return "tiktok";
     if (hostname.includes("youtube.com") || hostname === "youtu.be") return "youtube";
     if (hostname.includes("instagram.com")) return "instagram";
-    if (hostname.includes("likee.video") || hostname.includes("like.video")) return "likee";
-    if (hostname.includes("pinterest.com") || hostname.includes("pin.it")) return "pinterest";
+    // Likee + Pinterest detection отключены (не в ICP). Юзер вставивший URL
+    // этих платформ получит null от detect → ошибка "не удалось определить".
+    // PLATFORM_LABELS lookup для них сохранён — legacy записи в БД рендерятся
+    // корректно, просто новые через UI не добавишь.
   } catch {
     // invalid URL
   }
