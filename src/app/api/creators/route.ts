@@ -97,6 +97,7 @@ export async function GET(request: NextRequest) {
       FROM creators c
       LEFT JOIN deltas d ON d.creator_id = c.id
       WHERE c.tenant_id = ${tenantId}
+      AND c.archived_at IS NULL
       ${creatorListFilter}
       GROUP BY c.id, c.name, c.avatar_url
       ORDER BY views DESC
@@ -111,6 +112,7 @@ export async function GET(request: NextRequest) {
       FROM creators c
       LEFT JOIN deltas d ON d.creator_id = c.id
       WHERE c.tenant_id = ${tenantId}
+      AND c.archived_at IS NULL
       ${creatorListFilter}
       GROUP BY c.id
     `);
