@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
-import { requireAuthWithTenant } from "@/lib/tenant";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +23,9 @@ export const dynamic = "force-dynamic";
  * `status: "error"` so the sidebar can show something instead of
  * crashing the whole render.
  */
-export async function GET(req: NextRequest) {
-  const auth = await requireAuthWithTenant(req);
-  if (!auth.ok) return auth.response;
+export async function GET(request: NextRequest) {
+  const authError = await requireAuth(request);
+  if (authError) return authError;
 
   try {
     const [counts, state] = await Promise.all([

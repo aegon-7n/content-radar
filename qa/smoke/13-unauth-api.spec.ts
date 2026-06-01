@@ -6,7 +6,10 @@ import { test, expect, request } from "@playwright/test";
  * Post-mortem action item from TRU-104 / TRU-97 incident.
  * Regression: middleware.ts had a regex that excluded ALL /api/* from auth checks.
  * These tests call each protected endpoint without a session and assert 401.
- * Public allowlist routes (health, waitlist) must NOT return 401.
+ * Public allowlist routes (ping, waitlist) must NOT return 401.
+ *
+ * /api/health is auth-gated (TRU-171, restored in TRU-288).
+ * Use /api/ping for uptime monitors — it returns {"ok":true} with no operational data.
  */
 
 const PROTECTED_ENDPOINTS = [
@@ -18,16 +21,19 @@ const PROTECTED_ENDPOINTS = [
   { id: "S13-F", path: "/api/settings/products" },
   { id: "S13-G", path: "/api/videos/export" },
   { id: "S13-H", path: "/api/last-sync" },
+  // S13-I: /api/health must be auth-gated — it leaks operational data (TRU-288 regression).
+  { id: "S13-I", path: "/api/health" },
 ];
 
 const PUBLIC_ENDPOINTS = [
-  { id: "S13-I", path: "/api/health", method: "GET", expectedStatuses: [200] },
-  // S13-J: /api/waitlist is in the middleware allowlist.
+  // S13-J: /api/ping is the public liveness probe for uptime monitors (no operational data).
+  { id: "S13-J", path: "/api/ping", method: "GET", expectedStatuses: [200] },
+  // S13-K: /api/waitlist is in the middleware allowlist.
   // Only POST is exported — GET returns 405 from Next.js, proving the
   // middleware let the request through (middleware 401 would appear instead).
   // POST /api/waitlist without WAITLIST_INGEST_SECRET returns a route-level
   // 401 which is intentional bearer-token protection, not NextAuth middleware.
-  { id: "S13-J", path: "/api/waitlist", method: "GET", expectedStatuses: [405] },
+  { id: "S13-K", path: "/api/waitlist", method: "GET", expectedStatuses: [405] },
 ];
 
 test.describe("S13 — Unauth API Guard (no session)", () => {

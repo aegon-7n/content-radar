@@ -4,11 +4,10 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/ping — public liveness probe for uptime monitors (UptimeRobot, Cloudflare).
- * Returns only {"ok": true} — no internal data. No auth required.
  *
- * /api/health requires auth and returns full scraper state + counts.
- * Use /api/ping for external monitoring, /api/health for internal tooling.
+ * Returns no operational data. /api/health is auth-gated and contains
+ * internal metrics; monitors should use this endpoint instead.
  */
-export function GET() {
+export async function GET() {
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }
