@@ -43,12 +43,18 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 // ─── Input schema ─────────────────────────────────────────────────────────────
+// Accepts both rev1 (email + brand) and rev2 (contact + storeUrl) payloads.
 const SubmitSchema = z.object({
   name: z.string().min(1).max(200).optional().nullable(),
-  email: z.string().email().max(254),
+  // rev1 fields (legacy)
+  email: z.string().email().max(254).optional().nullable(),
   phone: z.string().max(32).optional().nullable(),
   telegramHandle: z.string().max(100).optional().nullable(),
-  brand: z.string().min(1).max(300),
+  brand: z.string().max(300).optional().nullable(),
+  // rev2 fields
+  contact: z.string().max(200).optional().nullable(),   // TG-handle or email
+  storeUrl: z.string().max(500).optional().nullable(),  // WB store URL
+  // common
   creatorsRange: z.string().max(16),
   videoVolume: z.string().max(200).optional().nullable(),
   marketplace: z.string().max(50).optional().nullable(),
@@ -66,6 +72,14 @@ const SubmitSchema = z.object({
   consent: z.literal(true),
   consentAcceptedAt: z.string().datetime().optional(),
 });
+
+// Extract email address from contact field if it looks like an email.
+function extractEmailFromContact(contact: string | null | undefined): string | null {
+  if (!contact) return null;
+  if (contact.startsWith("@")) return null;
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) return contact;
+  return null;
+}
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 async function sendConfirmationEmail(email: string, name: string | null | undefined): Promise<void> {
@@ -135,11 +149,12 @@ async function sendConfirmationEmail(email: string, name: string | null | undefi
 
 async function sendTelegramNotification(data: {
   name: string | null | undefined;
-  email: string;
-  telegramHandle: string | null | undefined;
-  brand: string;
+  contact: string | null | undefined;       // rev2
+  storeUrl: string | null | undefined;      // rev2
+  email: string | null | undefined;         // rev1 legacy
+  telegramHandle: string | null | undefined; // rev1 legacy
+  brand: string | null | undefined;         // rev1 legacy
   creatorsRange: string;
-  marketplace: string | null | undefined;
   feedbackCommitment: string | null | undefined;
   utmCampaign: string | null | undefined;
   insertedId: number;
@@ -154,14 +169,16 @@ async function sendTelegramNotification(data: {
 
   const commitment = data.feedbackCommitment === "no" ? "❌ НЕТ (rejected)" : "✅ Да";
 
+  // Build contact display — prefer rev2 contact field
+  const contactDisplay = data.contact ?? data.email ?? "—";
+  const storeDisplay = data.storeUrl ?? data.brand ?? "—";
+
   const text =
     `🎯 <b>Новая заявка в бета-программу</b>\n` +
     `Имя: <code>${data.name ?? "—"}</code>\n` +
-    `Email: <code>${data.email}</code>\n` +
-    `Telegram: <code>${data.telegramHandle ?? "—"}</code>\n` +
-    `Бренд: <code>${data.brand}</code>\n` +
-    `Креаторов: <code>${data.creatorsRange}</code>\n` +
-    `Маркетплейс: <code>${data.marketplace ?? "—"}</code>\n` +
+    `Контакт: <code>${contactDisplay}</code>\n` +
+    `Магазин/бренд: <code>${storeDisplay}</code>\n` +
+    `Размер команды: <code>${data.creatorsRange}</code>\n` +
     `Созвоны: ${commitment}\n` +
     `Кампания: <code>${data.utmCampaign ?? "—"}</code>\n` +
     `ID: #${data.insertedId}`;
@@ -235,9 +252,11 @@ export async function POST(request: NextRequest) {
   }
 
   const {
-    name, email, phone, telegramHandle, brand, creatorsRange,
-    videoVolume, marketplace, excelHours, feedbackCommitment, goal,
-    source, utmSource, utmMedium, utmCampaign, utmContent, utmTerm,
+    name, email, phone, telegramHandle, brand,
+    contact, storeUrl,
+    creatorsRange, videoVolume, marketplace, excelHours,
+    feedbackCommitment, goal, source,
+    utmSource, utmMedium, utmCampaign, utmContent, utmTerm,
     referrer, consentAcceptedAt,
   } = parsed.data;
 
@@ -251,10 +270,12 @@ export async function POST(request: NextRequest) {
     .insert(waitlistSignups)
     .values({
       name: name ?? null,
-      email,
+      email: email ?? null,
       phone: phone ?? null,
       telegramHandle: telegramHandle ?? null,
-      brand,
+      brand: brand ?? null,
+      contact: contact ?? null,
+      storeUrl: storeUrl ?? null,
       creatorsRange,
       videoVolume: videoVolume ?? null,
       marketplace: marketplace ?? null,
@@ -275,14 +296,17 @@ export async function POST(request: NextRequest) {
 
   const insertedId = inserted.id;
 
-  // 6. Notify — skip email for hard-filter rejections, always send TG
+  // 6. Notify
+  // For confirmation email: prefer email from rev1, else extract from contact if it's an email address
+  const confirmationEmail = email ?? extractEmailFromContact(contact);
+
   await Promise.allSettled([
-    status !== "rejected"
-      ? sendConfirmationEmail(email, name)
+    status !== "rejected" && confirmationEmail
+      ? sendConfirmationEmail(confirmationEmail, name)
       : Promise.resolve(),
     sendTelegramNotification({
-      name, email, telegramHandle, brand, creatorsRange,
-      marketplace, feedbackCommitment, utmCampaign, insertedId,
+      name, contact, storeUrl, email, telegramHandle, brand,
+      creatorsRange, feedbackCommitment, utmCampaign, insertedId,
     }),
   ]);
 

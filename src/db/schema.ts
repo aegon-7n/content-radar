@@ -175,15 +175,18 @@ export const waitlistSignups = pgTable(
   "waitlist_signups",
   {
     id: serial("id").primaryKey(),
-    name: text("name"),                     // beta-form: applicant name
-    email: text("email").notNull(),
+    name: text("name"),                     // applicant name
+    email: text("email"),                   // nullable: rev1 had email, rev2 uses contact field
     phone: text("phone"),
-    telegramHandle: text("telegram_handle"), // beta-form: required for screening
-    brand: text("brand").notNull(),          // brand + WB niche
+    telegramHandle: text("telegram_handle"), // rev1 field (legacy)
+    brand: text("brand"),                   // nullable: rev1 brand+niche, not in rev2
+    // rev2 fields
+    contact: text("contact"),              // TG-handle or email (rev2 merged field)
+    storeUrl: text("store_url"),           // WB store URL (rev2)
     creatorsRange: text("creators_range").notNull(), // "3-5" | "6-10" | "11-20" | "20+"
-    videoVolume: text("video_volume"),       // approx videos/month
-    marketplace: text("marketplace"),        // "WB" | "WB+Ozon" | "другие"
-    excelHours: text("excel_hours"),         // hours/month on manual analytics
+    videoVolume: text("video_volume"),       // rev1 field (legacy)
+    marketplace: text("marketplace"),        // rev1 field (legacy)
+    excelHours: text("excel_hours"),         // rev1 field (legacy)
     feedbackCommitment: text("feedback_commitment"), // "yes" | "no" — hard-filter
     goal: text("goal"),                      // what applicant wants from system
     source: text("source"),
