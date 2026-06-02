@@ -40,38 +40,45 @@ referral_codes   — промокоды партнёров. Не привяза�
 - скрейпером — для self-healing lookback (`compute_lookback_hours`),
 - API `/api/health` — для светофора в UI и health-check'ов.
 
-**`waitlist_signups`** — лиды с публичного лендинга. Не связана с `users` — это pre-signup записи. Поля:
+**`waitlist_signups`** — заявки в бета-программу с публичного лендинга. Не связана с `users` — это pre-signup записи. Поля:
 
 | Колонка | Тип | Назначение |
 |---|---|---|
 | `id` | serial | PK, auto-increment |
+| `name` | text | Имя заявителя (beta-скрининг) |
 | `email` | text NOT NULL | Контактный email заявителя |
 | `phone` | text | Телефон (опционально) |
-| `brand` | text NOT NULL | Название бренда/магазина |
-| `creators_range` | text NOT NULL | Кол-во креаторов: `"1-5"` / `"6-20"` / `"20+"` |
-| `source` | text | Идентификатор формы (legacy, для обратной совместимости) |
-| `utm_source` | text | UTM-параметр: источник трафика (`partner`, `founder`, …) |
-| `utm_medium` | text | UTM-параметр: канал (`telegram`, `email`, …) |
-| `utm_campaign` | text | UTM-параметр: кампания (`cohort_a_teaser`, …) |
+| `telegram_handle` | text | Telegram-handle (beta-скрининг) |
+| `brand` | text NOT NULL | Название бренда/ниша |
+| `creators_range` | text NOT NULL | Кол-во креаторов (`"3-5"` / `"6-10"` / `"11-20"` / `"20+"`) |
+| `video_volume` | text | Примерный объём видео/мес (beta-скрининг) |
+| `marketplace` | text | Маркетплейс: `"WB"` / `"WB+Ozon"` / `"другие"` |
+| `excel_hours` | text | Часов/мес на ручную аналитику (beta-скрининг) |
+| `feedback_commitment` | text | Готов к созвонам: `"yes"` / `"no"`. `"no"` → автоотклонение |
+| `goal` | text | Что хочет получить от системы (beta-скрининг) |
+| `source` | text | Идентификатор формы (legacy) |
+| `utm_source` | text | UTM-параметр: источник трафика |
+| `utm_medium` | text | UTM-параметр: канал |
+| `utm_campaign` | text | UTM-параметр: кампания |
 | `utm_content` | text | UTM-параметр: вариант креатива |
 | `utm_term` | text | UTM-параметр: ключевое слово |
-| `referrer` | text | HTTP Referer на момент отправки формы |
-| `consent_accepted_at` | timestamptz NOT NULL | Момент согласия с политикой (GDPR-трекинг) |
-| `status` | text DEFAULT `'new'` | Этап воронки: `"new"` / `"contacted"` / `"onboarded"` / `"rejected"` |
+| `referrer` | text | HTTP Referer на момент отправки |
+| `consent_accepted_at` | timestamptz NOT NULL | Момент согласия (GDPR-трекинг) |
+| `status` | text DEFAULT `'new'` | Статус воронки: `"new"` / `"in_cohort"` / `"awaiting_call"` / `"rejected"` |
 | `notes` | text | Внутренние заметки менеджера |
 | `created_at` | timestamptz DEFAULT now() | Время создания записи |
 
-Как наполняется: через POST `/api/waitlist` (endpoint — вторая фаза). Лендинг (`content-radar-landing/`) делает server-to-server запрос на основной VPS.
+Как наполняется: лендинг (`content-radar-landing/`, Vercel) делает server-to-server POST → `/api/waitlist` на VPS с Bearer-токеном `WAITLIST_INGEST_SECRET`. Автоотклонение: если `feedback_commitment = "no"`, статус сразу `"rejected"`, email заявителю не отправляется.
 
 Инварианты `waitlist_signups`:
-- **Append-only по смыслу лида.** Один email может появиться дважды — это валидно (человек исправил данные, отправил снова). Поэтому `UNIQUE` на `email` **не ставится**.
+- **Append-only по смыслу лида.** Один email может появиться дважды — это валидно. `UNIQUE` на `email` **не ставится**.
 - Не апсертим — каждая отправка формы = новая строка.
-- `consent_accepted_at` заполняет лендинг в момент клика «Отправить» — не `DEFAULT NOW()`, чтобы зафиксировать реальный момент согласия, а не момент записи в БД.
+- `consent_accepted_at` заполняет лендинг в момент клика «Отправить», не `DEFAULT NOW()` — фиксируем реальный момент согласия.
 
 Индексы:
-- `idx_waitlist_signups_created_at` ON `created_at` — основная сортировка в админ-странице (`ORDER BY created_at DESC`).
-- `idx_waitlist_signups_status` ON `status` — фильтрация по этапу воронки.
-- `idx_waitlist_signups_utm_campaign` ON `utm_campaign` — фильтрация по кампании в `/admin/waitlist`.
+- `idx_waitlist_signups_created_at` ON `created_at` — основная сортировка в `/admin/waitlist`.
+- `idx_waitlist_signups_status` ON `status` — фильтрация по статусу воронки.
+- `idx_waitlist_signups_utm_campaign` ON `utm_campaign` — фильтрация по кампании.
 
 **`subscriptions`** — текущая подписка тенанта. Одна строка на тенант. `tenant_id` FK NOT NULL. Поля:
 - `tier` — `'solo'` / `'pro'` / `'studio'` / `'custom'`
