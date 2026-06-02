@@ -31,6 +31,7 @@ FAIL_RATE_MIN_TOTAL = 10
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from scraper.config import DATABASE_URL, SCRAPE_HORIZON_DAYS
+from scraper.db import update_video_metadata
 from scraper.scrapers.tiktok import TikTokScraper
 from scraper.scrapers.youtube import YouTubeScraper
 from scraper.scrapers.instagram import InstagramScraper
@@ -114,6 +115,13 @@ def main():
             cur.execute("UPDATE videos SET fail_streak = 0 WHERE id = %s AND fail_streak > 0", (video_id,))
             logger.info("OK platform=%s video_id=%s views=%s", platform, video_id, m.views)
             ok += 1
+            # Save content metadata (TikTok only — from _last_content set by TikAPI).
+            # One-shot: update_video_metadata only writes when videos.title IS NULL.
+            if isinstance(scraper, TikTokScraper) and scraper._last_content:
+                try:
+                    update_video_metadata(scraper._last_content)
+                except Exception as exc:
+                    logger.warning("metadata save failed for video_id=%s: %s", video_id, exc)
         else:
             # Increment fail streak. After MAX_FAIL_STREAK consecutive
             # failures the video will be skipped on subsequent runs.

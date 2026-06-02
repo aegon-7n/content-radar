@@ -4,6 +4,7 @@ import {
   text,
   integer,
   bigint,
+  boolean,
   timestamp,
   pgEnum,
   serial,
@@ -129,6 +130,15 @@ export const videos = pgTable(
     // Consecutive failed scrape nights. Reset to 0 on each successful scrape.
     // When >= 3, run_daily skips the video and UI shows "недоступно".
     failStreak: integer("fail_streak").default(0).notNull(),
+    // Content metadata — populated lazily on first successful API scrape (TRU-310).
+    // Already returned by TikAPI/HikerAPI/YT responses; zero extra API cost.
+    title: text("title"),
+    durationSec: integer("duration_sec"),
+    musicTitle: text("music_title"),
+    musicAuthor: text("music_author"),
+    musicIsOriginal: boolean("music_is_original"),
+    hashtags: text("hashtags"), // comma-separated, e.g. "wildberries,продажи"
+    coverUrl: text("cover_url"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

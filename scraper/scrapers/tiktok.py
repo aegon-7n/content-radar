@@ -14,12 +14,12 @@
 import json
 import logging
 import re
-from typing import Optional
+from typing import Optional, Tuple
 
 import requests
 
 from .. import config
-from ..models import VideoMetric
+from ..models import VideoContent, VideoMetric
 from .base import BaseScraper
 
 logger = logging.getLogger(__name__)
@@ -37,11 +37,15 @@ _BROWSER_HEADERS = {
 class TikTokScraper(BaseScraper):
     platform = "tiktok"
 
+    def __init__(self) -> None:
+        # Set by _scrape_tikapi when content metadata is available.
+        # Consumed by run_daily after a successful scrape via scrape_video_with_content().
+        self._last_content: Optional[VideoContent] = None
+
     def scrape_video(self, video_id: str, url: str) -> Optional[VideoMetric]:
-        # Разворачиваем короткие ссылки vm.tiktok.com
+        self._last_content = None
         resolved_url = _resolve_short_url(url)
 
-        # Метод 1: TikAPI.io
         if config.TIKAPI_KEY:
             metric = self._scrape_tikapi(video_id, resolved_url)
             if metric is not None and metric.is_valid():
@@ -49,7 +53,6 @@ class TikTokScraper(BaseScraper):
                 return metric
             logger.info("tiktok video_id=%s TikAPI failed, trying HTTP fallback", video_id)
 
-        # Метод 2: HTTP fallback
         metric = self._scrape_http(video_id, resolved_url)
         if metric is not None and metric.is_valid():
             logger.debug("tiktok video_id=%s scraped via HTTP fallback", video_id)
@@ -57,6 +60,14 @@ class TikTokScraper(BaseScraper):
 
         logger.warning("tiktok video_id=%s all methods failed", video_id)
         return None
+
+    def scrape_video_with_content(
+        self, video_id: str, url: str
+    ) -> Tuple[Optional[VideoMetric], Optional[VideoContent]]:
+        """Returns metric + content metadata in one call. Content is only
+        populated when TikAPI succeeds (HTTP fallback doesn't have metadata)."""
+        metric = self.scrape_video(video_id, url)
+        return metric, self._last_content
 
     # ------------------------------------------------------------------
     # Метод 1: TikAPI.io
@@ -117,6 +128,24 @@ class TikTokScraper(BaseScraper):
         def get_stat(key: str) -> Optional[int]:
             val = stats_v2.get(key) or stats.get(key)
             return _to_int(val)
+
+        # Extract content metadata — already in the response, zero extra cost.
+        music = item.get("music", {})
+        hashtags = [
+            t.get("hashtagName", "")
+            for t in item.get("textExtra", [])
+            if t.get("hashtagName")
+        ]
+        self._last_content = VideoContent(
+            video_id=video_id,
+            title=item.get("desc") or None,
+            duration_sec=_to_int(_deep_get(item, "video", "duration")),
+            music_title=music.get("title") or None,
+            music_author=music.get("authorName") or None,
+            music_is_original=bool(music.get("original")) if "original" in music else None,
+            hashtags=hashtags or None,
+            cover_url=_deep_get(item, "video", "cover") or None,
+        )
 
         return VideoMetric(
             video_id=video_id,
