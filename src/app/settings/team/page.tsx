@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Copy, UserMinus, UserPlus, Check, Video } from "lucide-react";
+import { Copy, UserMinus, UserPlus, Check, Video, ChevronDown } from "lucide-react";
 import { formatNumber } from "@/lib/format";
 
 type Member = {
@@ -9,12 +9,15 @@ type Member = {
   name: string;
   email: string;
   role: "owner" | "creator";
+  creatorId: string | null;
   createdAt: string;
 };
 
 type PendingInvite = {
   token: string;
   email: string | null;
+  creatorId: string;
+  creatorName: string | null;
   expiresAt: string;
   createdAt: string;
 };
@@ -23,6 +26,11 @@ type TeamData = {
   members: Member[];
   pendingInvites: PendingInvite[];
   me: Member | null;
+};
+
+type CreatorOption = {
+  id: string;
+  name: string;
 };
 
 type CreatorQuota = {
@@ -49,9 +57,10 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tuData, setTuData] = useState<TuData | null>(null);
+  const [allCreators, setAllCreators] = useState<CreatorOption[]>([]);
 
   // Invite form state
-  const [inviteEmail, setInviteEmail] = useState("");
+  const [selectedCreatorId, setSelectedCreatorId] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteResult, setInviteResult] = useState<{ url: string } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -63,15 +72,21 @@ export default function TeamPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [teamRes, billingRes] = await Promise.all([
+      const [teamRes, billingRes, creatorsRes] = await Promise.all([
         fetch("/api/invites"),
         fetch("/api/billing/status"),
+        fetch("/api/settings/creators"),
       ]);
       if (!teamRes.ok) throw new Error("Ошибка загрузки");
-      setData(await teamRes.json() as TeamData);
+      const team = await teamRes.json() as TeamData;
+      setData(team);
       if (billingRes.ok) {
         const billing = await billingRes.json() as { tu?: TuData };
         if (billing.tu) setTuData(billing.tu);
+      }
+      if (creatorsRes.ok) {
+        const c = await creatorsRes.json() as { creators?: CreatorOption[] };
+        setAllCreators(c.creators ?? []);
       }
     } catch {
       setError("Не удалось загрузить данные команды.");
@@ -82,22 +97,31 @@ export default function TeamPage() {
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
+  // Creators already linked to a user account or with a pending invite are unavailable.
+  const usedCreatorIds = new Set([
+    ...(data?.members.map((m) => m.creatorId).filter(Boolean) as string[] ?? []),
+    ...(data?.pendingInvites.map((i) => i.creatorId) ?? []),
+  ]);
+  const availableCreators = allCreators.filter((c) => !usedCreatorIds.has(c.id));
+
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
+    if (!selectedCreatorId) return;
     setInviting(true);
     setInviteResult(null);
+    setError("");
     try {
       const res = await fetch("/api/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail || undefined }),
+        body: JSON.stringify({ creatorId: selectedCreatorId }),
       });
       const d = await res.json() as { inviteUrl?: string; error?: string };
       if (!res.ok) {
         setError(d.error ?? "Ошибка при создании приглашения.");
       } else {
         setInviteResult({ url: d.inviteUrl! });
-        setInviteEmail("");
+        setSelectedCreatorId("");
         void fetchData();
       }
     } catch {
@@ -159,9 +183,20 @@ export default function TeamPage() {
     boxShadow: "var(--shadow-card)",
   };
 
+  const selectStyle = {
+    background: "var(--surface-2)",
+    border: "1px solid var(--border-default)",
+    color: "var(--text-primary)",
+    appearance: "none" as const,
+    WebkitAppearance: "none" as const,
+  };
+
   if (loading) {
     return <div className="p-6 text-sm" style={{ color: "var(--text-muted)" }}>Загрузка...</div>;
   }
+
+  const noCreatorsAtAll = allCreators.length === 0;
+  const allCreatorsLinked = !noCreatorsAtAll && availableCreators.length === 0;
 
   return (
     <div className="p-6 max-w-2xl space-y-6">
@@ -184,27 +219,46 @@ export default function TeamPage() {
           <UserPlus className="inline w-4 h-4 mr-1.5" style={{ color: "var(--accent-primary)" }} />
           Пригласить создателя
         </h2>
-        <form onSubmit={handleInvite} className="flex gap-2">
-          <input
-            type="email"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-            placeholder="email (необязательно)"
-            className="flex-1 rounded-lg px-3 py-2 text-sm focus:outline-none transition"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
-          />
-          <button
-            type="submit"
-            disabled={inviting}
-            className="px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 disabled:opacity-50"
-            style={{ background: "var(--accent-primary)", color: "#fff" }}
-          >
-            {inviting ? "..." : "Создать ссылку"}
-          </button>
-        </form>
-        <p className="text-xs mt-2" style={{ color: "var(--text-disabled)" }}>
-          Email необязателен. Без email создаётся общая ссылка-приглашение.
-        </p>
+
+        {noCreatorsAtAll ? (
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Сначала добавьте креатора в{" "}
+            <a href="/settings" className="underline underline-offset-2" style={{ color: "var(--accent-primary)" }}>
+              Настройки → Креаторы
+            </a>
+            .
+          </p>
+        ) : allCreatorsLinked ? (
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Все креаторы уже добавлены в команду или ожидают принятия приглашения.
+          </p>
+        ) : (
+          <form onSubmit={handleInvite} className="flex gap-2">
+            <div className="relative flex-1">
+              <select
+                value={selectedCreatorId}
+                onChange={(e) => setSelectedCreatorId(e.target.value)}
+                required
+                className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none transition pr-8"
+                style={selectStyle}
+              >
+                <option value="">— выберите креатора —</option>
+                {availableCreators.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "var(--text-disabled)" }} />
+            </div>
+            <button
+              type="submit"
+              disabled={inviting || !selectedCreatorId}
+              className="px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 disabled:opacity-50"
+              style={{ background: "var(--accent-primary)", color: "#fff" }}
+            >
+              {inviting ? "..." : "Создать ссылку"}
+            </button>
+          </form>
+        )}
 
         {inviteResult && (
           <div className="mt-3 rounded-lg px-3 py-2.5 flex items-center gap-2" style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-border)" }}>
@@ -230,33 +284,43 @@ export default function TeamPage() {
           <p className="text-sm" style={{ color: "var(--text-disabled)" }}>Нет других участников.</p>
         ) : (
           <ul className="space-y-2">
-            {data.members.map((m) => (
-              <li key={m.id} className="flex items-center justify-between py-1.5">
-                <div>
-                  <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{m.name}</p>
-                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>{m.email}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                    background: m.role === "owner" ? "var(--accent-muted)" : "var(--surface-2)",
-                    color: m.role === "owner" ? "var(--accent-primary)" : "var(--text-muted)",
-                    border: `1px solid ${m.role === "owner" ? "var(--accent-border)" : "var(--border-default)"}`,
-                  }}>
-                    {m.role === "owner" ? "владелец" : "создатель"}
-                  </span>
-                  {m.role === "creator" && (
-                    <button
-                      onClick={() => handleRevoke(m.id)}
-                      className="text-xs flex items-center gap-1 transition"
-                      style={{ color: "var(--error-text)" }}
-                      title="Отозвать доступ"
-                    >
-                      <UserMinus className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
+            {data.members.map((m) => {
+              const creatorName = m.creatorId
+                ? allCreators.find((c) => c.id === m.creatorId)?.name ?? null
+                : null;
+              return (
+                <li key={m.id} className="flex items-center justify-between py-1.5">
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{m.name}</p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      {m.email}
+                      {creatorName && (
+                        <span className="ml-1.5 opacity-60">· {creatorName}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                      background: m.role === "owner" ? "var(--accent-muted)" : "var(--surface-2)",
+                      color: m.role === "owner" ? "var(--accent-primary)" : "var(--text-muted)",
+                      border: `1px solid ${m.role === "owner" ? "var(--accent-border)" : "var(--border-default)"}`,
+                    }}>
+                      {m.role === "owner" ? "владелец" : "создатель"}
+                    </span>
+                    {m.role === "creator" && (
+                      <button
+                        onClick={() => handleRevoke(m.id)}
+                        className="text-xs flex items-center gap-1 transition"
+                        style={{ color: "var(--error-text)" }}
+                        title="Отозвать доступ"
+                      >
+                        <UserMinus className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -277,7 +341,6 @@ export default function TeamPage() {
             </span>
           </div>
 
-          {/* Pool usage bar */}
           <div className="mb-4">
             <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
               <div
@@ -297,7 +360,6 @@ export default function TeamPage() {
             </p>
           </div>
 
-          {/* Per-creator rows */}
           {tuData.byCreator.length === 0 ? (
             <p className="text-sm" style={{ color: "var(--text-disabled)" }}>Нет креаторов.</p>
           ) : (
@@ -368,7 +430,7 @@ export default function TeamPage() {
               <li key={inv.token} className="flex items-center justify-between">
                 <div>
                   <p className="text-sm" style={{ color: "var(--text-primary)" }}>
-                    {inv.email ?? "Общая ссылка"}
+                    {inv.creatorName ?? "Неизвестный креатор"}
                   </p>
                   <p className="text-xs" style={{ color: "var(--text-disabled)" }}>
                     Истекает: {new Date(inv.expiresAt).toLocaleDateString("ru-RU")}
