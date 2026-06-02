@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { db } from "@/db";
-import { inviteTokens, users } from "@/db/schema";
+import { creators, inviteTokens, users } from "@/db/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { requireOwner } from "@/lib/tenant";
 
 const CreateInviteSchema = z.object({
+  creatorId: z.string().uuid("Некорректный creatorId."),
   email: z.string().email().optional(),
-  creatorId: z.string().uuid().optional(),
 });
 
 /** GET /api/invites — list team members + pending invites. Owner only. */
@@ -18,16 +18,24 @@ export async function GET(req: NextRequest) {
   const { tenantId, userId } = auth.ctx;
 
   const members = await db
-    .select({ id: users.id, name: users.name, email: users.email, role: users.role, createdAt: users.createdAt })
+    .select({ id: users.id, name: users.name, email: users.email, role: users.role, createdAt: users.createdAt, creatorId: users.creatorId })
     .from(users)
     .where(and(eq(users.tenantId, tenantId)));
 
+  // Join pending invites with creator name so the UI can show who was invited.
   const pendingInvites = await db
-    .select({ token: inviteTokens.token, email: inviteTokens.email, expiresAt: inviteTokens.expiresAt, createdAt: inviteTokens.createdAt })
+    .select({
+      token: inviteTokens.token,
+      email: inviteTokens.email,
+      creatorId: inviteTokens.creatorId,
+      creatorName: creators.name,
+      expiresAt: inviteTokens.expiresAt,
+      createdAt: inviteTokens.createdAt,
+    })
     .from(inviteTokens)
+    .leftJoin(creators, eq(creators.id, inviteTokens.creatorId))
     .where(and(eq(inviteTokens.tenantId, tenantId), isNull(inviteTokens.usedAt)));
 
-  // Filter out expired pending invites on the fly (no need for extra DB query)
   const now = new Date();
   const activePendingInvites = pendingInvites.filter((i) => i.expiresAt > now);
 
@@ -38,30 +46,72 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** POST /api/invites — create invite link (+ optional email). Owner only. */
+/** POST /api/invites — create invite link for a specific creator. Owner only. */
 export async function POST(req: NextRequest) {
   const auth = await requireOwner(req);
   if (!auth.ok) return auth.response;
   const { tenantId, userId } = auth.ctx;
 
+  let creatorId: string;
   let email: string | undefined;
-  let creatorId: string | undefined;
   try {
     const body = await req.json();
     const parsed = CreateInviteSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request." }, { status: 400 });
     }
-    email = parsed.data.email;
     creatorId = parsed.data.creatorId;
+    email = parsed.data.email;
   } catch {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
+  }
+
+  // Validate creator belongs to this tenant and is not archived.
+  const [creator] = await db
+    .select({ id: creators.id, name: creators.name })
+    .from(creators)
+    .where(and(eq(creators.id, creatorId), eq(creators.tenantId, tenantId), isNull(creators.archivedAt)))
+    .limit(1);
+
+  if (!creator) {
+    return NextResponse.json({ error: "Креатор не найден. Сначала добавьте креатора в настройках." }, { status: 400 });
+  }
+
+  // Prevent duplicate: creator already has an active user account.
+  const [existingUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.tenantId, tenantId), eq(users.creatorId, creatorId)))
+    .limit(1);
+
+  if (existingUser) {
+    return NextResponse.json({ error: `У этого креатора уже есть аккаунт в команде.` }, { status: 409 });
+  }
+
+  // Idempotency: if there's already an active pending invite for this creator, return it.
+  const now = new Date();
+  const [existingInvite] = await db
+    .select({ token: inviteTokens.token, expiresAt: inviteTokens.expiresAt })
+    .from(inviteTokens)
+    .where(and(eq(inviteTokens.tenantId, tenantId), eq(inviteTokens.creatorId, creatorId), isNull(inviteTokens.usedAt)))
+    .limit(1);
+
+  if (existingInvite && existingInvite.expiresAt > now) {
+    const baseUrl = process.env.NEXTAUTH_URL ?? "https://contentradar.app";
+    return NextResponse.json({ token: existingInvite.token, inviteUrl: `${baseUrl}/invite/${existingInvite.token}` });
   }
 
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-  await db.insert(inviteTokens).values({ token, tenantId, invitedByUserId: userId, email: email ?? null, creatorId: creatorId ?? null, expiresAt });
+  await db.insert(inviteTokens).values({
+    token,
+    tenantId,
+    invitedByUserId: userId,
+    email: email ?? null,
+    creatorId,
+    expiresAt,
+  });
 
   const baseUrl = process.env.NEXTAUTH_URL ?? "https://contentradar.app";
   const inviteUrl = `${baseUrl}/invite/${token}`;
@@ -83,7 +133,7 @@ export async function POST(req: NextRequest) {
         <tr><td style="padding:32px 36px 24px;">
           <p style="margin:0 0 16px;font-size:16px;color:#0f172a;font-weight:600;">Вас пригласили в ContentRadar</p>
           <p style="margin:0 0 20px;font-size:14px;color:#334155;line-height:1.6;">
-            ${inviter?.name ?? "Владелец аккаунта"} приглашает вас присоединиться как креатор. Ссылка действительна 7 дней.
+            ${inviter?.name ?? "Владелец аккаунта"} приглашает вас присоединиться как креатор${creator.name ? ` (${creator.name})` : ""}. Ссылка действительна 7 дней.
           </p>
           <a href="${inviteUrl}" style="display:inline-block;background:#5b5bd6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;">Принять приглашение</a>
         </td></tr>

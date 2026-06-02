@@ -91,7 +91,7 @@ referral_codes   — промокоды партнёров. Не привяза�
 
 Индексы: `user_id`, `yookassa_payment_id`, `status`.
 
-**`invite_tokens`** — однократные токены для приглашения creator-пользователей. `tenant_id` FK NOT NULL, `invited_by_user_id` FK NOT NULL. `email` nullable (null = sharable link без конкретного адресата). TTL 7 дней, `used_at` помечает использование.
+**`invite_tokens`** — однократные токены для приглашения creator-пользователей. `tenant_id` FK NOT NULL, `invited_by_user_id` FK NOT NULL, `creator_id` FK nullable → `creators.id` (ON DELETE SET NULL). Каждый инвайт обязан ссылаться на конкретного креатора; API-уровень (`POST /api/invites`) отклоняет запросы без `creatorId`. `email` nullable — если указан, отправляется письмо. TTL 7 дней, `used_at` помечает использование. Повторный инвайт того же креатора идемпотентен — возвращает существующий токен.
 
 **`admin_settings`** — KV-хранилище для настроек admin-аккаунта. Используется для хранения bcrypt-хэша пароля owner-а после сброса через forgot-password flow. `key = 'password_hash'`, `value = bcrypt hash`. Нет FK — глобальная таблица (не per-tenant).
 
