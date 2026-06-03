@@ -42,6 +42,7 @@ types/       глобальные .d.ts
 - `products`, `products/[id]`.
 - `videos`, `videos/[id]`, `videos/export` (CSV).
 - `last-sync` — `MAX(scraped_at)` из `video_metrics`.
+- `patterns` — GET, паттерны топа недели для `WeeklyPatternsWidget`. Читает из `tenant_insights` (latest for tenant). Возвращает `{ state, patterns, period_label, ... }`.
 - `health` — статус трёх scraper-джобов из `scraper_state`. **Auth-gated** — требует JWT. Для uptime-мониторов — `/api/ping`.
 - `ping` — публичный liveness-probe для uptime-мониторов. Возвращает `{"ok":true}`, никаких operational данных.
 
