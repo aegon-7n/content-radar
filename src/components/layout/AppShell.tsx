@@ -8,7 +8,7 @@ import TrialBanner from "@/components/ui/TrialBanner";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAuth = pathname === "/login" || pathname === "/register" || pathname.startsWith("/invite/") || pathname === "/forgot-password" || pathname.startsWith("/reset-password");
+  const isAuth = pathname === "/login" || pathname === "/register" || pathname.startsWith("/invite/") || pathname === "/forgot-password" || pathname.startsWith("/reset-password") || pathname.startsWith("/ceo-x7Hg9pQ2Wf");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);

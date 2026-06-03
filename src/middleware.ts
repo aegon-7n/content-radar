@@ -4,11 +4,39 @@ import type { NextRequest } from "next/server";
 
 const SECRET = process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production";
 
-const KNOWN_PAGE_ROUTES = /^\/($|dashboard$|creators(\/[^/]+)?$|products(\/[^/]+)?$|videos(\/[^/]+)?$|settings(\/team)?$|admin\/waitlist$|admin\/referrals$)/;
+const KNOWN_PAGE_ROUTES = /^\/($|dashboard(\/patterns)?$|creators(\/[^/]+)?$|products(\/[^/]+)?$|videos(\/[^/]+)?$|settings(\/team)?$|admin\/waitlist$|admin\/referrals$)/;
+
+function checkCeoBasicAuth(request: NextRequest): NextResponse | null {
+  const ceoUser = process.env.CEO_ADMIN_BASIC_USER ?? "";
+  const ceoPass = process.env.CEO_ADMIN_BASIC_PASS ?? "";
+
+  if (!ceoUser || !ceoPass) {
+    return new NextResponse("CEO admin not configured", { status: 503 });
+  }
+
+  const authHeader = request.headers.get("authorization") ?? "";
+  const expected = `Basic ${btoa(`${ceoUser}:${ceoPass}`)}`;
+
+  if (authHeader !== expected) {
+    return new NextResponse("Unauthorized", {
+      status: 401,
+      headers: { "WWW-Authenticate": 'Basic realm="ContentRadar CEO Admin"' },
+    });
+  }
+
+  return null; // auth OK
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isApi = pathname.startsWith("/api/");
+
+  // CEO secret admin area — basic auth only, no NextAuth session
+  if (pathname.startsWith("/ceo-x7Hg9pQ2Wf")) {
+    const authError = checkCeoBasicAuth(request);
+    if (authError) return authError;
+    return NextResponse.next();
+  }
 
   if (!isApi && !KNOWN_PAGE_ROUTES.test(pathname)) {
     return NextResponse.next();
