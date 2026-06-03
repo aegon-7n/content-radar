@@ -73,6 +73,10 @@ types/       глобальные .d.ts
 - **`/admin/waitlist`** — Server Component за NextAuth (middleware защищает всё кроме `/api` и `/login`). Таблица заявок с фильтром по статусу (`?status=new|contacted|onboarded|rejected`), сортировка `created_at DESC`, лимит 100. Смена статуса — Server Action `updateStatus` (form + hidden id + select). Счётчики «Всего / Новых» в шапке. Ссылка в боковом меню под «Настройки».
 - **`/admin/referrals`** — Client Component. Список реферальных кодов с счётчиком использований. Форма создания нового кода (uppercase, regex `[A-Z0-9_-]+`). Кнопка копирования кода. Удаление кода. Только для adminOnly (Глеб). Ссылка в боковом меню рядом с Waitlist.
 
+## Маршруты `/ceo-*` (CEO admin, изолированные)
+
+- **`/ceo-x7Hg9pQ2Wf/waitlist`** — Секретная read-only страница для CEO. Защищена HTTP Basic Auth (middleware проверяет `Authorization: Basic` ДО любого рендера, возвращает 401 + `WWW-Authenticate` если нет). Не требует NextAuth-сессии. Env vars: `CEO_ADMIN_USER`, `CEO_ADMIN_PASS`. Показывает waitlist без Sidebar/Header (AppShell пропускает `/ceo-*` маршруты). Читает из БД напрямую (Server Component — исключение из паттерна "только через API", т.к. нет сессии).
+
 ## Паттерны
 
 **Server vs client.** Корневой `layout.tsx` — server. Большинство страниц-листов и дашборд — `"use client"`, т.к. нужны `useState` для периода/сортировки и `useEffect` для запросов. `Header`/`Sidebar`/`AppShell` — тоже клиентские (нужен `usePathname`). API-роуты, естественно, server.
