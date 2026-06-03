@@ -61,7 +61,7 @@ function DashboardInner() {
     if (selectedCategory) params.set("category", selectedCategory);
 
     fetch(`/api/dashboard?${params}`)
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then((d) => {
         d.dailyViews = d.byDay ?? [];
         setData(d);
@@ -80,7 +80,7 @@ function DashboardInner() {
   useEffect(() => {
     if (isEmpty && session?.user && role !== "creator") {
       fetch("/api/onboarding/state")
-        .then((r) => r.json())
+        .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
         .then(({ state }: { state: string | null }) => {
           if (!state) setShowWizard(true);
         })
