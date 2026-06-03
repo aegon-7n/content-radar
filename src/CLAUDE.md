@@ -42,6 +42,7 @@ types/       глобальные .d.ts
 - `products`, `products/[id]`.
 - `videos`, `videos/[id]`, `videos/export` (CSV).
 - `last-sync` — `MAX(scraped_at)` из `video_metrics`.
+- `patterns` — GET, паттерны топа недели для `WeeklyPatternsWidget`. Возвращает `{ state, patterns, period_label, ... }` по контракту TRU-320. Сейчас — stub с мок-данными; реальная аналитическая логика в TRU-321.
 - `health` — статус трёх scraper-джобов из `scraper_state`. **Требует auth** (внутренние данные: totals, job timing).
 - `ping` — публичный liveness probe для uptime мониторов, возвращает `{"ok": true}`. Без auth, без внутренних данных.
 

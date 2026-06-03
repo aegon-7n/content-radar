@@ -21,6 +21,7 @@ import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import { StatCardSkeleton, ChartSkeleton } from "@/components/ui/SkeletonCard";
 import OnboardingWizard from "@/components/ui/OnboardingWizard";
+import WeeklyPatternsWidget from "@/components/ui/WeeklyPatternsWidget";
 import { formatViews, formatDate, formatDateShort, formatER, getPlatformColor, getPlatformLabel } from "@/lib/format";
 import { MOCK_DASHBOARD, type DashboardData, type Platform } from "@/lib/mock-data";
 
@@ -336,6 +337,8 @@ function DashboardInner() {
           </div>
         </div>
       )}
+
+      <WeeklyPatternsWidget />
 
       {/* Bottom two-column row */}
       {!loading && (
