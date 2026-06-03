@@ -296,18 +296,16 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
           }}
         >
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] text-sm border-collapse">
+            <table className="w-full min-w-[1100px] text-sm border-collapse">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-default)" }}>
                   {[
                     "Дата",
                     "Имя",
-                    "Email",
-                    "Telegram",
-                    "Бренд / ниша",
-                    "Креаторов",
-                    "Маркетплейс",
-                    "Цель",
+                    "Контакт",
+                    "Магазин WB",
+                    "Команда",
+                    "Цель / боль",
                     "Статус",
                     "Заметки",
                     "",
@@ -323,7 +321,11 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, i) => (
+                {rows.map((row, i) => {
+                  // Prefer rev2 unified fields, fall back to rev1 separate fields
+                  const contactDisplay = row.contact ?? row.email ?? row.telegramHandle ?? "—";
+                  const storeDisplay = row.storeUrl ?? row.brand ?? "—";
+                  return (
                   <tr
                     key={row.id}
                     style={{
@@ -338,27 +340,19 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
                       {row.name ?? "—"}
                     </td>
 
-                    <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: "var(--text-primary)" }}>
-                      {row.email}
+                    <td className="px-4 py-3 whitespace-nowrap text-xs max-w-[180px] truncate" style={{ color: "var(--text-primary)" }} title={contactDisplay}>
+                      {contactDisplay}
                     </td>
 
-                    <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: "var(--text-secondary)" }}>
-                      {row.telegramHandle ?? "—"}
-                    </td>
-
-                    <td className="px-4 py-3 text-xs font-medium max-w-[160px] truncate" style={{ color: "var(--text-primary)" }} title={row.brand}>
-                      {row.brand}
+                    <td className="px-4 py-3 text-xs max-w-[180px] truncate" style={{ color: "var(--text-secondary)" }} title={storeDisplay}>
+                      {storeDisplay}
                     </td>
 
                     <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: "var(--text-secondary)" }}>
                       {row.creatorsRange}
                     </td>
 
-                    <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: "var(--text-muted)" }}>
-                      {row.marketplace ?? "—"}
-                    </td>
-
-                    <td className="px-4 py-3 text-xs max-w-[200px]" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 text-xs max-w-[220px]" style={{ color: "var(--text-secondary)" }}>
                       {row.goal ? (
                         <span title={row.goal} className="block truncate">{row.goal}</span>
                       ) : "—"}
@@ -432,7 +426,8 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
                       </form>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
