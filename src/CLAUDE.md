@@ -16,6 +16,7 @@ types/       глобальные .d.ts
 ## Маршруты `app/`
 
 - **`/`** — главный дашборд: KPI-карточки, line-chart по дням, donut по платформам, топ-5 роликов. Использует `getPeriodDates()` из `PeriodSelector`.
+- **`/dashboard/patterns`** — AI-разбор топ-роликов: список pattern-карточек (top-N vs bot-N, delta, actionable, inverted). MVP hardcoded на Тиму. Данные из `/api/dashboard/creator-insights`.
 - **`/creators`**, **`/creators/[id]`** — список и детальная.
 - **`/products`**, **`/products/[id]`** — список и детальная.
 - **`/videos`**, **`/videos/[id]`** — список с фильтрами/сортировкой/пагинацией и детальная.
@@ -43,6 +44,7 @@ types/       глобальные .d.ts
 - `videos`, `videos/[id]`, `videos/export` (CSV).
 - `last-sync` — `MAX(scraped_at)` из `video_metrics`.
 - `patterns` — GET, паттерны топа недели для `WeeklyPatternsWidget`. Читает из `tenant_insights` (latest for tenant). Возвращает `{ state, patterns, period_label, ... }`.
+- `dashboard/creator-insights` — GET, AI-разбор топ-роликов (top-N vs bot-N паттерны). MVP: данные из статичного файла `lib/creator-insights-data.ts`, hardcoded Тима. Схема: `CreatorInsightsData` из того же файла. Когда Krab доставит TRU-361 bottom-15 JSON — обновить данные в `creator-insights-data.ts`.
 - `health` — статус трёх scraper-джобов из `scraper_state`. **Auth-gated** — требует JWT. Для uptime-мониторов — `/api/ping`.
 - `ping` — публичный liveness-probe для uptime-мониторов. Возвращает `{"ok":true}`, никаких operational данных.
 
