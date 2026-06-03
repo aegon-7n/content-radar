@@ -1,8 +1,16 @@
 """
-TRU-344: Production pattern-analysis pipeline.
+TRU-344/TRU-368: Production pattern-analysis pipeline.
 
 Queries prod DB, downloads top videos via yt-dlp, analyzes with Gemini 2.5 Flash,
 saves results to tenant_insights.  Runs weekly via cron (Monday 04:00 UTC).
+
+Architecture (TRU-368):
+  Step A — Per-video tagging: analyze_video() extracts structured JSON per video (LLM, cached).
+            extract_tags() converts that JSON to a flat tag list (Python, no LLM).
+  Step B — Pattern comparison: build_tag_dataframe() computes pct_top/pct_bottom per tag (Python).
+            LOO validation recomputes the same dataframe — no extra LLM calls.
+  Step C — Describe survivors: one LLM call for all patterns that passed sharp+LOO gates.
+  Step D — Russian validator: is_russian() + auto-retry if any field is below 80% Cyrillic.
 
 Usage:
     # All tenants (normal cron mode):
@@ -309,60 +317,326 @@ Output JSON:
     return result
 
 
-# ── Comparative analysis → JSON patterns ─────────────────────────────────────
+# ── Tag taxonomy (Step A) ─────────────────────────────────────────────────────
 
-def comparative_analysis(top_features: list[dict], mid_features: list[dict],
-                         gem: genai.Client) -> tuple[dict, int]:
+# tag → (Russian name, Russian description) used as fallback when LLM fails
+TAG_NAMES: dict[str, tuple[str, str]] = {
+    "first2s_result":              ("результат_с_первой_секунды",    "Первые 2 секунды показывают результат или итог"),
+    "first2s_problem":             ("проблема_с_первой_секунды",     "Первые 2 секунды обозначают проблему"),
+    "first2s_face":                ("лицо_с_первой_секунды",         "Первые 2 секунды — крупный план лица"),
+    "first2s_product":             ("товар_с_первой_секунды",        "Первые 2 секунды показывают товар"),
+    "first2s_text":                ("текстовый_старт",               "Первые 2 секунды — текстовый экран без товара"),
+    "first2s_hands":               ("руки_с_первой_секунды",         "Первые 2 секунды — только руки"),
+    "first2s_environment":         ("среда_с_первой_секунды",        "Первые 2 секунды — окружение или обстановка"),
+    "narrative_problem_solution":  ("нарратив_проблема_решение",     "Структура: проблема → решение"),
+    "narrative_before_after":      ("нарратив_до_после",             "Структура: до/после"),
+    "narrative_demo":              ("нарратив_демонстрация",         "Демонстрация товара или процесса"),
+    "narrative_review":            ("нарратив_обзор",                "Обзор или отзыв о товаре"),
+    "narrative_storytelling":      ("нарратив_история",              "Сторителлинг с личным опытом"),
+    "narrative_haul":              ("нарратив_хаул",                 "Хаул или распаковка нескольких товаров"),
+    "narrative_comparison":        ("нарратив_сравнение",            "Сравнение товаров или вариантов"),
+    "human_talking_head":          ("говорящая_голова",              "Человек снят по плечи, прямо в камеру"),
+    "human_hands_only":            ("только_руки",                   "Только руки, без показа лица"),
+    "human_absent":                ("нет_человека",                  "Человек отсутствует в кадре"),
+    "human_lifestyle_bg":          ("лайфстайл_образ",              "Человек как образ жизни, не продавец"),
+    "speaks_to_camera":            ("прямое_обращение_к_камере",    "Прямое обращение к зрителю через камеру"),
+    "audio_voice_only":            ("только_голос",                  "Только голос автора, без фоновой музыки"),
+    "audio_trending_audio":        ("трендовый_аудиотрек",          "Использование трендового аудио"),
+    "audio_original_music":        ("оригинальная_музыка",          "Оригинальная или фоновая музыка"),
+    "audio_silence":               ("без_звука",                     "Тишина или очень тихий звук"),
+    "has_onscreen_text":           ("есть_текст_на_экране",         "Присутствует наложенный текст"),
+    "text_label":                  ("текст_подпись",                 "Текст как подпись или ярлык"),
+    "text_price":                  ("текст_цена",                    "Текст с ценой или скидкой"),
+    "text_hook":                   ("текст_зацепка",                 "Текст как зацепка в начале"),
+    "text_punchline":              ("текст_вывод",                   "Текст как итог или вывод"),
+    "text_all_caps":               ("текст_заглавными",             "Текст написан заглавными буквами"),
+    "emotion_desire":              ("эмоция_желание",               "Апелляция к желанию приобрести"),
+    "emotion_humor":               ("эмоция_юмор",                  "Юмор или шутка"),
+    "emotion_surprise":            ("эмоция_удивление",             "Удивление или вау-эффект"),
+    "emotion_recognition":         ("эмоция_узнавание",             "Узнавание ситуации «и у меня так»"),
+    "emotion_asmr":                ("эмоция_асмр",                  "АСМР или сенсорное удовольствие"),
+    "emotion_frustration":         ("эмоция_раздражение",          "Показ боли или раздражения"),
+    "pacing_fast":                 ("быстрый_монтаж",               "Быстрый темп монтажа"),
+    "pacing_medium":               ("средний_монтаж",               "Средний темп монтажа"),
+    "pacing_slow":                 ("медленный_монтаж",             "Медленный темп монтажа"),
+    "high_cuts":                   ("много_склеек",                  "4 и более склеек на 10 секунд"),
+    "product_early_show":          ("товар_первые_3_секунды",       "Товар появляется в первые 3 секунды"),
+}
+
+
+def extract_tags(features: dict) -> list[str]:
+    """Convert structured feature JSON to flat tag list (Python, no LLM)."""
+    if "error" in features:
+        return []
+
+    tags: list[str] = []
+
+    f2s = features.get("first_2s") or {}
+    shown = f2s.get("what_shown") or ""
+    # LLM sometimes returns pipe-separated multi-values; tag each individually
+    for item in (v.strip() for v in shown.split("|") if v.strip()):
+        tags.append(f"first2s_{item}")
+
+    ns = features.get("narrative_structure") or ""
+    if ns:
+        tags.append(f"narrative_{ns}")
+
+    human = features.get("human_in_frame") or {}
+    presence = human.get("presence") or ""
+    for item in (v.strip() for v in presence.split("|") if v.strip()):
+        tags.append(f"human_{item}")
+    if human.get("speaks_to_camera"):
+        tags.append("speaks_to_camera")
+
+    audio = features.get("audio") or {}
+    audio_type = audio.get("type") or ""
+    if audio_type:
+        tags.append(f"audio_{audio_type}")
+
+    ost = features.get("on_screen_text") or {}
+    if ost.get("present"):
+        tags.append("has_onscreen_text")
+        func = ost.get("function") or ""
+        if func:
+            tags.append(f"text_{func}")
+
+    emotion = features.get("emotion_target") or ""
+    for item in (v.strip() for v in emotion.split("|") if v.strip()):
+        tags.append(f"emotion_{item}")
+
+    pacing = features.get("pacing") or {}
+    tempo = pacing.get("perceived_tempo") or ""
+    if tempo:
+        tags.append(f"pacing_{tempo}")
+    if (pacing.get("cuts_per_10s") or 0) >= 4:
+        tags.append("high_cuts")
+
+    prod = features.get("product_show_timing") or {}
+    first_app = prod.get("first_appearance_sec")
+    if first_app is not None and first_app <= 3:
+        tags.append("product_early_show")
+
+    return tags
+
+
+# ── Pattern comparison (Step B) — pure Python, no LLM ────────────────────────
+
+def build_tag_dataframe(top_features: list[dict], mid_features: list[dict]) -> list[dict]:
+    """Compute pct_top and pct_bottom per tag across both pools."""
+    top_tags = [set(extract_tags(f)) for f in top_features]
+    mid_tags = [set(extract_tags(f)) for f in mid_features]
+
+    all_tags: set[str] = set()
+    for tags in top_tags + mid_tags:
+        all_tags.update(tags)
+
+    n_top = len(top_features)
+    n_mid = len(mid_features)
+
+    rows: list[dict] = []
+    for tag in sorted(all_tags):
+        cnt_top = sum(1 for tags in top_tags if tag in tags)
+        cnt_mid = sum(1 for tags in mid_tags if tag in tags)
+        pct_top = cnt_top / n_top if n_top > 0 else 0.0
+        pct_bot = cnt_mid / n_mid if n_mid > 0 else 0.0
+        rows.append({
+            "tag": tag,
+            "pct_top": pct_top,
+            "pct_bottom": pct_bot,
+            "cnt_top": cnt_top,
+            "cnt_bottom": cnt_mid,
+            "n_top": n_top,
+            "n_bottom": n_mid,
+        })
+
+    return rows
+
+
+# ── Sharp threshold (Step 3) ──────────────────────────────────────────────────
+
+def apply_sharp_filter(rows: list[dict]) -> list[dict]:
+    """Hard cutoff: pct_top ≥ 0.80, pct_bottom ≤ 0.20, diff ≥ 0.60."""
+    return [
+        p for p in rows
+        if p["pct_top"] >= 0.80
+        and p["pct_bottom"] <= 0.20
+        and (p["pct_top"] - p["pct_bottom"]) >= 0.60
+    ]
+
+
+# ── LOO cross-validation (Step 4) ─────────────────────────────────────────────
+
+def loo_validate(patterns: list[dict], top_features: list[dict]) -> list[dict]:
     """
-    Returns (patterns_dict, total_tokens).
-    patterns_dict = {"patterns": [{distinguishing_signal, evidence, actionable, confidence}]}
+    Leave-one-out cross-validation. Pure Python, no LLM calls.
+    Removes each top video once, recomputes pct_top.
+    Pattern is robust if ≥80% of LOO runs still give pct_top ≥ 0.80.
     """
-    prompt = f"""Ты — chief content strategist для ContentRadar (аналитика WB-селлеров).
+    all_top_tags = [set(extract_tags(f)) for f in top_features]
+    loo_n = min(15, len(top_features))
+    robust: list[dict] = []
 
-ВХОДНЫЕ ДАННЫЕ:
-- TOP-{len(top_features)} ролики (по просмотрам): {json.dumps(top_features, ensure_ascii=False)}
-- MIDDLE-{len(mid_features)} ролики (медиана): {json.dumps(mid_features, ensure_ascii=False)}
+    for p in patterns:
+        tag = p["tag"]
+        pass_count = 0
 
-ЗАДАЧА: Найди РОВНО 2-3 ОТЛИЧАЮЩИХ паттерна (не больше 3).
-Паттерн должен пройти ОБА теста:
-1. Тест отличия: встречается ≥70% top vs ≤30% middle (или наоборот).
-2. Тест применимости: «креатор прочитал и завтра конкретно делает Y».
+        for i in range(loo_n):
+            reduced = [tags for j, tags in enumerate(all_top_tags) if j != i]
+            cnt = sum(1 for tags in reduced if tag in tags)
+            pct = cnt / len(reduced) if reduced else 0.0
+            if pct >= 0.80:
+                pass_count += 1
 
-ЗАПРЕЩЕНО (банальности):
-- «используйте сильный хук», «снимайте динамично», «добавьте текст»
-- обобщения без числовой поддержки
+        p["loo_pass"] = pass_count
+        p["loo_n"] = loo_n
+        p["loo_robust"] = pass_count >= max(1, int(loo_n * 0.80))
 
-Для каждого паттерна:
-- confidence: "sharp" (≥70/30 разрыв надёжно) или "medium" (50-70% разрыв, но тест пройден)
+        if p["loo_robust"]:
+            robust.append(p)
 
-Output ТОЛЬКО JSON без markdown-обёртки:
-{{
-  "patterns": [
-    {{
-      "distinguishing_signal": "конкретный сигнал с цифрами",
-      "evidence": "X из Y топов vs A из B средних",
-      "actionable": "конкретное действие завтра",
-      "confidence": "sharp"
-    }}
-  ]
-}}"""
+    return robust
 
-    resp = gem.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
+
+# ── Russian validator (Step 5) ────────────────────────────────────────────────
+
+def is_russian(text: str) -> bool:
+    cyrillic = sum(1 for c in text if 'а' <= c.lower() <= 'я' or c.lower() == 'ё')
+    letters = sum(1 for c in text if c.isalpha())
+    return letters == 0 or cyrillic / letters >= 0.80
+
+
+_ENGLISH_MAPPING = (
+    "desire → желание\n"
+    "hook → зацепка\n"
+    "CTA → призыв_к_действию\n"
+    "call to action → призыв к действию\n"
+    "engagement → вовлечённость\n"
+    "conversion → конверсия\n"
+    "content → контент\n"
+    "trending → трендовый\n"
+    "storytelling → сторителлинг\n"
+    "haul → хаул\n"
+    "punchline → панчлайн\n"
+    "before after → до_после\n"
+)
+
+
+def validate_russian(pattern: dict, gem: genai.Client) -> dict:
+    """Validate name/description ≥80% Cyrillic; auto-retry with strict instruction."""
+    name = pattern.get("name", "")
+    description = pattern.get("description", "")
+
+    if is_russian(name) and is_russian(description):
+        return pattern
+
+    retry_prompt = (
+        "Переведи эти поля СТРОГО на русский язык (≥80% кириллических букв).\n"
+        "НЕ используй английские термины — даже в скобках, даже в терминологии.\n\n"
+        f"Таблица замен:\n{_ENGLISH_MAPPING}\n"
+        f"name: {name}\n"
+        f"description: {description}\n\n"
+        'Output ONLY JSON без markdown: {"name": "...", "description": "..."}'
     )
+    try:
+        resp = gem.models.generate_content(model="gemini-2.5-flash", contents=retry_prompt)
+        text = resp.text.strip()
+        if text.startswith("```"):
+            text = text.split("```")[1].lstrip("json\n")
+        result = json.loads(text)
+        pattern["name"] = result.get("name", name)
+        pattern["description"] = result.get("description", description)
+    except Exception as e:
+        print(f"  ! russian retry parse failed: {e}")
+
+    return pattern
+
+
+# ── Final description generation (Step C) ─────────────────────────────────────
+
+def generate_pattern_descriptions(
+    patterns: list[dict], gem: genai.Client
+) -> tuple[list[dict], int]:
+    """
+    One LLM call to generate Russian descriptions for all LOO-robust patterns.
+    Returns (enriched_patterns, tokens_used).
+    """
+    if not patterns:
+        return [], 0
+
+    summaries = []
+    for p in patterns:
+        name_hint, _ = TAG_NAMES.get(p["tag"], (p["tag"], ""))
+        summaries.append({
+            "tag": p["tag"],
+            "name_hint": name_hint,
+            "pct_top": round(p["pct_top"], 2),
+            "pct_bottom": round(p["pct_bottom"], 2),
+            "cnt_top": p["cnt_top"],
+            "cnt_bottom": p["cnt_bottom"],
+            "n_top": p["n_top"],
+            "n_bottom": p["n_bottom"],
+        })
+
+    prompt = (
+        "Ты — chief content strategist для ContentRadar (аналитика WB-селлеров).\n\n"
+        "Паттерны прошли sharp-порог и LOO-валидацию — они статистически отличают топ от средних.\n"
+        "Все поля output СТРОГО на русском языке. НЕ используй английские термины:\n"
+        "desire→желание, hook→зацепка, CTA→призыв_к_действию, storytelling→сторителлинг,\n"
+        "content→контент, trending→трендовый, haul→хаул.\n\n"
+        f"Паттерны:\n{json.dumps(summaries, ensure_ascii=False)}\n\n"
+        "Для каждого паттерна:\n"
+        "- name: короткое русское название-ярлык (используй name_hint как основу, snake_case кириллицей)\n"
+        "- description: 1-2 предложения — что именно делают топ-ролики и почему это важно\n"
+        "- distinguishing_signal: факт с цифрами (для UI-карточки)\n"
+        "- evidence: «N из M топов vs A из B средних»\n"
+        "- actionable: конкретное действие «что создатель делает завтра»\n\n"
+        "Output ONLY JSON без markdown:\n"
+        '{"patterns": [{"tag": "...", "name": "...", "description": "...", '
+        '"distinguishing_signal": "...", "evidence": "...", "actionable": "..."}]}'
+    )
+
+    resp = gem.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+    tokens = resp.usage_metadata.total_token_count
 
     try:
         text = resp.text.strip()
         if text.startswith("```"):
             text = text.split("```")[1].lstrip("json\n")
         result = json.loads(text)
-    except Exception as e:
-        print(f"  ! comparative parse failed: {e}")
-        result = {"patterns": []}
+        generated = {p["tag"]: p for p in result.get("patterns", [])}
 
-    tokens = resp.usage_metadata.total_token_count
-    return result, tokens
+        for p in patterns:
+            gen = generated.get(p["tag"], {})
+            name_ru, desc_ru = TAG_NAMES.get(p["tag"], (p["tag"], p["tag"]))
+            p["name"] = gen.get("name", name_ru)
+            p["description"] = gen.get("description", desc_ru)
+            p["distinguishing_signal"] = gen.get(
+                "distinguishing_signal",
+                f"{name_ru}: {round(p['pct_top'] * 100)}% топ vs {round(p['pct_bottom'] * 100)}% средних",
+            )
+            p["evidence"] = gen.get(
+                "evidence",
+                f"{p['cnt_top']} из {p['n_top']} топов vs {p['cnt_bottom']} из {p['n_bottom']} средних",
+            )
+            p["actionable"] = gen.get("actionable", "")
+            p["confidence"] = "sharp"
+
+    except Exception as e:
+        print(f"  ! generate descriptions parse failed: {e}")
+        for p in patterns:
+            name_ru, desc_ru = TAG_NAMES.get(p["tag"], (p["tag"], p["tag"]))
+            p["name"] = name_ru
+            p["description"] = desc_ru
+            p["distinguishing_signal"] = (
+                f"{name_ru}: {round(p['pct_top'] * 100)}% топ vs {round(p['pct_bottom'] * 100)}% средних"
+            )
+            p["evidence"] = (
+                f"{p['cnt_top']} из {p['n_top']} топов vs {p['cnt_bottom']} из {p['n_bottom']} средних"
+            )
+            p["actionable"] = ""
+            p["confidence"] = "sharp"
+
+    return patterns, tokens
 
 
 # ── Telegram alert ────────────────────────────────────────────────────────────
@@ -436,7 +710,7 @@ def run_tenant(tenant: dict, conn, gem: genai.Client, oai: OpenAI) -> str:
             print(f"  ! whisper failed {r['id']}: {e}")
             transcripts[r["id"]] = ""
 
-    # Per-video analysis
+    # Per-video feature extraction (Step A — LLM per video, cached)
     total_tokens = 0
     features: list[dict] = []
     for r, mp4 in pool_mp4:
@@ -452,25 +726,81 @@ def run_tenant(tenant: dict, conn, gem: genai.Client, oai: OpenAI) -> str:
     if len(top_feats) < 3 or len(mid_feats) < 3:
         return f"failed:not enough valid features top={len(top_feats)} mid={len(mid_feats)}"
 
-    # Comparative analysis
-    patterns_dict, cmp_tokens = comparative_analysis(top_feats, mid_feats, gem)
-    total_tokens += cmp_tokens
-
-    # Cost estimate: Gemini 2.5 Flash = $0.075/1M input + ~$0.30/1M output
     cost_usd = (total_tokens / 1_000_000) * 0.30
+
+    period_end = date.today()
+    period_start = period_end - timedelta(days=6)
+
+    # Step B: Python-only tag comparison (no LLM — LOO can recompute this cheaply)
+    all_patterns = build_tag_dataframe(top_feats, mid_feats)
+
+    # Step 3: Sharp threshold hard cutoff
+    sharp = apply_sharp_filter(all_patterns)
+    print(f"  Sharp patterns: {len(sharp)}/{len(all_patterns)}")
+
+    if not sharp:
+        cold = {
+            "patterns": [],
+            "cold_state": True,
+            "reason": "недостаточно данных для уверенного вывода, накапливаем",
+        }
+        save_insight(conn, tenant_id, period_start, period_end, cold, len(pool_mp4), cost_usd)
+        print("  Cold state: no patterns passed sharp threshold")
+        return "ok"
+
+    # Step 4: LOO cross-validation (Python, no LLM)
+    robust = loo_validate(sharp, top_feats)
+    print(f"  LOO-robust patterns: {len(robust)}/{len(sharp)}")
+
+    if not robust:
+        cold = {
+            "patterns": [],
+            "cold_state": True,
+            "reason": "недостаточно данных для уверенного вывода, накапливаем",
+        }
+        save_insight(conn, tenant_id, period_start, period_end, cold, len(pool_mp4), cost_usd)
+        print("  Cold state: no patterns survived LOO validation")
+        return "ok"
+
+    # Cap at MAX_PATTERNS, pick highest pct_top
+    robust.sort(key=lambda p: -(p["pct_top"] - p["pct_bottom"]))
+    robust = robust[:MAX_PATTERNS]
+
+    # Step C: One LLM call for surviving patterns
+    robust, desc_tokens = generate_pattern_descriptions(robust, gem)
+    total_tokens += desc_tokens
+
+    # Step 5: Russian validator with auto-retry per pattern
+    validated: list[dict] = []
+    for p in robust:
+        p = validate_russian(p, gem)
+        if is_russian(p.get("name", "")) and is_russian(p.get("description", "")):
+            validated.append(p)
+        else:
+            print(f"  ! pattern {p.get('tag')} dropped: failed Russian after retry")
+
+    cost_usd = (total_tokens / 1_000_000) * 0.30
+
+    if not validated:
+        cold = {
+            "patterns": [],
+            "cold_state": True,
+            "reason": "недостаточно данных для уверенного вывода, накапливаем",
+        }
+        save_insight(conn, tenant_id, period_start, period_end, cold, len(pool_mp4), cost_usd)
+        return "ok"
+
+    patterns_dict = {"patterns": validated}
 
     if cost_usd > COST_BUDGET_USD:
         print(f"  ! cost ${cost_usd:.3f} exceeds budget ${COST_BUDGET_USD}")
     else:
         print(f"  Cost: ${cost_usd:.4f} ({total_tokens} tokens)")
 
-    period_end = date.today()
-    period_start = period_end - timedelta(days=6)
-
     save_insight(conn, tenant_id, period_start, period_end,
                  patterns_dict, len(pool_mp4), cost_usd)
 
-    n_patterns = len(patterns_dict.get("patterns", []))
+    n_patterns = len(validated)
     print(f"  Saved: {n_patterns} patterns, period {period_start} → {period_end}")
     return "ok"
 
