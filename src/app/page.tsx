@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   LineChart,
@@ -34,9 +34,18 @@ const tooltipStyle = {
 };
 
 function DashboardInner() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const role = (session?.user as { role?: string } | undefined)?.role ?? "owner";
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/login");
+    }
+  }, [status, router]);
+
+  if (status === "unauthenticated") return null;
   const [period, setPeriod] = useState<Period>("30d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
