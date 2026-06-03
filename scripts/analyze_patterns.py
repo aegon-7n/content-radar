@@ -1,8 +1,14 @@
 """
-TRU-344: Production pattern-analysis pipeline.
+TRU-344 / TRU-368: Production pattern-analysis pipeline.
 
 Queries prod DB, downloads top videos via yt-dlp, analyzes with Gemini 2.5 Flash,
 saves results to tenant_insights.  Runs weekly via cron (Monday 04:00 UTC).
+
+Quality gates (TRU-368):
+- Top vs BOTTOM (not middle); bottom excludes <100 views.
+- Sharp threshold: pct_top ≥ 0.80 AND pct_bottom ≤ 0.20 AND diff ≥ 0.60 — in Python, not prompt.
+- LOO-robust: ≥80% of leave-one-out top runs still pass sharp threshold.
+- Russian-only output (≥80% Cyrillic): auto-retry if LLM returns English.
 
 Usage:
     # All tenants (normal cron mode):
@@ -25,7 +31,7 @@ import os
 import subprocess
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -48,19 +54,29 @@ for _d in (VIDEO_DIR, TRANSCRIPT_DIR, ANALYSIS_DIR):
 
 YT_DLP = os.getenv("YTDLP_BIN", str(APP_DIR / "scraper/venv/bin/yt-dlp"))
 if not Path(YT_DLP).exists():
-    YT_DLP = "yt-dlp"  # fallback to system PATH
+    YT_DLP = "yt-dlp"
 FFMPEG = os.getenv("FFMPEG_BIN", "ffmpeg")
 SOCKS_PROXY = os.getenv("SOCKS_PROXY", "")
 COOKIES_FILE = APP_DIR / "scraper" / "youtube_cookies.txt"
 
 # Gate thresholds
 GATE_MIN_VIDEOS = 10
-GATE_TOP_QUARTILE_RECENT = 3   # ≥3 top-quartile videos scraped in last 7 days
+GATE_TOP_QUARTILE_RECENT = 3
 GATE_RECENT_DAYS = 7
 
 TOP_N = 15
-MID_N = 15
+BOTTOM_N = 15
+BOTTOM_MIN_VIEWS = 100   # exclude zero-view noise from bottom group
 MAX_PATTERNS = 3
+
+# Sharp quality gates (TRU-368)
+SHARP_PCT_TOP = 0.80
+SHARP_PCT_BOTTOM = 0.20
+SHARP_DIFF = 0.60
+LOO_ROBUST_RATIO = 0.80  # ≥80% of LOO runs must pass
+
+RUSSIAN_MIN_RATIO = 0.80  # ≥80% Cyrillic in name+description
+RUSSIAN_MAX_RETRIES = 2
 
 COST_BUDGET_USD = 0.15
 
@@ -72,22 +88,16 @@ def get_conn():
 
 
 def get_tenants_for_analysis(conn, tenant_id_filter: str | None = None) -> list[dict]:
-    """Return tenants that pass the gate for analysis."""
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
     if tenant_id_filter:
         cur.execute("SELECT id, name FROM tenants WHERE id = %s", (tenant_id_filter,))
     else:
         cur.execute("SELECT id, name FROM tenants")
-
     return [dict(r) for r in cur.fetchall()]
 
 
 def get_tenant_videos(conn, tenant_id: str) -> list[dict]:
-    """
-    Return all active videos for the tenant with their latest metrics.
-    Sorted by views DESC.  Videos with zero successful scrapes are excluded.
-    """
+    """Return all active videos with latest metrics, sorted by views DESC."""
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute("""
         SELECT
@@ -114,11 +124,9 @@ def get_tenant_videos(conn, tenant_id: str) -> list[dict]:
 
 
 def check_gate(videos: list[dict]) -> tuple[bool, str]:
-    """Returns (passes, reason)."""
     if len(videos) < GATE_MIN_VIDEOS:
         return False, f"only {len(videos)} videos (need {GATE_MIN_VIDEOS})"
 
-    # Top quartile threshold by views
     top_25_pct = max(1, len(videos) // 4)
     top_quartile = videos[:top_25_pct]
 
@@ -130,14 +138,21 @@ def check_gate(videos: list[dict]) -> tuple[bool, str]:
             f"only {len(recent_top)} top-quartile videos scraped in last {GATE_RECENT_DAYS}d "
             f"(need {GATE_TOP_QUARTILE_RECENT})"
         )
-
     return True, "ok"
 
 
-def split_top_middle(videos: list[dict], top_n: int, mid_n: int) -> tuple[list, list]:
+def split_top_bottom(videos: list[dict], top_n: int, bottom_n: int) -> tuple[list, list]:
+    """
+    Top-N: highest views (already sorted desc).
+    Bottom-N: lowest views, excluding videos with <BOTTOM_MIN_VIEWS (zero-view noise).
+    """
     top = videos[:top_n]
-    mid = videos[top_n : top_n + mid_n]
-    return top, mid
+    eligible_bottom = [v for v in videos if (v["views"] or 0) >= BOTTOM_MIN_VIEWS]
+    bottom = list(reversed(eligible_bottom))[:bottom_n]
+    # Exclude any overlap with top (shouldn't happen, but defensive)
+    top_ids = {v["id"] for v in top}
+    bottom = [v for v in bottom if v["id"] not in top_ids]
+    return top, bottom
 
 
 def save_insight(conn, tenant_id: str, period_start: date, period_end: date,
@@ -176,7 +191,6 @@ def update_scraper_state(conn, status: str, message: str) -> None:
 # ── Video download ────────────────────────────────────────────────────────────
 
 def download_video(row: dict) -> Path | None:
-    """yt-dlp download. Cached by video_id. Returns mp4 path or None."""
     vid_id = row["id"]
     for ext in ("mp4", "webm", "mkv"):
         existing = VIDEO_DIR / f"{vid_id}.{ext}"
@@ -214,7 +228,6 @@ def download_video(row: dict) -> Path | None:
 # ── Transcription ─────────────────────────────────────────────────────────────
 
 def transcribe(mp4: Path, oai: OpenAI) -> str:
-    """Whisper transcript. Cached on disk."""
     txt_path = TRANSCRIPT_DIR / f"{mp4.stem}.txt"
     if txt_path.exists():
         return txt_path.read_text()
@@ -234,13 +247,19 @@ def transcribe(mp4: Path, oai: OpenAI) -> str:
     return r.text
 
 
-# ── Per-video feature extraction ──────────────────────────────────────────────
+# ── Per-video feature extraction (Stage A) ────────────────────────────────────
 
 def analyze_video(mp4: Path, transcript: str, row: dict, gem: genai.Client) -> dict:
-    """Single-video feature extraction via Gemini 2.5 Flash with native video upload."""
+    """
+    Tag a single video with fixed taxonomy via Gemini 2.5 Flash.
+    Cached per video_id — LOO reuses cache without extra LLM calls.
+    """
     cache = ANALYSIS_DIR / f"{mp4.stem}.json"
     if cache.exists():
-        return json.loads(cache.read_text())
+        stored = json.loads(cache.read_text())
+        # Invalidate if previous run had a parse error
+        if "error" not in stored:
+            return stored
 
     file = gem.files.upload(file=str(mp4))
     while file.state.name == "PROCESSING":
@@ -256,9 +275,10 @@ def analyze_video(mp4: Path, transcript: str, row: dict, gem: genai.Client) -> d
 - URL: {row['url']}, платформа: {row['platform']}
 - транскрипт: {transcript[:1500]}
 
-Извлеки СТРОГО структурированные признаки. Не пиши что-то «банальное». Если не уверен — ставь null.
+Извлеки СТРОГО структурированные признаки по ТОЧНОЙ таксономии ниже.
+Если не уверен — ставь null. Не выдумывай.
 
-Output JSON:
+Output JSON (только JSON, без markdown-обёртки):
 {{
   "first_2s": {{
     "what_shown": "result|problem|face|product|text|hands|environment",
@@ -283,7 +303,7 @@ Output JSON:
     "present": true|false,
     "function": "label|price|hook|punchline|all_caps"
   }},
-  "emotion_target": "desire|humor|surprise|recognition|asmr|frustration",
+  "emotion_target": "желание|юмор|удивление|узнавание|асмр|раздражение",
   "pacing": {{
     "cuts_per_10s": <int>,
     "perceived_tempo": "slow|medium|fast"
@@ -309,60 +329,207 @@ Output JSON:
     return result
 
 
-# ── Comparative analysis → JSON patterns ─────────────────────────────────────
+# ── Pattern computation (Stage B) — pure Python, no LLM ─────────────────────
 
-def comparative_analysis(top_features: list[dict], mid_features: list[dict],
-                         gem: genai.Client) -> tuple[dict, int]:
+def _flatten(feat: dict) -> dict:
+    """Flatten nested feature dict to key.subkey = value pairs."""
+    flat: dict = {}
+    for k, v in feat.items():
+        if k.startswith("_"):
+            continue
+        if isinstance(v, dict):
+            for sk, sv in v.items():
+                if sv is not None and not isinstance(sv, (dict, list)):
+                    flat[f"{k}.{sk}"] = sv
+        elif v is not None and not isinstance(v, list):
+            flat[k] = v
+    return flat
+
+
+def compute_sharp_patterns(top_feats: list[dict], bottom_feats: list[dict]) -> list[dict]:
     """
+    Compute pattern frequencies across top vs bottom groups.
+    Returns patterns passing hard sharp thresholds:
+      pct_top ≥ SHARP_PCT_TOP AND pct_bottom ≤ SHARP_PCT_BOTTOM AND diff ≥ SHARP_DIFF
+    or the symmetric bottom-dominant version.
+    """
+    top_flat = [_flatten(f) for f in top_feats]
+    bottom_flat = [_flatten(f) for f in bottom_feats]
+    n_top, n_bottom = len(top_flat), len(bottom_flat)
+    if n_top == 0 or n_bottom == 0:
+        return []
+
+    all_keys: set[str] = set()
+    for row in top_flat + bottom_flat:
+        all_keys.update(row.keys())
+
+    patterns: list[dict] = []
+    for key in all_keys:
+        all_values: set = set()
+        for row in top_flat + bottom_flat:
+            v = row.get(key)
+            if v is not None:
+                all_values.add(v)
+
+        for val in all_values:
+            pct_top = sum(1 for r in top_flat if r.get(key) == val) / n_top
+            pct_bottom = sum(1 for r in bottom_flat if r.get(key) == val) / n_bottom
+            diff = pct_top - pct_bottom
+
+            if pct_top >= SHARP_PCT_TOP and pct_bottom <= SHARP_PCT_BOTTOM and diff >= SHARP_DIFF:
+                patterns.append({
+                    "feature": key, "value": val,
+                    "pct_top": round(pct_top, 3), "pct_bottom": round(pct_bottom, 3),
+                    "differential": round(diff, 3),
+                    "direction": "top_dominant",
+                    "count_top": sum(1 for r in top_flat if r.get(key) == val),
+                    "count_bottom": sum(1 for r in bottom_flat if r.get(key) == val),
+                    "n_top": n_top, "n_bottom": n_bottom,
+                })
+            elif pct_bottom >= SHARP_PCT_TOP and pct_top <= SHARP_PCT_BOTTOM and (-diff) >= SHARP_DIFF:
+                # Top avoids this — equally informative signal
+                patterns.append({
+                    "feature": key, "value": val,
+                    "pct_top": round(pct_top, 3), "pct_bottom": round(pct_bottom, 3),
+                    "differential": round(-diff, 3),
+                    "direction": "bottom_dominant",
+                    "count_top": sum(1 for r in top_flat if r.get(key) == val),
+                    "count_bottom": sum(1 for r in bottom_flat if r.get(key) == val),
+                    "n_top": n_top, "n_bottom": n_bottom,
+                })
+
+    # Sort by differential descending for deterministic output
+    patterns.sort(key=lambda p: p["differential"], reverse=True)
+    return patterns
+
+
+def loo_validate(patterns: list[dict], top_feats: list[dict], bottom_feats: list[dict]) -> list[dict]:
+    """
+    Leave-one-out cross-validation across top group.
+    For each pattern, remove one top video at a time and recompute pct_top.
+    Robust if ≥ LOO_ROBUST_RATIO of runs still satisfy the sharp threshold.
+    This is cheap — reuses cached tag data, no LLM calls.
+    """
+    top_flat = [_flatten(f) for f in top_feats]
+    bottom_flat = [_flatten(f) for f in bottom_feats]
+    n_top = len(top_flat)
+    min_passes = max(1, round(n_top * LOO_ROBUST_RATIO))
+
+    robust: list[dict] = []
+    for p in patterns:
+        key, val, direction = p["feature"], p["value"], p["direction"]
+        passes = 0
+        for i in range(n_top):
+            loo_top = [r for j, r in enumerate(top_flat) if j != i]
+            n_loo = len(loo_top)
+            if n_loo == 0:
+                continue
+            pct_top_loo = sum(1 for r in loo_top if r.get(key) == val) / n_loo
+            if direction == "top_dominant" and pct_top_loo >= SHARP_PCT_TOP:
+                passes += 1
+            elif direction == "bottom_dominant" and pct_top_loo <= SHARP_PCT_BOTTOM:
+                passes += 1
+
+        p["loo_passes"] = passes
+        p["loo_total"] = n_top
+        p["loo_robust"] = passes >= min_passes
+        if p["loo_robust"]:
+            robust.append(p)
+
+    return robust
+
+
+# ── Russian validator ─────────────────────────────────────────────────────────
+
+def is_russian(text: str) -> bool:
+    cyrillic = sum(1 for c in text if 'а' <= c.lower() <= 'я' or c.lower() == 'ё')
+    letters = sum(1 for c in text if c.isalpha())
+    return letters == 0 or cyrillic / letters >= RUSSIAN_MIN_RATIO
+
+
+def _check_patterns_russian(patterns: list[dict]) -> bool:
+    for p in patterns:
+        combined = p.get("distinguishing_signal", "") + " " + p.get("actionable", "")
+        if not is_russian(combined):
+            return False
+    return True
+
+
+# ── Pattern description (Stage C) — LLM generates Russian text ───────────────
+
+def describe_patterns_russian(sharp_patterns: list[dict], gem: genai.Client) -> tuple[dict, int]:
+    """
+    Given pre-computed sharp+LOO-robust patterns, ask LLM to generate
+    Russian-language descriptions. Auto-retries if output is not Russian.
+
     Returns (patterns_dict, total_tokens).
     patterns_dict = {"patterns": [{distinguishing_signal, evidence, actionable, confidence}]}
+    If no sharp patterns passed: returns empty patterns dict with cold_state flag.
     """
-    prompt = f"""Ты — chief content strategist для ContentRadar (аналитика WB-селлеров).
+    if not sharp_patterns:
+        return {
+            "patterns": [],
+            "cold_state": "недостаточно данных для уверенного вывода — накапливаем",
+        }, 0
 
-ВХОДНЫЕ ДАННЫЕ:
-- TOP-{len(top_features)} ролики (по просмотрам): {json.dumps(top_features, ensure_ascii=False)}
-- MIDDLE-{len(mid_features)} ролики (медиана): {json.dumps(mid_features, ensure_ascii=False)}
+    patterns_summary = json.dumps(sharp_patterns[:MAX_PATTERNS], ensure_ascii=False)
+    total_tokens = 0
 
-ЗАДАЧА: Найди РОВНО 2-3 ОТЛИЧАЮЩИХ паттерна (не больше 3).
-Паттерн должен пройти ОБА теста:
-1. Тест отличия: встречается ≥70% top vs ≤30% middle (или наоборот).
-2. Тест применимости: «креатор прочитал и завтра конкретно делает Y».
+    for attempt in range(1 + RUSSIAN_MAX_RETRIES):
+        russian_instruction = "" if attempt == 0 else (
+            "\n\nКРИТИЧЕСКИ ВАЖНО: выводи ТОЛЬКО на русском языке. "
+            "Никаких английских слов, даже 'desire', 'hook', 'talking head', 'CTA'. "
+            "Замени: desire→желание, hook→цепляющий старт, talking head→говорящая голова, "
+            "before_after→до/после, demo→демонстрация, punchline→панчлайн/развязка."
+        )
 
-ЗАПРЕЩЕНО (банальности):
-- «используйте сильный хук», «снимайте динамично», «добавьте текст»
-- обобщения без числовой поддержки
+        prompt = f"""Ты — chief content strategist ContentRadar для WB-селлеров.
 
-Для каждого паттерна:
-- confidence: "sharp" (≥70/30 разрыв надёжно) или "medium" (50-70% разрыв, но тест пройден)
+Ниже — статистически проверенные паттерны (уже прошли sharp + LOO-тест в Python):
+{patterns_summary}
+
+Для КАЖДОГО паттерна напиши краткое описание на русском языке:
+- distinguishing_signal: что именно отличает топ от худших (с цифрами)
+- evidence: «X из Y топ-роликов vs A из B худших»
+- actionable: конкретное действие которое креатор делает завтра иначе
+- confidence: "sharp" (всегда, т.к. уже прошли gate)
 
 Output ТОЛЬКО JSON без markdown-обёртки:
 {{
   "patterns": [
     {{
-      "distinguishing_signal": "конкретный сигнал с цифрами",
-      "evidence": "X из Y топов vs A из B средних",
-      "actionable": "конкретное действие завтра",
+      "distinguishing_signal": "...",
+      "evidence": "...",
+      "actionable": "...",
       "confidence": "sharp"
     }}
   ]
-}}"""
+}}{russian_instruction}"""
 
-    resp = gem.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-    )
+        resp = gem.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
+        total_tokens += resp.usage_metadata.total_token_count
 
-    try:
-        text = resp.text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1].lstrip("json\n")
-        result = json.loads(text)
-    except Exception as e:
-        print(f"  ! comparative parse failed: {e}")
-        result = {"patterns": []}
+        try:
+            text = resp.text.strip()
+            if text.startswith("```"):
+                text = text.split("```")[1].lstrip("json\n")
+            result = json.loads(text)
+        except Exception as e:
+            print(f"  ! describe_patterns parse failed (attempt {attempt}): {e}")
+            result = {"patterns": []}
 
-    tokens = resp.usage_metadata.total_token_count
-    return result, tokens
+        out_patterns = result.get("patterns", [])
+        if _check_patterns_russian(out_patterns):
+            return result, total_tokens
+
+        print(f"  ! Russian check failed (attempt {attempt}), retrying...")
+
+    # Return whatever we have after exhausting retries
+    print("  ! Could not get Russian output after retries — returning last result")
+    return result, total_tokens
 
 
 # ── Telegram alert ────────────────────────────────────────────────────────────
@@ -414,9 +581,14 @@ def run_tenant(tenant: dict, conn, gem: genai.Client, oai: OpenAI) -> str:
         return f"skipped:{reason}"
 
     print(f"  Gate: OK — {len(videos)} videos")
-    top, mid = split_top_middle(videos, TOP_N, MID_N)
-    pool = top + mid
-    print(f"  Pool: top={len(top)}, mid={len(mid)}")
+    top, bottom = split_top_bottom(videos, TOP_N, BOTTOM_N)
+    if len(bottom) < 3:
+        reason = f"not enough bottom videos (got {len(bottom)}, need 3)"
+        print(f"  Split: SKIP — {reason}")
+        return f"skipped:{reason}"
+
+    pool = top + bottom
+    print(f"  Pool: top={len(top)}, bottom={len(bottom)}")
 
     # Download
     with ThreadPoolExecutor(max_workers=3) as ex:
@@ -436,27 +608,38 @@ def run_tenant(tenant: dict, conn, gem: genai.Client, oai: OpenAI) -> str:
             print(f"  ! whisper failed {r['id']}: {e}")
             transcripts[r["id"]] = ""
 
-    # Per-video analysis
+    # Stage A: per-video feature tagging
     total_tokens = 0
     features: list[dict] = []
+    top_ids = {v["id"] for v in top}
     for r, mp4 in pool_mp4:
         feat = analyze_video(mp4, transcripts.get(r["id"], ""), r, gem)
-        feat["_bucket"] = "top" if r in top else "mid"
+        feat["_bucket"] = "top" if r["id"] in top_ids else "bottom"
         features.append(feat)
         total_tokens += feat.get("_tokens", 0)
         print(f"  analyzed {r['id']} ({feat.get('_bucket')}) tokens={feat.get('_tokens', 0)}")
 
     top_feats = [f for f in features if f.get("_bucket") == "top" and "error" not in f]
-    mid_feats = [f for f in features if f.get("_bucket") == "mid" and "error" not in f]
+    bottom_feats = [f for f in features if f.get("_bucket") == "bottom" and "error" not in f]
 
-    if len(top_feats) < 3 or len(mid_feats) < 3:
-        return f"failed:not enough valid features top={len(top_feats)} mid={len(mid_feats)}"
+    if len(top_feats) < 3 or len(bottom_feats) < 3:
+        return f"failed:not enough valid features top={len(top_feats)} bottom={len(bottom_feats)}"
 
-    # Comparative analysis
-    patterns_dict, cmp_tokens = comparative_analysis(top_feats, mid_feats, gem)
-    total_tokens += cmp_tokens
+    # Stage B: compute sharp patterns in Python
+    sharp = compute_sharp_patterns(top_feats, bottom_feats)
+    print(f"  Sharp patterns (pre-LOO): {len(sharp)}")
 
-    # Cost estimate: Gemini 2.5 Flash = $0.075/1M input + ~$0.30/1M output
+    # LOO cross-validation (no LLM calls)
+    robust = loo_validate(sharp, top_feats, bottom_feats)
+    print(f"  LOO-robust patterns: {len(robust)}")
+    if not robust:
+        print("  → 0 robust patterns: INSERT empty with cold_state")
+
+    # Stage C: LLM generates Russian descriptions
+    patterns_dict, desc_tokens = describe_patterns_russian(robust, gem)
+    total_tokens += desc_tokens
+
+    # Cost estimate: Gemini 2.5 Flash ~$0.30/1M tokens blended
     cost_usd = (total_tokens / 1_000_000) * 0.30
 
     if cost_usd > COST_BUDGET_USD:
@@ -502,7 +685,6 @@ def main():
 
         results[tid] = status
 
-        # Track consecutive failures per tenant
         prev_failures = state.get(tid, {}).get("consecutive_failures", 0)
         if status.startswith("failed"):
             consecutive = prev_failures + 1
