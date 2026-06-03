@@ -13,9 +13,10 @@ tenants (1) ─┬─→ users (N)
              │                  │
              │                  └─ fail_streak ≥ 3 → "недоступно"
              ├─→ subscriptions (1)
-             └─→ payments (N)
+             ├─→ payments (N)
+             └─→ tenant_insights (N)  ← weekly AI analysis results
 
-scraper_state    — отдельная таблица для метаданных трёх крон-джобов.
+scraper_state    — отдельная таблица для метаданных четырёх крон-джобов (incl. pattern_analysis).
 waitlist_signups — лиды с публичного лендинга. Не связана с users.
 referral_codes   — промокоды партнёров. Не привязана к тенанту.
 ```
@@ -103,6 +104,17 @@ referral_codes   — промокоды партнёров. Не привяза�
 **`admin_settings`** — KV-хранилище для настроек admin-аккаунта. Используется для хранения bcrypt-хэша пароля owner-а после сброса через forgot-password flow. `key = 'password_hash'`, `value = bcrypt hash`. Нет FK — глобальная таблица (не per-tenant).
 
 **`password_reset_tokens`** — одноразовые токены сброса пароля для owner-аккаунта. TTL 1 час, `used_at` помечает использование. Нет FK — глобальная таблица.
+
+**`tenant_insights`** — результаты еженедельного AI-анализа видео (TRU-344). `tenant_id` FK NOT NULL. Одна строка на прогон; новые строки добавляются, не апсертятся. API `/api/patterns` читает latest по `(tenant_id, computed_at DESC)`. Поля:
+- `period_start` / `period_end` — ISO-date строки (`"2026-05-26"`) — период анализа (7 дней).
+- `patterns` JSONB — `{ "patterns": [{ distinguishing_signal, evidence, actionable, confidence }] }`. Максимум 3 паттерна.
+- `video_count_used` — сколько mp4 реально попало в анализ (из top+mid пула).
+- `gemini_cost_usd` — стоимость прогона (budget cap $0.15).
+
+Пишет: `scripts/analyze_patterns.py` (cron Monday 04:00 UTC via `pattern_analysis` job в `scraper_state`).
+Читает: `src/app/api/patterns/route.ts` → `WeeklyPatternsWidget`.
+
+Gate: тенант попадает в анализ если у него ≥10 активных видео + ≥3 из топ-квартиля со `scraped_at` в последние 7 дней.
 
 ## Enums
 

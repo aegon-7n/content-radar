@@ -31,6 +31,9 @@ SOCKS="${SOCKS_PROXY:-socks5://127.0.0.1:1080}"
 TG_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 TG_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 
+GEMINI_KEY="${GEMINI_API_KEY:-}"
+OAI_KEY="${OPENAI_API_KEY:-}"
+
 chmod +x "$APP_DIR/scripts/notify-telegram.sh"
 chmod +x "$APP_DIR/scripts/check-tls.sh"
 
@@ -52,6 +55,11 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # TLS cert expiry check — каждый понедельник в 09:00 МСК (06:00 UTC).
 # Отправляет Telegram-предупреждение если до истечения < 30 дней.
 0 6 * * 1 root TELEGRAM_BOT_TOKEN='$TG_BOT_TOKEN' TELEGRAM_CHAT_ID='$TG_CHAT_ID' bash $APP_DIR/scripts/check-tls.sh >> $LOG_DIR/tls-check.log 2>&1
+
+# AI pattern analysis — каждый понедельник в 04:00 UTC (07:00 МСК).
+# Скачивает топ-15 + средние-15 роликов каждого тенанта, анализирует через Gemini,
+# сохраняет в tenant_insights для WeeklyPatternsWidget.
+0 4 * * 1 root cd $APP_DIR && DATABASE_URL='$DB_URL' GEMINI_API_KEY='$GEMINI_KEY' OPENAI_API_KEY='$OAI_KEY' SOCKS_PROXY='$SOCKS' TELEGRAM_BOT_TOKEN='$TG_BOT_TOKEN' TELEGRAM_CHAT_ID='$TG_CHAT_ID' $PYTHON $APP_DIR/scripts/analyze_patterns.py >> $LOG_DIR/patterns.log 2>&1 || TELEGRAM_BOT_TOKEN='$TG_BOT_TOKEN' TELEGRAM_CHAT_ID='$TG_CHAT_ID' $APP_DIR/scripts/notify-telegram.sh "analyze_patterns fail" $LOG_DIR/patterns.log
 EOF
 
 chmod 644 /etc/cron.d/content-radar
@@ -62,6 +70,7 @@ echo "Задачи:"
 echo "  00:00 МСК — scraper.auto_discover (новые ролики)"
 echo "  00:10 МСК — scraper.run_daily     (метрики)"
 echo "  09:00 МСК пн — check-tls         (проверка TLS-сертификатов)"
+echo "  07:00 МСК пн — analyze_patterns  (AI-паттерны топа, Gemini 2.5 Flash)"
 echo "  01:00 МСК — scraper.audit         (проверка пропусков)"
 echo ""
 echo "Логи: $LOG_DIR/"

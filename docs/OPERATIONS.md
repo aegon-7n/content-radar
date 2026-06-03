@@ -20,14 +20,35 @@
 ## Cron-расписание (МСК)
 
 ```
-00:00  scraper.auto_discover  → /var/log/content-radar/discover.log
-00:10  scraper.run_daily      → /var/log/content-radar/daily.log
-01:00  scraper.audit          → /var/log/content-radar/audit.log
+00:00  scraper.auto_discover           → /var/log/content-radar/discover.log
+00:10  scraper.run_daily               → /var/log/content-radar/daily.log
+01:00  scraper.audit                   → /var/log/content-radar/audit.log
+07:00 пн  scripts/analyze_patterns.py  → /var/log/content-radar/patterns.log
 ```
 
-Все три команды на non-zero exit пушат алерт в Telegram через `scripts/notify-telegram.sh`.
+Все команды на non-zero exit пушат алерт в Telegram через `scripts/notify-telegram.sh`.
+
+`analyze_patterns.py` дополнительно шлёт Telegram-алерт при ≥3 подряд failed прогонах для одного тенанта (трекинг через `/opt/contentradar/pipeline_cache/pipeline_state.json`).
 
 Изменить расписание: отредактировать `scripts/setup-cron.sh`, запустить от root, проверить `cat /etc/cron.d/content-radar`.
+
+### Зависимости analyze_patterns.py
+
+```bash
+# Установить в scraper/venv (или отдельный venv):
+pip install google-genai openai
+
+# Бинари (уже есть на VPS для скрейпера):
+# yt-dlp, ffmpeg
+
+# Необходимые env (добавить в /root/content-radar/.env.local):
+# GEMINI_API_KEY=...
+# OPENAI_API_KEY=...
+```
+
+Кеш загруженных mp4 и транскриптов: `/opt/contentradar/pipeline_cache/`.
+Идемпотентный: повторный запуск re-использует кеш (не скачивает и не анализирует снова).
+Cost cap: ~$0.06–$0.15/прогон (все тенанты). Превышение логируется, не блокирует сохранение.
 
 ## Мониторинг
 
