@@ -15,6 +15,7 @@ import {
   X,
   UsersRound,
   ClipboardList,
+  Sparkles,
 } from "lucide-react";
 
 const allNavItems = [
@@ -22,6 +23,7 @@ const allNavItems = [
   { href: "/creators", label: "Креаторы", icon: Users, ownerOnly: false, adminOnly: false },
   { href: "/products", label: "Товары", icon: Package, ownerOnly: false, adminOnly: false },
   { href: "/videos", label: "Ролики", icon: Video, ownerOnly: false, adminOnly: false },
+  { href: "/dashboard/patterns", label: "AI-разбор", icon: Sparkles, ownerOnly: false, adminOnly: false },
   { href: "/settings", label: "Настройки", icon: Settings, ownerOnly: true, adminOnly: false },
   { href: "/settings/team", label: "Команда", icon: UsersRound, ownerOnly: true, adminOnly: true },
   { href: "/admin/waitlist", label: "Заявки", icon: ClipboardList, ownerOnly: true, adminOnly: true },

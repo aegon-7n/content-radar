@@ -3,11 +3,12 @@ import { waitlistSignups } from "@/db/schema";
 import type { WaitlistSignup } from "@/db/schema";
 import { eq, and, ne, desc, count, isNotNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getToken } from "next-auth/jwt";
 import { formatDate } from "@/lib/format";
 
-async function requireSession(): Promise<boolean> {
+async function requireGlobalAdmin(): Promise<void> {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore
     .getAll()
@@ -17,7 +18,7 @@ async function requireSession(): Promise<boolean> {
     req: { headers: { cookie: cookieHeader } } as Parameters<typeof getToken>[0]["req"],
     secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production",
   });
-  return token !== null;
+  if (!token?.isGlobalAdmin) redirect("/login");
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -61,7 +62,7 @@ function isValidStatus(s: string): s is SignupStatus {
 async function updateStatus(formData: FormData) {
   "use server";
 
-  if (!(await requireSession())) return;
+  await requireGlobalAdmin();
 
   const rawId = formData.get("id");
   const rawStatus = formData.get("status");
@@ -83,7 +84,7 @@ async function updateStatus(formData: FormData) {
 async function updateNotes(formData: FormData) {
   "use server";
 
-  if (!(await requireSession())) return;
+  await requireGlobalAdmin();
 
   const rawId = formData.get("id");
   const rawNotes = formData.get("notes");
@@ -123,6 +124,8 @@ interface PageProps {
 }
 
 export default async function WaitlistPage({ searchParams }: PageProps) {
+  await requireGlobalAdmin();
+
   const { status: statusFilter, campaign: campaignFilter, show_rejected } = await searchParams;
   const showRejected = show_rejected === "1";
 
