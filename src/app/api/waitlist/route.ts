@@ -45,7 +45,9 @@ function safeEqual(a: string, b: string): boolean {
 // ─── Input schema ─────────────────────────────────────────────────────────────
 const SubmitSchema = z.object({
   name: z.string().min(1).max(200).optional().nullable(),
-  email: z.string().email().max(254),
+  // Accept TG handle (@username) or real email — rev2 form uses a combined contact field.
+  // Real-email check is done before sending Resend confirmation (see notifications section).
+  email: z.string().min(1).max(254),
   phone: z.string().max(32).optional().nullable(),
   telegramHandle: z.string().max(100).optional().nullable(),
   brand: z.string().min(1).max(300),
@@ -275,9 +277,11 @@ export async function POST(request: NextRequest) {
 
   const insertedId = inserted.id;
 
-  // 6. Notify — skip email for hard-filter rejections, always send TG
+  // 6. Notify — skip email for hard-filter rejections, always send TG.
+  // Also skip Resend if email field actually holds a TG handle (@username).
+  const emailLooksReal = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   await Promise.allSettled([
-    status !== "rejected"
+    status !== "rejected" && emailLooksReal
       ? sendConfirmationEmail(email, name)
       : Promise.resolve(),
     sendTelegramNotification({
