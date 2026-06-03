@@ -7,7 +7,6 @@ const PLANS = [
   {
     id: "solo" as const,
     label: "Starter",
-    price: "4 900",
     creators: 5,
     videos: "1 000",
     features: ["5 креаторов", "1 000 видео/мес", "3 платформы", "Ежедневные обновления"],
@@ -15,7 +14,6 @@ const PLANS = [
   {
     id: "pro" as const,
     label: "Growth",
-    price: "9 900",
     creators: 10,
     videos: "4 000",
     features: ["10 креаторов", "4 000 видео/мес", "3 платформы", "Приоритетная поддержка"],
@@ -24,7 +22,6 @@ const PLANS = [
   {
     id: "studio" as const,
     label: "Brand",
-    price: "15 900",
     creators: 20,
     videos: "15 000",
     features: ["20 креаторов", "15 000 видео/мес", "3 платформы", "Выделенный менеджер"],
@@ -225,9 +222,6 @@ export default function BillingTab() {
               )}
 
               <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{plan.label}</p>
-              <p className="text-2xl font-bold mt-1" style={{ color: "var(--text-primary)" }}>
-                {plan.price} <span className="text-sm font-normal" style={{ color: "var(--text-muted)" }}>₽/мес</span>
-              </p>
 
               <ul className="flex flex-col gap-1.5 mt-4 flex-1">
                 {plan.features.map((f) => (
