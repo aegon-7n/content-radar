@@ -8,6 +8,8 @@ import {
   pgEnum,
   serial,
   index,
+  jsonb,
+  numeric,
 } from "drizzle-orm/pg-core";
 
 export const platformEnum = pgEnum("platform", [
@@ -343,3 +345,35 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
 
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type NewPasswordResetToken = typeof passwordResetTokens.$inferInsert;
+
+// ── Pattern insights (AI analysis) ───────────────────────────────────────────
+// One row per weekly analysis run per tenant.  Written by scripts/analyze_patterns.py
+// (cron every Monday 04:00 UTC).  API /api/patterns reads the latest row.
+//
+// patterns JSONB shape:
+//   { "patterns": [{ distinguishing_signal, evidence, actionable, confidence }] }
+export const tenantInsights = pgTable(
+  "tenant_insights",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id").references(() => tenants.id).notNull(),
+    computedAt: timestamp("computed_at", { withTimezone: true }).defaultNow().notNull(),
+    // ISO date strings: "2026-05-26"
+    periodStart: text("period_start").notNull(),
+    periodEnd: text("period_end").notNull(),
+    patterns: jsonb("patterns").notNull(),
+    videoCountUsed: integer("video_count_used").notNull(),
+    geminiCostUsd: numeric("gemini_cost_usd", { precision: 10, scale: 6 }),
+  },
+  (t) => [index("idx_tenant_insights_tenant_computed").on(t.tenantId, t.computedAt)],
+);
+
+export type TenantInsight = typeof tenantInsights.$inferSelect;
+export type NewTenantInsight = typeof tenantInsights.$inferInsert;
+
+export type InsightPattern = {
+  distinguishing_signal: string;
+  evidence: string;
+  actionable: string;
+  confidence: "sharp" | "medium";
+};
