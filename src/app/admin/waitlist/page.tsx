@@ -1,23 +1,25 @@
 import { db } from "@/db";
 import { waitlistSignups } from "@/db/schema";
 import type { WaitlistSignup } from "@/db/schema";
-import { eq, and, ne, desc, count, isNotNull } from "drizzle-orm";
+import { eq, and, ne, or, desc, count, isNotNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { getToken } from "next-auth/jwt";
 import { formatDate } from "@/lib/format";
 
+// SessionStore in next-auth reads req.cookies, not req.headers.cookie.
+// Passing ReadonlyRequestCookies directly satisfies the getAll() interface.
 async function requireSession(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const cookieHeader = cookieStore
-    .getAll()
-    .map((c) => `${c.name}=${c.value}`)
-    .join("; ");
-  const token = await getToken({
-    req: { headers: { cookie: cookieHeader } } as Parameters<typeof getToken>[0]["req"],
-    secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production",
-  });
-  return token !== null;
+  try {
+    const cookieStore = await cookies();
+    const token = await getToken({
+      req: { cookies: cookieStore, headers: {} } as unknown as Parameters<typeof getToken>[0]["req"],
+      secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production",
+    });
+    return token !== null;
+  } catch {
+    return false;
+  }
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -127,10 +129,19 @@ export default async function WaitlistPage({ searchParams }: PageProps) {
   const showRejected = show_rejected === "1";
 
   const conditions = [];
-  if (statusFilter && isValidStatus(statusFilter)) {
+  if (statusFilter === "rejected") {
+    // Show both manually-rejected rows AND hard-filter rejected (feedbackCommitment=no).
+    // Pre-c42e8c2 entries with feedbackCommitment=no kept status='new', so we need both.
+    conditions.push(
+      or(
+        eq(waitlistSignups.status, "rejected"),
+        eq(waitlistSignups.feedbackCommitment, "no")
+      )!
+    );
+  } else if (statusFilter && isValidStatus(statusFilter)) {
     conditions.push(eq(waitlistSignups.status, statusFilter));
   } else if (!showRejected) {
-    // By default exclude hard-filter rejected (feedbackCommitment=no) from candidates view
+    // Default "Кандидаты" view: exclude hard-filter rejected
     conditions.push(ne(waitlistSignups.feedbackCommitment, "no"));
   }
   if (campaignFilter) {

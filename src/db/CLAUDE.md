@@ -57,7 +57,7 @@ referral_codes   — промокоды партнёров. Не привяза�
 | `utm_term` | text | UTM-параметр: ключевое слово |
 | `referrer` | text | HTTP Referer на момент отправки формы |
 | `consent_accepted_at` | timestamptz NOT NULL | Момент согласия с политикой (GDPR-трекинг) |
-| `status` | text DEFAULT `'new'` | Этап воронки: `"new"` / `"contacted"` / `"onboarded"` / `"rejected"` |
+| `status` | text DEFAULT `'new'` | Этап воронки: `"new"` / `"awaiting_call"` / `"in_cohort"` / `"rejected"` |
 | `notes` | text | Внутренние заметки менеджера |
 | `created_at` | timestamptz DEFAULT now() | Время создания записи |
 
