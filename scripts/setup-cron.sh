@@ -14,10 +14,19 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
-set -a
-# shellcheck source=/dev/null
-source "$ENV_FILE"
-set +a
+# Safe parser: handles unquoted values with shell metacharacters (e.g. < in email addresses)
+while IFS= read -r _line || [[ -n "$_line" ]]; do
+  [[ "$_line" =~ ^[[:space:]]*# ]] && continue
+  [[ "$_line" =~ ^[[:space:]]*$ ]] && continue
+  if [[ "$_line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+    _key="${BASH_REMATCH[1]}"
+    _val="${BASH_REMATCH[2]}"
+    _val="${_val#\"}" ; _val="${_val%\"}"
+    _val="${_val#\'}" ; _val="${_val%\'}"
+    export "$_key=$_val"
+  fi
+done < "$ENV_FILE"
+unset _line _key _val
 
 mkdir -p "$LOG_DIR"
 
