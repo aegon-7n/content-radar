@@ -40,7 +40,7 @@ jobs:
             cd ${{ secrets.VPS_DEPLOY_PATH }}
             git pull origin main
             npm ci
+            npm run db:migrate
             rm -rf .next/types
             npm run build
             pm2 reload content-radar --update-env
-            npm run db:migrate
