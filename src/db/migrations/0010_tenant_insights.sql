@@ -1,4 +1,4 @@
-CREATE TABLE "tenant_insights" (
+CREATE TABLE IF NOT EXISTS "tenant_insights" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "tenant_id" uuid NOT NULL REFERENCES "tenants"("id"),
   "computed_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -9,4 +9,4 @@ CREATE TABLE "tenant_insights" (
   "gemini_cost_usd" numeric(10, 6)
 );
 
-CREATE INDEX "idx_tenant_insights_tenant_computed" ON "tenant_insights" ("tenant_id", "computed_at" DESC);
+CREATE INDEX IF NOT EXISTS "idx_tenant_insights_tenant_computed" ON "tenant_insights" ("tenant_id", "computed_at" DESC);

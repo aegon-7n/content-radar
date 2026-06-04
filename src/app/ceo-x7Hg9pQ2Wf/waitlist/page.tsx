@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { db } from "@/db";
 import { waitlistSignups } from "@/db/schema";
 import { desc, count, eq } from "drizzle-orm";
