@@ -99,6 +99,13 @@
       "when": 1748951580000,
       "tag": "0013_invite_creator_required",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1749047820000,
+      "tag": "0014_seed_tenant_insights",
+      "breakpoints": true
     }
   ]
 }

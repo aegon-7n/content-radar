@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // Skip TS/ESLint re-checks on VPS builds — CI covers these before deploy.
+  // Prevents OOM on memory-constrained VPS (clean builds without incremental cache).
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
   async redirects() {
     return [
       {
