@@ -29,19 +29,67 @@ jobs:
           fi
           echo "All secrets present -- proceeding with deploy"
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build runs on the GH Actions runner (7 GB RAM) — bypasses VPS memory constraint.
+      # Env vars here are build-time only; Next.js reads runtime vars from .env.local on VPS.
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://placeholder@localhost/placeholder
+          NEXTAUTH_URL: https://app.contentradar.app
+          NEXTAUTH_SECRET: placeholder-ci-secret
+          ADMIN_EMAIL: ci@placeholder.local
+          ADMIN_PASSWORD: placeholder
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" | tr -d '\r' > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Pull code and run migrations on VPS
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/vps_key "$VPS_USER@$VPS_HOST" "
             set -e
-            cd ${{ secrets.VPS_DEPLOY_PATH }}
+            cd '$VPS_DEPLOY_PATH'
             git pull origin main
             npm ci
             npm run db:migrate
-            rm -rf .next/types
-            NODE_OPTIONS='--max-old-space-size=1024' npm run build
+          "
+
+      - name: Upload build artifacts to VPS
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+        run: |
+          rsync -az --delete .next/ \
+            -e "ssh -i ~/.ssh/vps_key" \
+            "$VPS_USER@$VPS_HOST:$VPS_DEPLOY_PATH/.next/"
+
+      - name: Reload app on VPS
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/vps_key "$VPS_USER@$VPS_HOST" "
+            set -e
+            cd '$VPS_DEPLOY_PATH'
             sed -i 's|^NEXTAUTH_URL=.*|NEXTAUTH_URL=https://app.contentradar.app|' .env.local
             pm2 reload content-radar --update-env
+          "
