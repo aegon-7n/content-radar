@@ -272,7 +272,7 @@ def transcribe(mp4: Path, oai: OpenAI) -> str:
 
 # ── Per-video feature extraction (Stage A) ────────────────────────────────────
 
-def _extract_json_from_gemini(raw: str, video_id: str) -> dict:
+def _extract_json_from_gemini(raw: str | None, video_id: str) -> dict:
     """
     Robustly extract a JSON object from a Gemini response.
 
@@ -283,6 +283,9 @@ def _extract_json_from_gemini(raw: str, video_id: str) -> dict:
 
     Falls back to parse_failed with full raw text (up to 1000 chars) for diagnosis.
     """
+    if not raw:
+        print(f"  ! empty_response for {video_id}")
+        return {"error": "empty_response", "raw": "", "exc": "Gemini returned None/empty text"}
     text = raw.strip()
 
     # 1. Try direct parse (bare JSON — the happy path)
@@ -314,6 +317,24 @@ def _extract_json_from_gemini(raw: str, video_id: str) -> dict:
     return {"error": "parse_failed", "raw": raw[:1000], "exc": "all parse strategies failed"}
 
 
+_GEMINI_RETRYABLE = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "ServiceUnavailable", "ResourceExhausted")
+
+
+def _gemini_with_retry(fn, *args, max_attempts=3, **kwargs):
+    """Call fn(*args, **kwargs) with exponential backoff on transient Gemini errors."""
+    for attempt in range(max_attempts):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            msg = str(e)
+            if attempt < max_attempts - 1 and any(tag in msg for tag in _GEMINI_RETRYABLE):
+                delay = 2 ** (attempt + 1)  # 2, 4, 8 sec
+                print(f"  ~ Gemini transient error (attempt {attempt + 1}), retry in {delay}s: {msg[:120]}")
+                time.sleep(delay)
+            else:
+                raise
+
+
 def analyze_video(mp4: Path, transcript: str, row: dict, gem: genai.Client) -> dict:
     """
     Tag a single video with fixed taxonomy via Gemini 2.5 Flash.
@@ -326,7 +347,7 @@ def analyze_video(mp4: Path, transcript: str, row: dict, gem: genai.Client) -> d
         if "error" not in stored:
             return stored
 
-    file = gem.files.upload(file=str(mp4))
+    file = _gemini_with_retry(gem.files.upload, file=str(mp4))
     while file.state.name == "PROCESSING":
         time.sleep(2)
         file = gem.files.get(name=file.name)
@@ -375,7 +396,8 @@ Output JSON (только JSON, без markdown-обёртки):
   }}
 }}"""
 
-    resp = gem.models.generate_content(
+    resp = _gemini_with_retry(
+        gem.models.generate_content,
         model="gemini-2.5-flash",
         contents=[file, prompt],
     )
@@ -565,7 +587,8 @@ Output ТОЛЬКО JSON без markdown-обёртки:
   ]
 }}{russian_instruction}"""
 
-        resp = gem.models.generate_content(
+        resp = _gemini_with_retry(
+            gem.models.generate_content,
             model="gemini-2.5-flash",
             contents=prompt,
         )
@@ -727,6 +750,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tenant-id", help="Run for one tenant only (debug)")
     args = ap.parse_args()
+
+    # Propagate SOCKS_PROXY → HTTPS_PROXY/ALL_PROXY so Gemini and OpenAI SDKs use the tunnel.
+    # VPS is in RU region; without this, Gemini returns 400 FAILED_PRECONDITION and
+    # OpenAI returns 403 unsupported_country_region_territory.
+    if SOCKS_PROXY and not os.environ.get("HTTPS_PROXY"):
+        socks_url = SOCKS_PROXY if SOCKS_PROXY.startswith("socks") else f"socks5h://{SOCKS_PROXY}"
+        os.environ["HTTPS_PROXY"] = socks_url
+        os.environ["ALL_PROXY"] = socks_url
+        print(f"  ~ proxy propagated: HTTPS_PROXY={socks_url}")
 
     gem = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     oai = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
