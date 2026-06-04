@@ -433,6 +433,8 @@ def compute_sharp_patterns(top_feats: list[dict], bottom_feats: list[dict]) -> l
     Returns patterns passing hard sharp thresholds:
       pct_top ≥ SHARP_PCT_TOP AND pct_bottom ≤ SHARP_PCT_BOTTOM AND diff ≥ SHARP_DIFF
     or the symmetric bottom-dominant version.
+
+    Also checks 2-feature AND combinations (kind=composite) using the same 80/20/60 gate.
     """
     top_flat = [_flatten(f) for f in top_feats]
     bottom_flat = [_flatten(f) for f in bottom_feats]
@@ -445,6 +447,9 @@ def compute_sharp_patterns(top_feats: list[dict], bottom_feats: list[dict]) -> l
         all_keys.update(row.keys())
 
     patterns: list[dict] = []
+    # Collect all (key, val, pct_top, pct_bottom) for composite detection below.
+    single_features: list[tuple[str, object, float, float]] = []
+
     for key in all_keys:
         all_values: set = set()
         for row in top_flat + bottom_flat:
@@ -456,6 +461,8 @@ def compute_sharp_patterns(top_feats: list[dict], bottom_feats: list[dict]) -> l
             pct_top = sum(1 for r in top_flat if r.get(key) == val) / n_top
             pct_bottom = sum(1 for r in bottom_flat if r.get(key) == val) / n_bottom
             diff = pct_top - pct_bottom
+
+            single_features.append((key, val, pct_top, pct_bottom))
 
             if pct_top >= SHARP_PCT_TOP and pct_bottom <= SHARP_PCT_BOTTOM and diff >= SHARP_DIFF:
                 patterns.append({
@@ -479,6 +486,70 @@ def compute_sharp_patterns(top_feats: list[dict], bottom_feats: list[dict]) -> l
                     "n_top": n_top, "n_bottom": n_bottom,
                 })
 
+    # ── 2-feature AND combinations ────────────────────────────────────────────
+    # Filter to candidates with non-trivial individual signal before pairing.
+    COMPOSITE_MIN_DIFF = 0.2
+    candidates = [(k, v, pt, pb) for k, v, pt, pb in single_features
+                  if abs(pt - pb) >= COMPOSITE_MIN_DIFF]
+
+    near_misses: list[dict] = []  # top composite pairs that didn't pass — for cold-state diagnosis
+    seen_composites: set[tuple] = set()
+    for i, (k1, v1, pt1, pb1) in enumerate(candidates):
+        for k2, v2, pt2, pb2 in candidates[i + 1:]:
+            if k1 == k2:
+                continue  # same feature, different value — skip
+            dedup_key = (k1, str(v1), k2, str(v2))
+            if dedup_key in seen_composites:
+                continue
+            seen_composites.add(dedup_key)
+
+            pt_joint = sum(1 for r in top_flat if r.get(k1) == v1 and r.get(k2) == v2) / n_top
+            pb_joint = sum(1 for r in bottom_flat if r.get(k1) == v1 and r.get(k2) == v2) / n_bottom
+            diff = pt_joint - pb_joint
+
+            if pt_joint >= SHARP_PCT_TOP and pb_joint <= SHARP_PCT_BOTTOM and diff >= SHARP_DIFF:
+                patterns.append({
+                    "kind": "composite",
+                    "feature": f"{k1} AND {k2}", "value": f"{v1} / {v2}",
+                    "feature1": k1, "value1": v1,
+                    "feature2": k2, "value2": v2,
+                    "pct_top": round(pt_joint, 3), "pct_bottom": round(pb_joint, 3),
+                    "differential": round(diff, 3),
+                    "direction": "top_dominant",
+                    "count_top": sum(1 for r in top_flat if r.get(k1) == v1 and r.get(k2) == v2),
+                    "count_bottom": sum(1 for r in bottom_flat if r.get(k1) == v1 and r.get(k2) == v2),
+                    "n_top": n_top, "n_bottom": n_bottom,
+                })
+            elif pb_joint >= SHARP_PCT_TOP and pt_joint <= SHARP_PCT_BOTTOM and (-diff) >= SHARP_DIFF:
+                patterns.append({
+                    "kind": "composite",
+                    "feature": f"{k1} AND {k2}", "value": f"{v1} / {v2}",
+                    "feature1": k1, "value1": v1,
+                    "feature2": k2, "value2": v2,
+                    "pct_top": round(pt_joint, 3), "pct_bottom": round(pb_joint, 3),
+                    "differential": round(-diff, 3),
+                    "direction": "bottom_dominant",
+                    "count_top": sum(1 for r in top_flat if r.get(k1) == v1 and r.get(k2) == v2),
+                    "count_bottom": sum(1 for r in bottom_flat if r.get(k1) == v1 and r.get(k2) == v2),
+                    "n_top": n_top, "n_bottom": n_bottom,
+                })
+            else:
+                # Track near-misses: best effort = max absolute differential achieved
+                abs_diff = max(diff, -diff)
+                near_misses.append({
+                    "feature": f"{k1}={v1} AND {k2}={v2}",
+                    "pct_top": round(pt_joint, 3), "pct_bottom": round(pb_joint, 3),
+                    "diff": round(diff, 3),
+                })
+
+    # Print top-3 near-miss composites for cold-state diagnosis
+    composite_count = sum(1 for p in patterns if p.get("kind") == "composite")
+    if composite_count == 0 and near_misses:
+        near_misses.sort(key=lambda x: abs(x["diff"]), reverse=True)
+        print(f"  Composite near-misses (top-3, no composite passed gate):")
+        for nm in near_misses[:3]:
+            print(f"    {nm['feature']}: top={nm['pct_top']} bot={nm['pct_bottom']} diff={nm['diff']}")
+
     # Sort by differential descending for deterministic output
     patterns.sort(key=lambda p: p["differential"], reverse=True)
     return patterns
@@ -498,14 +569,21 @@ def loo_validate(patterns: list[dict], top_feats: list[dict], bottom_feats: list
 
     robust: list[dict] = []
     for p in patterns:
-        key, val, direction = p["feature"], p["value"], p["direction"]
+        direction = p["direction"]
+        is_composite = p.get("kind") == "composite"
         passes = 0
         for i in range(n_top):
             loo_top = [r for j, r in enumerate(top_flat) if j != i]
             n_loo = len(loo_top)
             if n_loo == 0:
                 continue
-            pct_top_loo = sum(1 for r in loo_top if r.get(key) == val) / n_loo
+            if is_composite:
+                k1, v1 = p["feature1"], p["value1"]
+                k2, v2 = p["feature2"], p["value2"]
+                pct_top_loo = sum(1 for r in loo_top if r.get(k1) == v1 and r.get(k2) == v2) / n_loo
+            else:
+                key, val = p["feature"], p["value"]
+                pct_top_loo = sum(1 for r in loo_top if r.get(key) == val) / n_loo
             if direction == "top_dominant" and pct_top_loo >= SHARP_PCT_TOP:
                 passes += 1
             elif direction == "bottom_dominant" and pct_top_loo <= SHARP_PCT_BOTTOM:
@@ -713,11 +791,13 @@ def run_tenant(tenant: dict, conn, gem: genai.Client, oai: OpenAI) -> str:
 
     # Stage B: compute sharp patterns in Python
     sharp = compute_sharp_patterns(top_feats, bottom_feats)
-    print(f"  Sharp patterns (pre-LOO): {len(sharp)}")
+    n_composite = sum(1 for p in sharp if p.get("kind") == "composite")
+    print(f"  Sharp patterns (pre-LOO): {len(sharp)} ({n_composite} composite, {len(sharp)-n_composite} single)")
 
     # LOO cross-validation (no LLM calls)
     robust = loo_validate(sharp, top_feats, bottom_feats)
-    print(f"  LOO-robust patterns: {len(robust)}")
+    n_robust_composite = sum(1 for p in robust if p.get("kind") == "composite")
+    print(f"  LOO-robust patterns: {len(robust)} ({n_robust_composite} composite)")
     if not robust:
         print("  → 0 robust patterns: INSERT empty with cold_state")
 
@@ -741,6 +821,7 @@ def run_tenant(tenant: dict, conn, gem: genai.Client, oai: OpenAI) -> str:
 
     n_patterns = len(patterns_dict.get("patterns", []))
     print(f"  Saved: {n_patterns} patterns, period {period_start} → {period_end}")
+    print(f"  INSERT JSON: {json.dumps(patterns_dict, ensure_ascii=False)}")
     return "ok"
 
 
