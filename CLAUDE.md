@@ -75,6 +75,10 @@ npm run build          # прод-сборка
 npm run db:push        # синк схемы → локальная БД
 npm run db:seed        # реальные данные клиента
 
+# idempotency-тест миграций (требует Docker):
+./scripts/setup-test-db.sh        # поднять postgres:15 + прогнать миграции дважды
+./scripts/setup-test-db.sh --down # убить тестовый контейнер
+
 # скрейперы (из корня проекта):
 cd scraper && source venv/bin/activate
 python -m scraper.run_daily

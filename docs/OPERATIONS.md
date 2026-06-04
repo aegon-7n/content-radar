@@ -328,6 +328,38 @@ GitHub Actions разделён на два воркфлоу:
 - `git revert <bad-commit>` → push в `main` → новый автоматический деплой с откатом.
 - Или вручную на VPS: `cd /root/content-radar && git checkout <previous-good-sha> && npm ci --omit=dev && npm run build && pm2 reload content-radar --update-env`.
 
+## Локальный idempotency-тест миграций
+
+Запускается без доступа к продовой БД. Требует Docker.
+
+```bash
+./scripts/setup-test-db.sh
+```
+
+Что делает:
+1. Поднимает `postgres:15` в контейнере `content-radar-test-db` на порту `5433`.
+2. Применяет все миграции (`npm run db:migrate`) с `DATABASE_URL` теста — не трогает `.env.local`.
+3. Запускает миграции второй раз — если скрипт падает здесь, значит в миграции нет `IF NOT EXISTS` / `IF EXISTS`.
+
+При успехе печатает:
+```
+✓ Прогон №1 прошёл.
+✓ Прогон №2 прошёл — миграции идемпотентны.
+✓ Все проверки прошли.
+```
+
+Остановить тестовый контейнер:
+```bash
+./scripts/setup-test-db.sh --down
+```
+
+Подключиться к тестовой БД напрямую:
+```bash
+docker exec -it content-radar-test-db psql -U postgres -d content_radar_test
+```
+
+Этот тест не заменяет CI — он нужен для локальной проверки перед созданием PR с новой миграцией.
+
 ## Восстановить .env.local на VPS
 
 После SSH на VPS — он лежит в `/root/content-radar/.env.local`. После правки **обязательно**:
