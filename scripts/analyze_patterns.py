@@ -285,7 +285,7 @@ def _extract_json_from_gemini(raw: str | None, video_id: str) -> dict:
     """
     if not raw:
         print(f"  ! empty_response for {video_id}")
-        return {"error": "empty_response", "raw": "", "exc": "Gemini returned None/empty text"}
+        return {"error": "empty_response", "raw": "", "exc": "Gemini returned None/empty text (safety block or 5xx with no body)"}
     text = raw.strip()
 
     # 1. Try direct parse (bare JSON — the happy path)
@@ -317,7 +317,7 @@ def _extract_json_from_gemini(raw: str | None, video_id: str) -> dict:
     return {"error": "parse_failed", "raw": raw[:1000], "exc": "all parse strategies failed"}
 
 
-_GEMINI_RETRYABLE = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "ServiceUnavailable", "ResourceExhausted")
+_GEMINI_RETRYABLE = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "ServiceUnavailable", "ResourceExhausted", "TooManyRequests")
 
 
 def _gemini_with_retry(fn, *args, max_attempts=3, **kwargs):
@@ -595,7 +595,7 @@ Output ТОЛЬКО JSON без markdown-обёртки:
         total_tokens += resp.usage_metadata.total_token_count
 
         try:
-            text = resp.text.strip()
+            text = (resp.text or "").strip()
             if text.startswith("```"):
                 text = text.split("```")[1].lstrip("json\n")
             result = json.loads(text)
@@ -754,8 +754,9 @@ def main():
     # Propagate SOCKS_PROXY → HTTPS_PROXY/ALL_PROXY so Gemini and OpenAI SDKs use the tunnel.
     # VPS is in RU region; without this, Gemini returns 400 FAILED_PRECONDITION and
     # OpenAI returns 403 unsupported_country_region_territory.
+    # socks5:// → socks5h:// so DNS also resolves through the proxy.
     if SOCKS_PROXY and not os.environ.get("HTTPS_PROXY"):
-        socks_url = SOCKS_PROXY if SOCKS_PROXY.startswith("socks") else f"socks5h://{SOCKS_PROXY}"
+        socks_url = SOCKS_PROXY.replace("socks5://", "socks5h://") if "socks5://" in SOCKS_PROXY else SOCKS_PROXY
         os.environ["HTTPS_PROXY"] = socks_url
         os.environ["ALL_PROXY"] = socks_url
         print(f"  ~ proxy propagated: HTTPS_PROXY={socks_url}")
