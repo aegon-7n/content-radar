@@ -1,11 +1,13 @@
 """
-TRU-344 / TRU-368: Production pattern-analysis pipeline.
+TRU-344 / TRU-368 / TRU-392: Production pattern-analysis pipeline.
 
 Queries prod DB, downloads top videos via yt-dlp, analyzes with Gemini 2.5 Flash,
 saves results to tenant_insights.  Runs weekly via cron (Monday 04:00 UTC).
 
 Quality gates (TRU-368):
-- Top vs BOTTOM (not middle); bottom excludes <100 views.
+- Top vs BOTTOM (not middle); bottom excludes <1 view (TRU-392: was 100).
+- Top pool: videos published in last TOP_WINDOW_DAYS (7d) — keeps "recent" signal.
+- Bottom pool: extended to BOTTOM_WINDOW_DAYS (30d) to grow pool size (TRU-392).
 - Sharp threshold: pct_top ≥ 0.80 AND pct_bottom ≤ 0.20 AND diff ≥ 0.60 — in Python, not prompt.
 - LOO-robust: ≥80% of leave-one-out top runs still pass sharp threshold.
 - Russian-only output (≥80% Cyrillic): auto-retry if LLM returns English.
@@ -28,6 +30,7 @@ Binaries on VPS:
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -66,7 +69,9 @@ GATE_RECENT_DAYS = 7
 
 TOP_N = 15
 BOTTOM_N = 15
-BOTTOM_MIN_VIEWS = 100   # exclude zero-view noise from bottom group
+BOTTOM_MIN_VIEWS = 1     # TRU-392: was 100; include low-view TikToks (exclude true 0-view noise)
+TOP_WINDOW_DAYS = 7      # top pool: recent signal only
+BOTTOM_WINDOW_DAYS = 30  # bottom pool: wider window to grow pool size
 MAX_PATTERNS = 3
 
 # Sharp quality gates (TRU-368)
@@ -96,14 +101,24 @@ def get_tenants_for_analysis(conn, tenant_id_filter: str | None = None) -> list[
     return [dict(r) for r in cur.fetchall()]
 
 
-def get_tenant_videos(conn, tenant_id: str) -> list[dict]:
-    """Return all active videos with latest metrics, sorted by views DESC."""
+def get_tenant_videos(conn, tenant_id: str, days_back: int | None = None) -> list[dict]:
+    """Return active videos with latest metrics, sorted by views DESC.
+
+    days_back: if set, only videos published in the last N days are returned.
+    """
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("""
+    params: list = [tenant_id]
+    date_clause = ""
+    if days_back is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
+        date_clause = "AND v.published_at >= %s"
+        params.append(cutoff)
+    cur.execute(f"""
         SELECT
             v.id,
             v.url,
             v.platform,
+            v.published_at,
             vm.views,
             vm.likes,
             vm.comments,
@@ -118,8 +133,9 @@ def get_tenant_videos(conn, tenant_id: str) -> list[dict]:
         ) vm ON TRUE
         WHERE v.tenant_id = %s
           AND v.fail_streak < 3
+          {date_clause}
         ORDER BY vm.views DESC
-    """, (tenant_id,))
+    """, params)
     return [dict(r) for r in cur.fetchall()]
 
 
@@ -141,17 +157,24 @@ def check_gate(videos: list[dict]) -> tuple[bool, str]:
     return True, "ok"
 
 
-def split_top_bottom(videos: list[dict], top_n: int, bottom_n: int) -> tuple[list, list]:
+def split_top_bottom(
+    top_candidates: list[dict],
+    bottom_candidates: list[dict],
+    top_n: int,
+    bottom_n: int,
+) -> tuple[list, list]:
     """
-    Top-N: highest views (already sorted desc).
-    Bottom-N: lowest views, excluding videos with <BOTTOM_MIN_VIEWS (zero-view noise).
+    Top-N: highest views from top_candidates (sorted desc, recent window).
+    Bottom-N: lowest views from bottom_candidates (extended window), excluding
+              zero-view noise (<BOTTOM_MIN_VIEWS) and any overlap with top.
     """
-    top = videos[:top_n]
-    eligible_bottom = [v for v in videos if (v["views"] or 0) >= BOTTOM_MIN_VIEWS]
-    bottom = list(reversed(eligible_bottom))[:bottom_n]
-    # Exclude any overlap with top (shouldn't happen, but defensive)
+    top = top_candidates[:top_n]
     top_ids = {v["id"] for v in top}
-    bottom = [v for v in bottom if v["id"] not in top_ids]
+    eligible_bottom = [
+        v for v in bottom_candidates
+        if (v["views"] or 0) >= BOTTOM_MIN_VIEWS and v["id"] not in top_ids
+    ]
+    bottom = list(reversed(eligible_bottom))[:bottom_n]
     return top, bottom
 
 
@@ -249,6 +272,48 @@ def transcribe(mp4: Path, oai: OpenAI) -> str:
 
 # ── Per-video feature extraction (Stage A) ────────────────────────────────────
 
+def _extract_json_from_gemini(raw: str, video_id: str) -> dict:
+    """
+    Robustly extract a JSON object from a Gemini response.
+
+    Handles common Gemini formatting issues:
+    - Markdown code block (```json ... ```) with or without preamble text
+    - Bare JSON
+    - JSON preceded/followed by explanatory text
+
+    Falls back to parse_failed with full raw text (up to 1000 chars) for diagnosis.
+    """
+    text = raw.strip()
+
+    # 1. Try direct parse (bare JSON — the happy path)
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # 2. Strip markdown code block and retry
+    md_match = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', text)
+    if md_match:
+        try:
+            return json.loads(md_match.group(1))
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # 3. Greedy fallback: extract outermost {...} even if surrounded by prose
+    obj_match = re.search(r'\{[\s\S]+\}', text)
+    if obj_match:
+        try:
+            result = json.loads(obj_match.group(0))
+            print(f"  ~ regex JSON extraction used for {video_id}")
+            return result
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # 4. Give up — record enough context to diagnose later
+    print(f"  ! parse_failed for {video_id}, raw[:200]: {raw[:200]!r}")
+    return {"error": "parse_failed", "raw": raw[:1000], "exc": "all parse strategies failed"}
+
+
 def analyze_video(mp4: Path, transcript: str, row: dict, gem: genai.Client) -> dict:
     """
     Tag a single video with fixed taxonomy via Gemini 2.5 Flash.
@@ -314,13 +379,7 @@ Output JSON (только JSON, без markdown-обёртки):
         model="gemini-2.5-flash",
         contents=[file, prompt],
     )
-    try:
-        text = resp.text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1].lstrip("json\n")
-        result = json.loads(text)
-    except Exception as e:
-        result = {"error": "parse_failed", "raw": resp.text[:200], "exc": str(e)}
+    result = _extract_json_from_gemini(resp.text, row["id"])
 
     result["_video_id"] = row["id"]
     result["_views"] = row["views"]
@@ -574,14 +633,18 @@ def run_tenant(tenant: dict, conn, gem: genai.Client, oai: OpenAI) -> str:
     print(f"\n{'='*60}")
     print(f"Tenant: {tenant_name} ({tenant_id})")
 
-    videos = get_tenant_videos(conn, tenant_id)
-    passes, reason = check_gate(videos)
+    # Gate check uses all videos (no date filter) — unchanged
+    all_videos = get_tenant_videos(conn, tenant_id)
+    passes, reason = check_gate(all_videos)
     if not passes:
         print(f"  Gate: SKIP — {reason}")
         return f"skipped:{reason}"
 
-    print(f"  Gate: OK — {len(videos)} videos")
-    top, bottom = split_top_bottom(videos, TOP_N, BOTTOM_N)
+    # Separate date windows: top = recent 7d, bottom = extended 30d (TRU-392)
+    top_candidates = get_tenant_videos(conn, tenant_id, days_back=TOP_WINDOW_DAYS)
+    bottom_candidates = get_tenant_videos(conn, tenant_id, days_back=BOTTOM_WINDOW_DAYS)
+    print(f"  Gate: OK — all={len(all_videos)} top_cand={len(top_candidates)} bottom_cand={len(bottom_candidates)}")
+    top, bottom = split_top_bottom(top_candidates, bottom_candidates, TOP_N, BOTTOM_N)
     if len(bottom) < 3:
         reason = f"not enough bottom videos (got {len(bottom)}, need 3)"
         print(f"  Split: SKIP — {reason}")
