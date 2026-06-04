@@ -22,6 +22,83 @@
       "when": 1779247550379,
       "tag": "0002_complete_brother_voodoo",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779247600000,
+      "tag": "0003_creator_link",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1747846300000,
+      "tag": "0004_creator_video_limit",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1748696700000,
+      "tag": "0005_onboarding_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1748696760000,
+      "tag": "0006_referral_codes",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1748779620000,
+      "tag": "0007_creator_archived",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1748779680000,
+      "tag": "0008_drop_referrals",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1748944080000,
+      "tag": "0009_beta_waitlist_screening",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1748944140000,
+      "tag": "0010_tenant_insights",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1748944200000,
+      "tag": "0011_creator_youtube_handle",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1748951520000,
+      "tag": "0012_rev2_waitlist",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1748951580000,
+      "tag": "0013_invite_creator_required",
+      "breakpoints": true
     }
   ]
 }
