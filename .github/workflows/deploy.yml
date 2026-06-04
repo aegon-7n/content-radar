@@ -1,0 +1,45 @@
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required secrets are set
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+        run: |
+          missing=()
+          [ -z "$VPS_HOST" ]        && missing+=(VPS_HOST)
+          [ -z "$VPS_USER" ]        && missing+=(VPS_USER)
+          [ -z "$VPS_SSH_KEY" ]     && missing+=(VPS_SSH_KEY)
+          [ -z "$VPS_DEPLOY_PATH" ] && missing+=(VPS_DEPLOY_PATH)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "ERROR: Missing GitHub Actions secrets: ${missing[*]}"
+            echo "Go to: Settings → Secrets and variables → Actions → New repository secret"
+            echo "Required: VPS_HOST, VPS_USER, VPS_SSH_KEY, VPS_DEPLOY_PATH=/root/content-radar"
+            exit 1
+          fi
+          echo "All secrets present — proceeding with deploy"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_DEPLOY_PATH }}
+            git pull origin main
+            npm ci --omit=dev
+            npm run build
+            npm run db:migrate
+            pm2 reload content-radar --update-env
