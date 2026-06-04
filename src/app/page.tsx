@@ -39,13 +39,6 @@ function DashboardInner() {
   const role = (session?.user as { role?: string } | undefined)?.role ?? "owner";
   const searchParams = useSearchParams();
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.replace("/login");
-    }
-  }, [status, router]);
-
-  if (status === "unauthenticated") return null;
   const [period, setPeriod] = useState<Period>("30d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -55,6 +48,12 @@ function DashboardInner() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isEmpty, setIsEmpty] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/login");
+    }
+  }, [status, router]);
 
   // Auto-open onboarding wizard when redirected with ?openOnboarding=1
   useEffect(() => {
@@ -100,6 +99,8 @@ function DashboardInner() {
         });
     }
   }, [isEmpty, session, role]);
+
+  if (status === "unauthenticated") return null;
 
   const d = (isEmpty || !data) ? MOCK_DASHBOARD : data;
   const hasRealData = (d.dailyViews ?? []).some((v: { views: number }) => v.views > 0);
