@@ -9,7 +9,7 @@ app/         маршруты (страницы + API)
 components/  переиспользуемая UI (layout, ui-kit, providers)
 db/          drizzle-схема и подключение (см. src/db/CLAUDE.md)
 lib/         утилиты форматирования, моки, helpers
-middleware.ts  next-auth guard на все маршруты кроме /login, /api/auth, /api/ping, /api/forgot-password, /api/reset-password, /api/scrape, /api/waitlist, /api/billing/webhooks, статика
+middleware.ts  next-auth guard на все маршруты кроме /login, /api/auth, /api/ping, /api/health, /api/forgot-password, /api/reset-password, /api/scrape, /api/waitlist, /api/billing/webhooks, статика
 types/       глобальные .d.ts
 ```
 
@@ -45,7 +45,7 @@ types/       глобальные .d.ts
 - `last-sync` — `MAX(scraped_at)` из `video_metrics`.
 - `patterns` — GET, паттерны топа недели для `WeeklyPatternsWidget`. Читает из `tenant_insights` (latest for tenant). Возвращает `{ state, patterns, period_label, ... }`.
 - `dashboard/creator-insights` — GET, AI-разбор топ-роликов (top-N vs bot-N паттерны). MVP: данные из статичного файла `lib/creator-insights-data.ts`, hardcoded Тима. Схема: `CreatorInsightsData` из того же файла. Когда Krab доставит TRU-361 bottom-15 JSON — обновить данные в `creator-insights-data.ts`.
-- `health` — статус трёх scraper-джобов из `scraper_state`. **Auth-gated** — требует JWT. Для uptime-мониторов — `/api/ping`.
+- `health` — публичный endpoint. Статус трёх scraper-джобов из `scraper_state` + агрегаты (`total_videos/creators/products`). Используется uptime-мониторами, sidebar и healthcheck'ами. Возвращает `status: "ok"|"degraded"|"error"`.
 - `ping` — публичный liveness-probe для uptime-мониторов. Возвращает `{"ok":true}`, никаких operational данных.
 
 **Инвайты и команда**
@@ -86,7 +86,7 @@ types/       глобальные .d.ts
 **Получение данных.** Страницы **никогда** не ходят в БД напрямую — только через `fetch('/api/...')`. Вся работа с Drizzle живёт в `app/api/*/route.ts`. На сетевой ошибке UI падает на `mock-data.ts` чтобы не показывать пустоту в деве.
 
 **Аутентификация (defense in depth).** Два слоя:
-1. [middleware.ts](middleware.ts) — `getToken` из `next-auth/jwt`, fail-closed (try/catch → 401). Все маршруты требуют JWT-токен, кроме allowlist: `/login`, `/invite`, `/forgot-password`, `/reset-password`, `/robots.txt`, `/sitemap.xml`, `/api/auth`, `/api/ping`, `/api/forgot-password`, `/api/reset-password`, `/api/scrape`, `/api/waitlist`, `/api/billing/webhooks`, статика. `/api/health` — **AUTH-GATED** (TRU-171/TRU-288); для uptime-мониторов использовать `/api/ping`.
+1. [middleware.ts](middleware.ts) — `getToken` из `next-auth/jwt`, fail-closed (try/catch → 401). Все маршруты требуют JWT-токен, кроме allowlist: `/login`, `/invite`, `/forgot-password`, `/reset-password`, `/robots.txt`, `/sitemap.xml`, `/api/auth`, `/api/ping`, `/api/health`, `/api/forgot-password`, `/api/reset-password`, `/api/scrape`, `/api/waitlist`, `/api/billing/webhooks`, статика.
 2. Route-level guard — каждый API handler вызывает `requireAuthWithTenant(request)` из `lib/tenant.ts` перед любой логикой. Возвращает `{ userId, tenantId }`. Если middleware упадёт/пропустит, хендлер сам вернёт 401. `tenant_id` берётся из JWT (запекается при логине) — per-request DB lookup не нужен.
 
 Новые API-маршруты **обязаны** вызвать `requireAuthWithTenant` (из `lib/tenant.ts`) в каждом экспортируемом handler и скоупить все запросы по `tenantId`. Для owner-only маршрутов используй `requireOwner(request)` из того же файла — проверяет `role === 'owner'` из JWT. Для публичного маршрута — добавить в `config.matcher` allowlist и не вызывать `requireAuthWithTenant`.
