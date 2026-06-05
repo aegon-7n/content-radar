@@ -20,8 +20,8 @@ export async function middleware(request: NextRequest) {
   // CEO admin paths use HTTP Basic Auth — no NextAuth session involved.
   if (pathname.startsWith("/ceo-")) {
     const authHeader = request.headers.get("authorization");
-    const expectedUser = process.env.CEO_ADMIN_USER ?? "";
-    const expectedPass = process.env.CEO_ADMIN_PASS ?? "";
+    const expectedUser = process.env.CEO_ADMIN_BASIC_USER ?? "";
+    const expectedPass = process.env.CEO_ADMIN_BASIC_PASS ?? "";
 
     if (!expectedUser || !authHeader || !authHeader.startsWith("Basic ")) {
       return unauthorizedBasic();
