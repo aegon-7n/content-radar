@@ -70,11 +70,6 @@ types/       глобальные .d.ts
 **Реферальные коды (admin)**
 - `admin/referral-codes` — GET (список кодов) + POST (создание кода) + DELETE (`?code=CODE`, удаление). Только для авторизованных owner. Коды хранятся в `referral_codes` таблице (код, имя партнёра, счётчик использований).
 
-## Маршруты `/admin/`
-
-- **`/admin/waitlist`** — Server Component за NextAuth (middleware защищает всё кроме `/api` и `/login`). Таблица заявок с фильтром по статусу (`?status=new|contacted|onboarded|rejected`), сортировка `created_at DESC`, лимит 100. Смена статуса — Server Action `updateStatus` (form + hidden id + select). Счётчики «Всего / Новых» в шапке. Ссылка в боковом меню под «Настройки».
-- **`/admin/referrals`** — Client Component. Список реферальных кодов с счётчиком использований. Форма создания нового кода (uppercase, regex `[A-Z0-9_-]+`). Кнопка копирования кода. Удаление кода. Только для adminOnly (Глеб). Ссылка в боковом меню рядом с Waitlist.
-
 ## Маршруты `/ceo-*` (CEO admin, изолированные)
 
 - **`/ceo-x7Hg9pQ2Wf/waitlist`** — Секретная read-only страница для CEO. Защищена HTTP Basic Auth (middleware проверяет `Authorization: Basic` ДО любого рендера, возвращает 401 + `WWW-Authenticate` если нет). Не требует NextAuth-сессии. Env vars: `CEO_ADMIN_BASIC_USER`, `CEO_ADMIN_BASIC_PASS`. Показывает waitlist без Sidebar/Header (AppShell пропускает `/ceo-*` маршруты). Читает из БД напрямую (Server Component — исключение из паттерна "только через API", т.к. нет сессии).
