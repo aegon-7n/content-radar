@@ -28,7 +28,7 @@ import psycopg2
 import requests
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from scraper.config import DATABASE_URL, TIKAPI_KEY, YOUTUBE_API_KEY, HIKERAPI_KEY
+from scraper.config import DATABASE_URL, TIKAPI_KEY, YOUTUBE_API_KEY, HIKERAPI_KEY, PROXY_DICT
 
 logging.basicConfig(
     level=logging.INFO,
@@ -73,6 +73,7 @@ def tiktok_count(username: Optional[str]) -> Optional[int] | str:
             "https://api.tikapi.io/public/check",
             params={"username": username},
             headers={"X-API-KEY": TIKAPI_KEY},
+            proxies=PROXY_DICT,
             timeout=TIMEOUT,
         )
         if not r.ok:
@@ -85,6 +86,7 @@ def tiktok_count(username: Optional[str]) -> Optional[int] | str:
             "https://api.tikapi.io/public/posts",
             params={"secUid": sec_uid, "count": 35},
             headers={"X-API-KEY": TIKAPI_KEY, "Accept": "application/json"},
+            proxies=PROXY_DICT,
             timeout=TIMEOUT,
         )
         if not r.ok:
