@@ -19,17 +19,25 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const res = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    if (res?.ok) {
-      router.push("/");
-      router.refresh();
-    } else {
-      setError("Неверный email или пароль");
+      if (res?.ok) {
+        router.push("/");
+        router.refresh();
+      } else if (res?.status === 429) {
+        setError("Слишком много попыток входа. Подождите 15 минут и попробуйте снова.");
+        setLoading(false);
+      } else {
+        setError("Неверный email или пароль");
+        setLoading(false);
+      }
+    } catch {
+      setError("Слишком много попыток входа. Подождите 15 минут и попробуйте снова.");
       setLoading(false);
     }
   }
