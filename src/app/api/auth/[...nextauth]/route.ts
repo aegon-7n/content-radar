@@ -4,39 +4,60 @@ import { compare } from "bcryptjs";
 import { db } from "@/db";
 import { adminSettings, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-
-// ─── Rate limiting for credential login (OWASP A07:2021) ─────────────────────
-// 10 attempts per 15 minutes per IP. Stops headless-browser brute-force that
-// bypasses CSRF (attacker has valid cookie from same origin).
-const authRateLimitMap = new Map<string, { count: number; windowStart: number }>();
-const AUTH_RATE_LIMIT_MAX = 10;
+// ─── Failed-attempt rate limiting (OWASP A07:2021) ───────────────────────────
+// Counts only failed credential checks per IP — successful login clears the
+// counter so legitimate NAT users (office Wi-Fi, shared IP) aren't blocked.
+// Raised from 10 → 50 to handle multi-user NAT scenarios.
+const failedAttemptsMap = new Map<string, { count: number; windowStart: number }>();
+const AUTH_RATE_LIMIT_MAX = 50;
 const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60_000;
 
-function checkAuthRateLimit(ip: string): { allowed: boolean; retryAfterSecs?: number } {
+function isRateLimited(ip: string): { limited: boolean; retryAfterSecs?: number } {
   const now = Date.now();
 
   if (Math.random() < 0.02) {
-    for (const [key, entry] of authRateLimitMap) {
+    for (const [key, entry] of failedAttemptsMap) {
       if (now - entry.windowStart > AUTH_RATE_LIMIT_WINDOW_MS * 2) {
-        authRateLimitMap.delete(key);
+        failedAttemptsMap.delete(key);
       }
     }
   }
 
-  const entry = authRateLimitMap.get(ip);
-
+  const entry = failedAttemptsMap.get(ip);
   if (!entry || now - entry.windowStart > AUTH_RATE_LIMIT_WINDOW_MS) {
-    authRateLimitMap.set(ip, { count: 1, windowStart: now });
-    return { allowed: true };
+    return { limited: false };
   }
 
   if (entry.count >= AUTH_RATE_LIMIT_MAX) {
     const retryAfterSecs = Math.ceil((entry.windowStart + AUTH_RATE_LIMIT_WINDOW_MS - now) / 1000);
-    return { allowed: false, retryAfterSecs };
+    return { limited: true, retryAfterSecs };
   }
 
-  entry.count += 1;
-  return { allowed: true };
+  return { limited: false };
+}
+
+function recordFailedAttempt(ip: string): null {
+  const now = Date.now();
+  const entry = failedAttemptsMap.get(ip);
+  if (!entry || now - entry.windowStart > AUTH_RATE_LIMIT_WINDOW_MS) {
+    failedAttemptsMap.set(ip, { count: 1, windowStart: now });
+  } else {
+    entry.count += 1;
+  }
+  return null;
+}
+
+function clearFailedAttempts(ip: string): void {
+  failedAttemptsMap.delete(ip);
+}
+
+function getIpFromAuthReq(req: { headers?: Record<string, unknown> }): string {
+  const h = req.headers ?? {};
+  const ri = h["x-real-ip"];
+  const ff = h["x-forwarded-for"];
+  if (typeof ri === "string" && ri) return ri;
+  if (typeof ff === "string" && ff) return ff.split(",")[0]?.trim() ?? "unknown";
+  return "unknown";
 }
 
 const handler = NextAuth({
@@ -47,14 +68,13 @@ const handler = NextAuth({
         email:    { label: "Email",    type: "email" },
         password: { label: "Пароль",  type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null;
 
+        const ip = getIpFromAuthReq(req as { headers?: Record<string, unknown> });
         const adminEmail = process.env.ADMIN_EMAIL ?? "admin@content-radar.ru";
 
         if (credentials.email === adminEmail) {
-          // Owner path: prefer bcrypt hash stored via reset-password flow,
-          // fall back to plaintext env var on first boot.
           let passwordOk = false;
           try {
             const [row] = await db
@@ -70,14 +90,16 @@ const handler = NextAuth({
           } catch {
             passwordOk = credentials.password === (process.env.ADMIN_PASSWORD ?? "admin123");
           }
-          if (!passwordOk) return null;
+          if (!passwordOk) return recordFailedAttempt(ip);
 
           const [user] = await db
             .select({ id: users.id, tenantId: users.tenantId, email: users.email, name: users.name, role: users.role, creatorId: users.creatorId })
             .from(users)
             .where(eq(users.email, adminEmail))
             .limit(1);
-          if (!user) return null;
+          if (!user) return recordFailedAttempt(ip);
+
+          clearFailedAttempts(ip);
           return { id: user.id, email: user.email, name: user.name, tenantId: user.tenantId, role: user.role, creatorId: user.creatorId, isGlobalAdmin: true };
         }
 
@@ -89,6 +111,7 @@ const handler = NextAuth({
             .where(eq(users.email, credentials.email))
             .limit(1);
           if (user?.passwordHash && await compare(credentials.password, user.passwordHash)) {
+            clearFailedAttempts(ip);
             return { id: user.id, email: user.email, name: user.name, tenantId: user.tenantId, role: user.role, creatorId: user.creatorId };
           }
         } catch {
@@ -102,11 +125,12 @@ const handler = NextAuth({
           .where(eq(users.email, credentials.email))
           .limit(1);
 
-        if (!user?.passwordHash) return null;
+        if (!user?.passwordHash) return recordFailedAttempt(ip);
 
         const valid = await compare(credentials.password, user.passwordHash);
-        if (!valid) return null;
+        if (!valid) return recordFailedAttempt(ip);
 
+        clearFailedAttempts(ip);
         return { id: user.id, email: user.email, name: user.name, tenantId: user.tenantId };
       },
     }),
@@ -152,8 +176,8 @@ const POST = async (req: Request, ctx: unknown) => {
       req.headers.get("x-real-ip") ??
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
       "unknown";
-    const { allowed, retryAfterSecs } = checkAuthRateLimit(ip);
-    if (!allowed) {
+    const { limited, retryAfterSecs } = isRateLimited(ip);
+    if (limited) {
       return Response.json(
         { error: "too many requests" },
         { status: 429, headers: { "Retry-After": String(retryAfterSecs ?? AUTH_RATE_LIMIT_WINDOW_MS / 1000) } }

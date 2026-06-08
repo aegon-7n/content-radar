@@ -28,6 +28,9 @@ export default function LoginPage() {
     if (res?.ok) {
       router.push("/");
       router.refresh();
+    } else if (res?.status === 429) {
+      setError("Слишком много попыток входа. Подождите 15 минут и попробуйте снова.");
+      setLoading(false);
     } else {
       setError("Неверный email или пароль");
       setLoading(false);
