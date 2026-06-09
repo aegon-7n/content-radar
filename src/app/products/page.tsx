@@ -26,6 +26,7 @@ type ProductRow = {
   id: string;
   name: string;
   wbArticle: string;
+  needsReview?: boolean;
   views: number;
   videos: number;
   newVideos: number;
@@ -229,9 +230,25 @@ export default function ProductsPage() {
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <td className="px-4 py-3.5">
-                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                      {product.name}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                        {product.name}
+                      </span>
+                      {product.needsReview && (
+                        <span
+                          className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                          style={{
+                            background: "rgba(245,158,11,0.15)",
+                            color: "#F59E0B",
+                            border: "1px solid rgba(245,158,11,0.3)",
+                            whiteSpace: "nowrap",
+                          }}
+                          title="Артикул определён автоматически — проверьте и уточните название товара в Настройках"
+                        >
+                          Нужно название
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3.5">
                     <span

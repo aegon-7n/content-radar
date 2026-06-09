@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
         p.id AS product_id,
         p.name AS product_name,
         p.wb_article,
+        p.needs_review,
         COALESCE(SUM(d.delta), 0)::bigint AS views,
         COUNT(DISTINCT d.video_id) FILTER (WHERE d.delta > 0)::int AS active_videos,
         (SELECT COUNT(*) FROM videos v2
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN deltas d ON d.product_id = p.id
       WHERE p.tenant_id = ${tenantId}
       ${productCreatorFilter}
-      GROUP BY p.id, p.name, p.wb_article
+      GROUP BY p.id, p.name, p.wb_article, p.needs_review
       ORDER BY views DESC
     `);
 
@@ -103,6 +104,7 @@ export async function GET(request: NextRequest) {
       product_id: string;
       product_name: string;
       wb_article: string;
+      needs_review: number;
       views: string;
       active_videos: number;
       new_videos: number;
@@ -128,6 +130,7 @@ export async function GET(request: NextRequest) {
       id: row.product_id,
       name: row.product_name,
       wbArticle: row.wb_article,
+      needsReview: row.needs_review === 1,
       views: Number(row.views),
       videos: Number(row.active_videos),
       newVideos: Number(row.new_videos),
