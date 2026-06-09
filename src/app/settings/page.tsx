@@ -2,15 +2,16 @@
 
 import { Suspense, useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Users, Package, Film, Upload, CreditCard } from "lucide-react";
+import { Users, Package, Film, Upload, CreditCard, UserCircle } from "lucide-react";
 import Toast, { ToastState } from "./_components/Toast";
 import CreatorsTab from "./_components/CreatorsTab";
 import ProductsTab from "./_components/ProductsTab";
 import VideosTab from "./_components/VideosTab";
 import ImportTab from "./_components/ImportTab";
 import BillingTab from "./_components/BillingTab";
+import ProfileTab from "./_components/ProfileTab";
 
-type TabId = "creators" | "products" | "videos" | "import" | "billing";
+type TabId = "creators" | "products" | "videos" | "import" | "billing" | "profile";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "creators", label: "Креаторы", icon: <Users className="w-3.5 h-3.5" /> },
@@ -18,6 +19,7 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "videos", label: "Ролики", icon: <Film className="w-3.5 h-3.5" /> },
   { id: "import", label: "Импорт CSV", icon: <Upload className="w-3.5 h-3.5" /> },
   { id: "billing", label: "Подписка", icon: <CreditCard className="w-3.5 h-3.5" /> },
+  { id: "profile", label: "Профиль", icon: <UserCircle className="w-3.5 h-3.5" /> },
 ];
 
 export default function SettingsPage() {
@@ -35,7 +37,7 @@ function SettingsContent() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     const tab = searchParams.get("tab");
-    const validTabs: TabId[] = ["creators", "products", "videos", "import", "billing"];
+    const validTabs: TabId[] = ["creators", "products", "videos", "import", "billing", "profile"];
     return (validTabs.includes(tab as TabId) ? tab : "creators") as TabId;
   });
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -104,6 +106,7 @@ function SettingsContent() {
         {activeTab === "videos" && <VideosTab showToast={showToast} />}
         {activeTab === "import" && <ImportTab showToast={showToast} />}
         {activeTab === "billing" && <BillingTab />}
+        {activeTab === "profile" && <ProfileTab showToast={showToast} />}
       </div>
 
       {/* Toast */}
