@@ -250,13 +250,13 @@ def instagram_count(username: Optional[str]) -> Optional[int] | str:
 
 def main() -> int:
     with _conn() as c, c.cursor() as cur:
-        # Only audit creators whose tenant has at least 1 video — skips test/QA
-        # tenants that accumulate in production from development and demos.
+        # Only audit creators who have at least 1 video tracked — skips test/QA
+        # creators that have no real content (tenant-level filter was insufficient).
         cur.execute("""
             SELECT id, name,
                    tiktok_username, youtube_channel_id, instagram_username
             FROM creators
-            WHERE tenant_id IN (SELECT DISTINCT tenant_id FROM videos)
+            WHERE id IN (SELECT DISTINCT creator_id FROM videos WHERE creator_id IS NOT NULL)
             ORDER BY name
         """)
         creators = cur.fetchall()
