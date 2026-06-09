@@ -6,16 +6,14 @@
 
 ## Следующий спринт
 
-- [ ] **CI/CD**: push в main → GitHub Actions build → auto-deploy на сервер (SSH + PM2 restart). Убрать ручной scp.
+- [ ] **CI/CD**: push в main → GitHub Actions build → auto-deploy на сервер (SSH + PM2 restart). Убрать ручной git pull. _Workflow [deploy.yml](.github/workflows/deploy.yml) готов. Нужно добавить 4 секрета в GitHub: `VPS_HOST`, `VPS_USER`, `VPS_DEPLOY_PATH`, `VPS_SSH_KEY` — см. TRU-449._
 - [x] **Auto-rescrape retry**: если видео failed 3 ночи подряд → пометить `permanently_unavailable`, не тратить API calls. _(failStreak реализован в scraper; `>= 3` → пропуск; UI: тег «недоступен»)_
-- [ ] **UI для ru_cross_border_block**: показывать недоступные видео в `/videos` с тегом "недоступно в регионе". _(отличается от failStreak — это geo-блок, не удаление ролика)_
+- [x] **UI для ru_cross_border_block**: показывать недоступные видео в `/videos` с тегом "недоступно в регионе". _(реализовано: `failStreak >= 3` + TikTok → тег «недоступно в регионе»; остальные платформы → тег «недоступен»; banner на детальной; CSV-экспорт. PR#41)_
 
 ## Высокий приоритет (блокирует монетизацию)
 
-> Без multi-tenancy waitlist не превратится в активных юзеров — это блокер монетизации. Лиды копятся в `waitlist_signups`, но онбордить их некуда пока нет регистрации и изоляции данных.
-
-- [ ] **Multi-tenancy**: фильтрация всех API-запросов по `user_id` (сейчас нет WHERE `user_id = ?`), регистрация нового пользователя, изоляция данных. 4-6ч рефакторинга схемы + auth-flow. **Без этого онбординг каждого нового клиента — ручная работа.**
-- [ ] **ЮKassa: рекуррентные подписки**: webhook `payment.succeeded` → активация аккаунта, `payment.canceled` → блокировка. Тарифы: 10-15К ₽/мес base, до 30К custom. Нужна интеграция ЮKassa API + модель `subscriptions` в БД. **Без биллинга нет автоматической монетизации.**
+- [x] **Multi-tenancy**: фильтрация всех API-запросов по `tenant_id`, регистрация нового тенанта (`POST /api/auth/register`), изоляция данных. _(реализовано: миграция 0001, `requireAuthWithTenant()` в каждом handler, `tenant_id` запекается в JWT. Нужна ручная регистрация через REGISTER_SECRET — self-serve онбординг отдельная задача.)_
+- [x] **ЮKassa: рекуррентные подписки**: webhook `payment.succeeded` → активация аккаунта, `payment.canceled` → блокировка. _(реализовано: `/api/billing/subscribe`, `/api/billing/status`, `/api/billing/webhooks/yookassa`, таблицы `subscriptions` + `payments`, BillingTab в настройках.)_
 
 ## Лендинг и хостинг
 
@@ -27,9 +25,8 @@
 ## Потом (когда клиент попросит)
 
 - [ ] **Alerting на бизнес-метрики**: "у Полины -50% просмотров за неделю" / "вирусный ролик >1M" → Telegram. Расширение audit.py + notify-telegram.sh.
-- [ ] **Обработка permanently_unavailable в UI**: показывать недоступные видео в `/videos` с тегом, не скрывать их.
-- [x] **Вынос секретов из setup-cron.sh**: ~~сейчас API-ключи захардкожены в скрипте~~ — теперь читает из `.env.local`. Старые ключи в git history, нужна ротация.
 - [x] **Обработка permanently_unavailable в UI**: тег «недоступен» на `/videos` (список + детальная + CSV), banner на детальной. _(реализовано в PR#41)_
+- [x] **Вынос секретов из setup-cron.sh**: ~~сейчас API-ключи захардкожены в скрипте~~ — теперь читает из `.env.local`. Старые ключи в git history, нужна ротация.
 - [ ] **Экспорт в Excel**: /api/export?format=xlsx&period=30d. Клиент раньше вёл Excel-таблицы, может хотеть автосгенерированные.
 - [ ] **Исторические графики >30 дней**: сейчас delta-model считает max 30д. Для "покажи рост за 3 месяца" — нужна отдельная агрегация.
 - [ ] **Pinterest official API**: если клиент пришлёт developer credentials. Пока RSS + scraper (метрики пинов не парсятся из HTML с 2026, нужен API или Apify actor).
