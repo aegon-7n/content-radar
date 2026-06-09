@@ -320,15 +320,16 @@ def _extract_json_from_gemini(raw: str | None, video_id: str) -> dict:
 _GEMINI_RETRYABLE = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "ServiceUnavailable", "ResourceExhausted", "TooManyRequests")
 
 
-def _gemini_with_retry(fn, *args, max_attempts=3, **kwargs):
+def _gemini_with_retry(fn, *args, max_attempts=5, **kwargs):
     """Call fn(*args, **kwargs) with exponential backoff on transient Gemini errors."""
+    delays = [10, 30, 60, 120]  # 503 "high demand" needs longer waits than 2/4/8s
     for attempt in range(max_attempts):
         try:
             return fn(*args, **kwargs)
         except Exception as e:
             msg = str(e)
             if attempt < max_attempts - 1 and any(tag in msg for tag in _GEMINI_RETRYABLE):
-                delay = 2 ** (attempt + 1)  # 2, 4, 8 sec
+                delay = delays[min(attempt, len(delays) - 1)]
                 print(f"  ~ Gemini transient error (attempt {attempt + 1}), retry in {delay}s: {msg[:120]}")
                 time.sleep(delay)
             else:
