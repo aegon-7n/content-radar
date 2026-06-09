@@ -43,9 +43,9 @@ WB_ARTICLE_RE = re.compile(r"\b(\d{5,})\b")  # 5+ цифр подряд = арт
 # делать one-shot backfill с большим окном — например для нового креатора,
 # которому канал прописали позже, чем существовали ролики на канале:
 #   MIN_LOOKBACK_HOURS=2160 MAX_LOOKBACK_HOURS=2160 python auto_discover.py
-# (2160h = 90d). cron оставляет defaults 504/504, не задевает.
-MIN_LOOKBACK_HOURS = int(os.getenv("MIN_LOOKBACK_HOURS", str(24 * 21)))
-MAX_LOOKBACK_HOURS = int(os.getenv("MAX_LOOKBACK_HOURS", str(24 * 21)))
+# (2160h = 90d). cron оставляет defaults (168h/720h), не задевает.
+MIN_LOOKBACK_HOURS = int(os.getenv("MIN_LOOKBACK_HOURS", str(24 * 7)))   # 168h = 7 days
+MAX_LOOKBACK_HOURS = int(os.getenv("MAX_LOOKBACK_HOURS", str(24 * 30)))  # 720h = 30 days
 
 # Extra buffer added on top of "gap since last success". Prevents off-by-one
 # when the previous run finished a few minutes before a new publish.
