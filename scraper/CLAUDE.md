@@ -71,9 +71,9 @@ python main.py --platform tiktok --dry-run   # одна платформа бе�
 
 - Смотри `scraper_state` — там `last_status`, `last_message`, `last_run_at` для каждого джоба.
 - `/api/health` отдаёт это в виде JSON (внутренний эндпоинт).
-- Логи на проде: `/var/log/content-radar/{discover,daily,audit}.log`.
+- Логи на проде: `/var/log/content-radar/{discover,daily,audit,analyze,patterns,tls-check}.log`.
 - При росте расходов первое подозреваемое — `audit.py` или пагинация в `auto_discover` (см. ловушку #1, #2).
 
-## ⚠️ Безопасность
+## Безопасность
 
-`scripts/setup-cron.sh` сейчас содержит API-ключи **в открытом виде** в репозитории (TIKAPI_KEY, YOUTUBE_API_KEY, HIKERAPI_KEY). При первом удобном случае это надо вынести в `.env` на сервере и держать `setup-cron.sh` без секретов.
+`scripts/setup-cron.sh` читает ключи из `.env.local` на сервере (не хранит их в репо). Генерирует `/etc/cron.d/content-radar` с подставленными значениями — это нормально, файл доступен только root. Старые версии скрипта с хардкодом засветили ключи в git history → при случае стоит ротировать TIKAPI_KEY и HIKERAPI_KEY.
