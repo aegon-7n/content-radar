@@ -76,12 +76,19 @@ def _conn():
     )
 
 
+TRIAL_DAYS = 14  # keep in sync with TIER_CONFIG.trialDays and audit.py
+
+
 def get_creators(cur) -> list[dict]:
     # Note: Likee is intentionally missing from discovery. Likee's web is
     # fully blocked behind anti-bot (every URL → redirect to /), and the
     # only way to hit their internal API is by numeric uid which the
     # platform does not expose to end users. Manual URL add via the
     # Videos tab is the supported flow for Likee; see docs/likee-research.md.
+    #
+    # Only discover for live tenants: active subscription OR still in trial.
+    # This avoids burning TikAPI/HikerAPI quota on garbage handles from
+    # expired-trial test accounts (same filter as audit.py).
     cur.execute("""
         SELECT c.id, c.user_id, u.tenant_id, c.name,
                c.tiktok_username,
@@ -96,6 +103,12 @@ def get_creators(cur) -> list[dict]:
             OR c.youtube_channel_id IS NOT NULL
             OR c.instagram_username IS NOT NULL
             OR c.pinterest_username IS NOT NULL
+          )
+          AND u.tenant_id IN (
+            SELECT t.id FROM tenants t
+            WHERE
+              EXISTS (SELECT 1 FROM subscriptions s WHERE s.tenant_id = t.id AND s.status = 'active')
+              OR t.created_at >= NOW() - INTERVAL '14 days'
           )
     """)
     return [dict(r) for r in cur.fetchall()]
