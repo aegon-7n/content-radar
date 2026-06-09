@@ -38,7 +38,11 @@ logger = logging.getLogger(__name__)
 
 LOOKBACK_DAYS = 30
 TIMEOUT = (10, 30)
-GAP_WARN_THRESHOLD = 1  # warn if platform − DB ≥ N
+GAP_WARN_THRESHOLD = 3  # warn if platform − DB ≥ N
+# Rationale: auto_discover skips videos without a WB article number
+# (skipped_no_article). Those videos can never enter the DB (product_id is
+# NOT NULL) but ARE counted by the platform APIs, so a persistent gap of
+# 1-2 is expected and shouldn't page. Gap ≥ 3 is unusual enough to alert.
 
 
 def _conn():
