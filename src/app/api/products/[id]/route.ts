@@ -38,7 +38,7 @@ export async function GET(
 
     // Product info.
     const productResult = await db.execute(sql`
-      SELECT id, name, wb_article FROM products WHERE id = ${id} AND tenant_id = ${tenantId}
+      SELECT id, name, wb_article, needs_review FROM products WHERE id = ${id} AND tenant_id = ${tenantId}
     `);
     if (!productResult.length) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
@@ -47,6 +47,7 @@ export async function GET(
       id: string;
       name: string;
       wb_article: string;
+      needs_review: number;
     };
 
     // Per-video delta scoped to this product.
@@ -161,6 +162,7 @@ export async function GET(
         id: product.id,
         name: product.name,
         wbArticle: product.wb_article,
+        needsReview: product.needs_review === 1,
       },
       stats: {
         views: Number(statsRow?.views ?? 0),

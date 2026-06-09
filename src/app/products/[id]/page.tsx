@@ -21,7 +21,7 @@ import { formatViews, formatDate, formatER, getPlatformColor, getPlatformLabel }
 import { type Platform } from "@/lib/mock-data";
 
 type ProductDetail = {
-  product: { id: string; name: string; wbArticle: string };
+  product: { id: string; name: string; wbArticle: string; needsReview?: boolean };
   stats: { views: number; videos: number; newVideos: number };
   byPlatform: Array<{ platform: string; views: number; videos: number }>;
   byCreator: Array<{ creatorId: string; creatorName: string; views: number; videos: number }>;
@@ -201,6 +201,28 @@ export default function ProductDetailPage() {
           <PeriodSelector value={period} onChange={setPeriod} />
         </div>
       </div>
+
+      {/* needs_review banner */}
+      {d?.product?.needsReview && (
+        <div
+          className="rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap"
+          style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)" }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm">⚠️</span>
+            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              Товар создан автоматически из описания ролика. Задайте настоящее название.
+            </span>
+          </div>
+          <a
+            href="/settings?tab=products"
+            className="text-xs font-medium px-3 py-1.5 rounded-lg shrink-0 transition-colors"
+            style={{ background: "rgba(245,158,11,0.2)", color: "#F59E0B", border: "1px solid rgba(245,158,11,0.35)" }}
+          >
+            Переименовать в Настройках →
+          </a>
+        </div>
+      )}
 
       {/* Stat cards */}
       {loading || !d ? (
