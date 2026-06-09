@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_TIMEOUT = (10, 30)  # (connect, read)
 
 WB_ARTICLE_RE = re.compile(r"\b(\d{5,})\b")  # 5+ цифр подряд = артикул WB
+_INSTAGRAM_USERNAME_RE = re.compile(r"^[a-zA-Z0-9._]{1,30}$")
 
 # Unified horizon: 3 weeks (21 days) for daily cron. ENV-override позволяет
 # делать one-shot backfill с большим окном — например для нового креатора,
@@ -95,9 +96,6 @@ def get_creators(cur) -> list[dict]:
             OR c.youtube_channel_id IS NOT NULL
             OR c.instagram_username IS NOT NULL
             OR c.pinterest_username IS NOT NULL
-          )
-          AND u.tenant_id IN (
-              SELECT DISTINCT tenant_id FROM videos WHERE tenant_id IS NOT NULL
           )
     """)
     return [dict(r) for r in cur.fetchall()]
@@ -757,10 +755,14 @@ def main():
             candidate_videos.extend(vids)
 
         if creator["instagram_username"]:
-            vids = fetch_instagram_videos(creator["instagram_username"], since)
-            for v in vids:
-                v["platform"] = "instagram"
-            candidate_videos.extend(vids)
+            ig_user = creator["instagram_username"].strip().lstrip("@")
+            if not _INSTAGRAM_USERNAME_RE.match(ig_user):
+                logger.warning("  Пропускаем невалидный instagram_username=%r для %s", ig_user, creator["name"])
+            else:
+                vids = fetch_instagram_videos(ig_user, since)
+                for v in vids:
+                    v["platform"] = "instagram"
+                candidate_videos.extend(vids)
 
         if creator.get("pinterest_username"):
             vids = fetch_pinterest_videos(creator["pinterest_username"], since)
