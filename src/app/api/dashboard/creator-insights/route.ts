@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const auth = await requireAuthWithTenant(request);
   if (!auth.ok) return auth.response;
 
-  if (auth.tenantId !== DEFAULT_TENANT_ID) {
+  if (auth.ctx.tenantId !== DEFAULT_TENANT_ID) {
     return NextResponse.json({ state: "unavailable" });
   }
 
