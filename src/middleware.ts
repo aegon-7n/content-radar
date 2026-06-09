@@ -17,6 +17,11 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isApi = pathname.startsWith("/api/");
 
+  // Registration is closed — send to login before any auth check.
+  if (pathname === "/register") {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
   // CEO admin paths use HTTP Basic Auth — no NextAuth session involved.
   if (pathname.startsWith("/ceo-")) {
     const authHeader = request.headers.get("authorization");
@@ -73,6 +78,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!login|register|invite|forgot-password|reset-password|_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|api/auth|api/ping|api/forgot-password|api/reset-password|api/scrape|api/waitlist|api/billing/webhooks|api/patterns/seed).*)",
+    "/((?!login|invite|forgot-password|reset-password|_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|api/auth|api/ping|api/forgot-password|api/reset-password|api/scrape|api/waitlist|api/billing/webhooks|api/patterns/seed).*)",
   ],
 };
