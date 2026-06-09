@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { db } from "@/db";
 import { tenants, users, videos, subscriptions } from "@/db/schema";
-import { desc, count, eq, max, sql } from "drizzle-orm";
+import { desc, count, eq } from "drizzle-orm";
 import { formatDate } from "@/lib/format";
 
 const TRIAL_DAYS = 14;
