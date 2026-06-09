@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { ArrowLeft, Eye, Film, Sparkles, Search, X } from "lucide-react";
+import { ArrowLeft, Eye, Film, Sparkles, Search, X, Download, FileSpreadsheet } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
@@ -176,7 +176,30 @@ export default function ProductDetailPage() {
             )}
           </div>
         </div>
-        <PeriodSelector value={period} onChange={setPeriod} />
+        <div className="flex items-center gap-2 flex-wrap">
+          {[
+            { label: "Экспорт CSV", icon: <Download className="w-3.5 h-3.5" />, format: "csv" },
+            { label: "Экспорт Excel", icon: <FileSpreadsheet className="w-3.5 h-3.5" />, format: "xlsx" },
+          ].map(({ label, icon, format }) => (
+            <button
+              key={format}
+              type="button"
+              onClick={() => {
+                const { from, to } = getPeriodDates(period);
+                const params = new URLSearchParams({ from, to, productId: id, format });
+                window.location.href = `/api/videos/export?${params}`;
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs border transition-colors"
+              style={{ color: "var(--text-muted)", borderColor: "var(--border-default)", background: "var(--bg-muted)" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-overlay)"; (e.currentTarget as HTMLElement).style.color = "var(--text-primary)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)"; (e.currentTarget as HTMLElement).style.color = "var(--text-muted)"; }}
+            >
+              {icon}
+              {label}
+            </button>
+          ))}
+          <PeriodSelector value={period} onChange={setPeriod} />
+        </div>
       </div>
 
       {/* Stat cards */}

@@ -11,7 +11,6 @@ import {
   Video,
   Settings,
   Radio,
-  Inbox,
   X,
   UsersRound,
   Sparkles,
@@ -24,7 +23,7 @@ const allNavItems = [
   { href: "/videos", label: "Ролики", icon: Video, ownerOnly: false, adminOnly: false },
   { href: "/dashboard/patterns", label: "AI-разбор", icon: Sparkles, ownerOnly: false, adminOnly: false },
   { href: "/settings", label: "Настройки", icon: Settings, ownerOnly: true, adminOnly: false },
-  { href: "/settings/team", label: "Команда", icon: UsersRound, ownerOnly: true, adminOnly: true },
+  { href: "/settings/team", label: "Команда", icon: UsersRound, ownerOnly: true, adminOnly: false },
 ];
 
 function formatLastSync(iso: string | null): string {
