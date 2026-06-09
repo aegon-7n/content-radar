@@ -69,7 +69,9 @@ types/       глобальные .d.ts
 
 ## Маршруты `/ceo-*` (CEO admin, изолированные)
 
-- **`/ceo-x7Hg9pQ2Wf/waitlist`** — Секретная read-only страница для CEO. Защищена HTTP Basic Auth (middleware проверяет `Authorization: Basic` ДО любого рендера, возвращает 401 + `WWW-Authenticate` если нет). Не требует NextAuth-сессии. Env vars: `CEO_ADMIN_BASIC_USER`, `CEO_ADMIN_BASIC_PASS`. Показывает waitlist без Sidebar/Header (AppShell пропускает `/ceo-*` маршруты). Читает из БД напрямую (Server Component — исключение из паттерна "только через API", т.к. нет сессии).
+- **`/ceo-x7Hg9pQ2Wf/waitlist`** — Секретная страница CEO. Показывает waitlist-заявки с кнопкой «Онбордить» (POST `/ceo-x7Hg9pQ2Wf/onboard`). Защищена HTTP Basic Auth. Env vars: `CEO_ADMIN_BASIC_USER`, `CEO_ADMIN_BASIC_PASS`. Server Component — читает БД напрямую (нет NextAuth-сессии).
+- **`/ceo-x7Hg9pQ2Wf/tenants`** — Обзор всех тенантов: дата регистрации, кол-во пользователей, кол-во видео, статус триала (N дней осталось, подсветка красным ≤3д) или активная подписка. Помогает отслеживать, кто близок к истечению триала.
+- **`/ceo-x7Hg9pQ2Wf/onboard`** (POST) — API для онбординга тенанта из waitlist: создаёт `tenants` + `users(role=owner)`, помечает waitlist-запись как `in_cohort`, возвращает `{ email, password, loginUrl }`. 409 если email уже зарегистрирован.
 
 ## Паттерны
 
