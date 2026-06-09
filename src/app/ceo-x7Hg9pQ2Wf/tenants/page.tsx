@@ -17,7 +17,9 @@ function trialInfo(createdAt: Date, hasSub: boolean): { label: string; color: st
   return { label: `Триал: ${daysLeft}д`, color: "#60A5FA", urgent: false };
 }
 
-export default async function CeoTenantsPage() {
+export default async function CeoTenantsPage({ searchParams }: { searchParams: { all?: string } }) {
+  const showAll = searchParams.all === "1";
+
   const rows = await db
     .select({
       id: tenants.id,
@@ -43,20 +45,36 @@ export default async function CeoTenantsPage() {
     .groupBy(videos.tenantId);
   const videoMap = new Map(videoCounts.map((v) => [v.tenantId, v.cnt]));
 
+  // By default hide QA/test tenants (those with 0 videos and no subscription).
+  const displayRows = showAll
+    ? rows
+    : rows.filter((r) => (videoMap.get(r.id) ?? 0) > 0 || subSet.has(r.id));
+
   return (
     <div style={{ fontFamily: "system-ui, sans-serif", background: "#0F1117", minHeight: "100vh", color: "#E2E8F0", padding: "24px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0, color: "#F8FAFC" }}>
-            Тенанты — ContentRadar
-          </h1>
-          <p style={{ fontSize: 13, color: "#94A3B8", marginTop: 4 }}>
-            Всего: <strong style={{ color: "#F8FAFC" }}>{rows.length}</strong>
-            &nbsp;·&nbsp;
-            С подпиской: <strong style={{ color: "#10B981" }}>{activeSubs.length}</strong>
-            &nbsp;·&nbsp;
-            На триале: <strong style={{ color: "#60A5FA" }}>{rows.length - activeSubs.length}</strong>
-          </p>
+        <div style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0, color: "#F8FAFC" }}>
+              Тенанты — ContentRadar
+            </h1>
+            <p style={{ fontSize: 13, color: "#94A3B8", marginTop: 4 }}>
+              Показано: <strong style={{ color: "#F8FAFC" }}>{displayRows.length}</strong>
+              {!showAll && rows.length !== displayRows.length && (
+                <span style={{ color: "#475569" }}> из {rows.length} (QA скрыты)</span>
+              )}
+              &nbsp;·&nbsp;
+              С подпиской: <strong style={{ color: "#10B981" }}>{activeSubs.length}</strong>
+              &nbsp;·&nbsp;
+              На триале: <strong style={{ color: "#60A5FA" }}>{displayRows.length - activeSubs.length}</strong>
+            </p>
+          </div>
+          <a
+            href={showAll ? "/ceo-x7Hg9pQ2Wf/tenants" : "/ceo-x7Hg9pQ2Wf/tenants?all=1"}
+            style={{ fontSize: 12, color: "#818CF8", textDecoration: "none", whiteSpace: "nowrap", paddingTop: 4 }}
+          >
+            {showAll ? "Скрыть QA ↑" : "Показать всех ↓"}
+          </a>
         </div>
 
         <div style={{ background: "#1E2433", borderRadius: 12, border: "1px solid #2D3748", overflowX: "auto" }}>
@@ -83,7 +101,7 @@ export default async function CeoTenantsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, i) => {
+              {displayRows.map((row, i) => {
                 const hasSub = subSet.has(row.id);
                 const trial = trialInfo(row.createdAt, hasSub);
                 const vCnt = videoMap.get(row.id) ?? 0;
@@ -91,7 +109,7 @@ export default async function CeoTenantsPage() {
                   <tr
                     key={row.id}
                     style={{
-                      borderBottom: i < rows.length - 1 ? "1px solid #1A2030" : "none",
+                      borderBottom: i < displayRows.length - 1 ? "1px solid #1A2030" : "none",
                       background: trial.urgent ? "rgba(239,68,68,0.04)" : "transparent",
                     }}
                   >
@@ -129,7 +147,7 @@ export default async function CeoTenantsPage() {
                   </tr>
                 );
               })}
-              {rows.length === 0 && (
+              {displayRows.length === 0 && (
                 <tr>
                   <td colSpan={6} style={{ padding: 48, textAlign: "center", color: "#64748B", fontSize: 13 }}>
                     Тенантов нет

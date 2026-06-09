@@ -245,6 +245,53 @@ def build_message(tenant_name: str, virals: list[dict], wows: list[dict], new_co
     return header + "\n\n" + "\n".join(parts)
 
 
+TRIAL_DAYS = 14
+TRIAL_WARN_DAYS = 7   # start warning this many days before trial ends
+
+
+def trial_expiry_alerts(conn) -> list[dict]:
+    """Tenants with an expiring trial and at least 1 video (real clients only)."""
+    now = datetime.now(timezone.utc)
+    warn_cutoff = now + timedelta(days=TRIAL_WARN_DAYS)
+    trial_start_cutoff = now - timedelta(days=TRIAL_DAYS - TRIAL_WARN_DAYS)
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT t.id, t.name, t.created_at
+            FROM tenants t
+            WHERE
+              -- trial ends within TRIAL_WARN_DAYS: created_at + TRIAL_DAYS <= NOW + TRIAL_WARN_DAYS
+              t.created_at + INTERVAL '%s days' <= %s
+              -- trial hasn't ended more than TRIAL_WARN_DAYS ago (avoid alerting on ancient expired)
+              AND t.created_at + INTERVAL '%s days' >= %s - INTERVAL '1 day'
+              -- no active subscription
+              AND NOT EXISTS (
+                SELECT 1 FROM subscriptions s
+                WHERE s.tenant_id = t.id AND s.status = 'active'
+              )
+              -- at least 1 video (real tenant, not QA)
+              AND EXISTS (
+                SELECT 1 FROM videos v WHERE v.tenant_id = t.id
+              )
+            ORDER BY t.created_at
+            """,
+            (TRIAL_DAYS, warn_cutoff, TRIAL_DAYS, trial_start_cutoff),
+        )
+        rows = cur.fetchall()
+
+    alerts = []
+    for tenant_id, tenant_name, created_at in rows:
+        ends_at = created_at + timedelta(days=TRIAL_DAYS)
+        days_left = max(0, (ends_at - now).days)
+        alerts.append({
+            "tenant_name": tenant_name,
+            "days_left": days_left,
+            "ends_at": ends_at.strftime("%d.%m"),
+        })
+    return alerts
+
+
 def _update_scraper_state(conn, status: str, message: str) -> None:
     now = datetime.now(timezone.utc)
     with conn.cursor() as cur:
@@ -278,6 +325,17 @@ def main() -> int:
             )
             tenants = [(row["id"], row["name"]) for row in cur.fetchall()]
 
+        # Trial expiry alerts — sent once globally, not per-tenant
+        expiring = trial_expiry_alerts(conn)
+        if expiring:
+            lines = ["⚠️ <b>Истекающие триалы</b>"]
+            for e in expiring:
+                urgency = "🔴" if e["days_left"] <= 3 else "🟡"
+                suffix = "СРОЧНО — позвони!" if e["days_left"] <= 3 else f"до {e['ends_at']}"
+                lines.append(f"  {urgency} <b>{e['tenant_name']}</b>: {e['days_left']}д ({suffix})")
+            _send_telegram("\n".join(lines))
+            logger.info("Sent trial expiry alert: %d tenants", len(expiring))
+
         alerts_sent = 0
         for tenant_id, tenant_name in tenants:
             logger.info("Analyzing tenant: %s", tenant_name)
@@ -295,7 +353,7 @@ def main() -> int:
             else:
                 logger.info("No alerts for %s — quiet day", tenant_name)
 
-        summary = f"tenants={len(tenants)} alerts_sent={alerts_sent}"
+        summary = f"tenants={len(tenants)} alerts_sent={alerts_sent} expiring_trials={len(expiring)}"
         logger.info("Done. %s", summary)
         _update_scraper_state(conn, "ok", summary)
         return 0
