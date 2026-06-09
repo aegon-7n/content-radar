@@ -38,6 +38,7 @@ type CreatorQuota = {
   name: string;
   videoLimit: number | null;
   videosUsed: number;
+  nearLimit: boolean;
   atLimit: boolean;
 };
 
@@ -368,9 +369,10 @@ export default function TeamPage() {
                 <li key={c.id} className="flex items-center justify-between gap-3 py-1">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate" style={{ color: "var(--text-primary)" }}>{c.name}</p>
-                    <p className="text-xs font-mono" style={{ color: c.atLimit ? "var(--error-text)" : "var(--text-disabled)" }}>
+                    <p className="text-xs font-mono" style={{ color: c.atLimit ? "var(--error-text)" : c.nearLimit ? "var(--warning-text)" : "var(--text-disabled)" }}>
                       {formatNumber(c.videosUsed)}{c.videoLimit !== null ? ` / ${formatNumber(c.videoLimit)}` : ""} роликов
                       {c.atLimit && " · лимит"}
+                      {c.nearLimit && !c.atLimit && " · >80%"}
                     </p>
                   </div>
                   {editingQuota === c.id ? (

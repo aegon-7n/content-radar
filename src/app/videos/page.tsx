@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import { Search, X, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Search, X, ChevronLeft, ChevronRight, Download, FileSpreadsheet } from "lucide-react";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import PeriodSelector, { Period, getPeriodDates } from "@/components/ui/PeriodSelector";
 import OnboardingWizard from "@/components/ui/OnboardingWizard";
@@ -164,6 +164,33 @@ export default function VideosPage() {
           >
             <Download className="w-3.5 h-3.5" />
             Экспорт CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const { from, to } = getPeriodDates(period);
+              const params = new URLSearchParams({ from, to, format: "xlsx" });
+              if (platformFilter) params.set("platform", platformFilter);
+              if (search) params.set("search", search);
+              window.location.href = `/api/videos/export?${params}`;
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs border transition-colors"
+            style={{
+              color: "var(--text-muted)",
+              borderColor: "var(--border-default)",
+              background: "var(--bg-muted)",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "var(--bg-overlay)";
+              (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)";
+              (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
+            }}
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Экспорт Excel
           </button>
           <PeriodSelector value={period} onChange={setPeriod} />
         </div>

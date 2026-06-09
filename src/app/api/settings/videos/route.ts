@@ -112,7 +112,19 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    return NextResponse.json({ video }, { status: 201 });
+    // Post-insert quota snapshot for the creator (used after insert = creatorUsed + 1).
+    const usedAfter = creatorUsed + 1;
+    const lim = creator.videoLimit;
+    const quota = lim !== null
+      ? {
+          used: usedAfter,
+          limit: lim,
+          nearLimit: usedAfter >= Math.floor(lim * 0.8) && usedAfter < lim,
+          atLimit: usedAfter >= lim,
+        }
+      : null;
+
+    return NextResponse.json({ video, quota }, { status: 201 });
   } catch (error) {
     console.error("[settings/videos] POST error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
