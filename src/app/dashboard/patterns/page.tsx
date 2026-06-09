@@ -100,6 +100,7 @@ export default function PatternsPage() {
   const [data, setData] = useState<CreatorInsightsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     fetch("/api/dashboard/creator-insights")
@@ -107,7 +108,13 @@ export default function PatternsPage() {
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
       })
-      .then((d: CreatorInsightsData) => setData(d))
+      .then((d: CreatorInsightsData & { state?: string }) => {
+        if (d.state === "unavailable") {
+          setUnavailable(true);
+        } else {
+          setData(d);
+        }
+      })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
@@ -163,6 +170,21 @@ export default function PatternsPage() {
           style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-muted)" }}
         >
           Не удалось загрузить данные
+        </div>
+      )}
+
+      {/* Unavailable */}
+      {unavailable && !loading && (
+        <div
+          className="rounded-xl px-5 py-10 text-center flex flex-col gap-2"
+          style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)" }}
+        >
+          <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            AI-разбор пока не настроен
+          </p>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Раздел появится, когда накопится достаточно данных по вашим роликам.
+          </p>
         </div>
       )}
 
