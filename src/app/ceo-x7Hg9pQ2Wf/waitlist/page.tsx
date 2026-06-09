@@ -5,6 +5,7 @@ import { waitlistSignups } from "@/db/schema";
 import { desc, count, eq } from "drizzle-orm";
 import { formatDate } from "@/lib/format";
 import { OnboardButton } from "./_components/OnboardButton";
+import { StatusButtons } from "./_components/StatusButtons";
 
 type SignupStatus = "new" | "in_cohort" | "rejected" | "awaiting_call";
 
@@ -168,15 +169,22 @@ export default async function CeoWaitlistPage() {
                         </span>
                       </td>
                       <td style={{ padding: "10px 16px", whiteSpace: "nowrap" }}>
-                        {s !== "in_cohort" && s !== "rejected" && (
-                          <OnboardButton
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          {s !== "in_cohort" && s !== "rejected" && (
+                            <OnboardButton
+                              waitlistId={row.id}
+                              defaultName={row.name ?? ""}
+                              defaultContact={contactDisplay === "—" ? "" : contactDisplay}
+                              defaultStore={storeDisplay === "—" ? "" : storeDisplay}
+                              authHeader={authHeader}
+                            />
+                          )}
+                          <StatusButtons
                             waitlistId={row.id}
-                            defaultName={row.name ?? ""}
-                            defaultContact={contactDisplay === "—" ? "" : contactDisplay}
-                            defaultStore={storeDisplay === "—" ? "" : storeDisplay}
+                            currentStatus={s}
                             authHeader={authHeader}
                           />
-                        )}
+                        </div>
                       </td>
                     </tr>
                   );
