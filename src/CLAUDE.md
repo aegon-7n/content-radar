@@ -20,7 +20,7 @@ types/       глобальные .d.ts
 - **`/creators`**, **`/creators/[id]`** — список и детальная.
 - **`/products`**, **`/products/[id]`** — список и детальная.
 - **`/videos`**, **`/videos/[id]`** — список с фильтрами/сортировкой/пагинацией и детальная.
-- **`/settings`** — пять табов: `CreatorsTab`, `ProductsTab`, `VideosTab`, `ImportTab`, `BillingTab`. Сабкомпоненты — в `app/settings/_components/`. `?tab=billing` открывает сразу вкладку подписки; `?status=success` показывает тост после редиректа из ЮKassa.
+- **`/settings`** — шесть табов: `CreatorsTab`, `ProductsTab`, `VideosTab`, `ImportTab`, `BillingTab`, `ProfileTab`. Сабкомпоненты — в `app/settings/_components/`. Любой таб открывается через `?tab=<id>` (creators/products/videos/import/billing/profile); `?status=success` показывает тост после редиректа из ЮKassa.
 - **`/settings/team`** — список пользователей тенанта (owner + creators), кнопка «Пригласить», отзыв доступа. Только для owner.
 - **`/login`** — форма, NextAuth `signIn("credentials")`, редирект на `/`.
 - **`/invite/[token]`** — публичная страница принятия инвайта. Creator вводит имя/пароль и создаёт аккаунт в тенанте owner-а. Исключена из middleware guard.
@@ -55,6 +55,7 @@ types/       глобальные .d.ts
 **Запись (`/api/settings/...`, POST/PUT/DELETE)**
 - `settings/{creators,products,videos}` + `[id]`-варианты.
 - `settings/import` — CSV/bulk-импорт.
+- `settings/password` — PATCH, смена пароля текущего пользователя. Требует `{ currentPassword, newPassword }`. Для ADMIN_EMAIL обновляет `adminSettings.key=password_hash`; для остальных — `users.password_hash`. Минимум 6 символов.
 
 **Внутренний триггер**
 - `scrape` — POST с `Authorization: Bearer ${SCRAPE_SECRET}`. Спавнит Python-subprocess в `scraper/`. Поддерживает `?async=true` (202 + фоновый запуск) или блокирующий режим. Не выставлять наружу без токена.

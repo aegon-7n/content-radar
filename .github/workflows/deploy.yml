@@ -57,7 +57,7 @@ jobs:
           chmod 600 ~/.ssh/vps_key
           ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Pull code and run migrations on VPS
+      - name: Pull code on VPS and install runtime deps
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -67,9 +67,11 @@ jobs:
             set -e
             cd '$VPS_DEPLOY_PATH'
             git pull origin main
-            npm ci
-            npm run db:migrate
+            npm ci --omit=dev
           "
+          # NOTE: DB migrations (0003+) are applied manually via psql.
+          # drizzle-kit is a devDep and not installed on the VPS.
+          # See docs/OPERATIONS.md for the migration runbook.
 
       - name: Upload build artifacts to VPS
         env:
