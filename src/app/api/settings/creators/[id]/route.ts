@@ -24,7 +24,10 @@ const patchCreatorSchema = z.object({
   // Accept @handle, full URL, or raw UC-ID — resolveYouTubeChannelId
   // validates and converts to UC... at runtime.
   youtubeChannelId: optionalHandle,
-  instagramUsername: optionalHandle,
+  instagramUsername: z.string().nullable().optional().or(z.literal("")).refine(
+    (v) => !v || /^[A-Za-z0-9._]{1,30}$/.test(v.replace(/^@/, "")),
+    { message: "Instagram username должен быть на латинице (1–30 символов)" },
+  ),
   pinterestUsername: optionalHandle,
   // Per-creator video cap. null removes the limit.
   videoLimit: z.number().int().min(1).nullable().optional(),
