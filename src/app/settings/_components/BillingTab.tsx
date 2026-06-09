@@ -6,7 +6,7 @@ import { Check, CreditCard, Clock, AlertTriangle } from "lucide-react";
 const PLANS = [
   {
     id: "solo" as const,
-    label: "Starter",
+    label: "Solo",
     price: "4 900",
     creators: 5,
     videos: "1 000",
@@ -14,7 +14,7 @@ const PLANS = [
   },
   {
     id: "pro" as const,
-    label: "Growth",
+    label: "Pro",
     price: "9 900",
     creators: 10,
     videos: "4 000",
@@ -23,7 +23,7 @@ const PLANS = [
   },
   {
     id: "studio" as const,
-    label: "Brand",
+    label: "Studio",
     price: "15 900",
     creators: 20,
     videos: "15 000",

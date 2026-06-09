@@ -17,8 +17,7 @@ function authHeader(): string {
 }
 
 // ── Tier pricing (creator-cap model, CEO-approved 2026-05, TRU-17 canonical) ─
-// Internal slugs (solo/pro/studio) preserved for DB backwards-compat;
-// user-visible labels are Starter/Growth/Brand per TRU-17.
+// Internal slugs (solo/pro/studio) are DB-stable; user-visible labels match landing page.
 
 export type BillingTier = "solo" | "pro" | "studio";
 
@@ -26,9 +25,9 @@ export const TIER_CONFIG: Record<
   BillingTier,
   { priceKopecks: number; creatorLimit: number; tuPool: number; label: string; trialDays: number }
 > = {
-  solo: { priceKopecks: 490_000, creatorLimit: 5, tuPool: 1_000, label: "Starter", trialDays: 14 },
-  pro: { priceKopecks: 990_000, creatorLimit: 10, tuPool: 4_000, label: "Growth", trialDays: 14 },
-  studio: { priceKopecks: 1_590_000, creatorLimit: 20, tuPool: 15_000, label: "Brand", trialDays: 14 },
+  solo: { priceKopecks: 490_000, creatorLimit: 5, tuPool: 1_000, label: "Solo", trialDays: 14 },
+  pro: { priceKopecks: 990_000, creatorLimit: 10, tuPool: 4_000, label: "Pro", trialDays: 14 },
+  studio: { priceKopecks: 1_590_000, creatorLimit: 20, tuPool: 15_000, label: "Studio", trialDays: 14 },
 };
 
 export function getTuPool(tier: string | null | undefined): number {
