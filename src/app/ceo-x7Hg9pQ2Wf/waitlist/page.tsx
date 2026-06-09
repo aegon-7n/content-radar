@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { waitlistSignups } from "@/db/schema";
 import { desc, count, eq } from "drizzle-orm";
 import { formatDate } from "@/lib/format";
+import { OnboardButton } from "./_components/OnboardButton";
 
 type SignupStatus = "new" | "in_cohort" | "rejected" | "awaiting_call";
 
@@ -26,6 +27,10 @@ function isValidStatus(s: string): s is SignupStatus {
 }
 
 export default async function CeoWaitlistPage() {
+  const ceoUser = process.env.CEO_ADMIN_BASIC_USER ?? "";
+  const ceoPass = process.env.CEO_ADMIN_BASIC_PASS ?? "";
+  const authHeader = "Basic " + Buffer.from(`${ceoUser}:${ceoPass}`).toString("base64");
+
   const rows = await db
     .select()
     .from(waitlistSignups)
@@ -89,7 +94,7 @@ export default async function CeoWaitlistPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #2D3748" }}>
-                {["Дата", "Имя", "Контакт", "Магазин WB", "Команда", "Цель / боль", "Статус"].map((h, i) => (
+                {["Дата", "Имя", "Контакт", "Магазин WB", "Команда", "Цель / боль", "Статус", ""].map((h, i) => (
                   <th
                     key={i}
                     style={{
@@ -111,7 +116,7 @@ export default async function CeoWaitlistPage() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: 48, textAlign: "center", color: "#64748B", fontSize: 13 }}>
+                  <td colSpan={8} style={{ padding: 48, textAlign: "center", color: "#64748B", fontSize: 13 }}>
                     Заявок нет
                   </td>
                 </tr>
@@ -161,6 +166,17 @@ export default async function CeoWaitlistPage() {
                         >
                           {STATUS_LABELS[s]}
                         </span>
+                      </td>
+                      <td style={{ padding: "10px 16px", whiteSpace: "nowrap" }}>
+                        {s !== "in_cohort" && s !== "rejected" && (
+                          <OnboardButton
+                            waitlistId={row.id}
+                            defaultName={row.name ?? ""}
+                            defaultContact={contactDisplay === "—" ? "" : contactDisplay}
+                            defaultStore={storeDisplay === "—" ? "" : storeDisplay}
+                            authHeader={authHeader}
+                          />
+                        )}
                       </td>
                     </tr>
                   );
