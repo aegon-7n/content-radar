@@ -96,6 +96,9 @@ def get_creators(cur) -> list[dict]:
             OR c.instagram_username IS NOT NULL
             OR c.pinterest_username IS NOT NULL
           )
+          AND u.tenant_id IN (
+              SELECT DISTINCT tenant_id FROM videos WHERE tenant_id IS NOT NULL
+          )
     """)
     return [dict(r) for r in cur.fetchall()]
 
