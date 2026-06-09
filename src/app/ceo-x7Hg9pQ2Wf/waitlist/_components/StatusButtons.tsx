@@ -52,7 +52,7 @@ export function StatusButtons({ waitlistId, currentStatus, authHeader }: Props) 
           Созвон
         </button>
       )}
-      {status !== "new" && status !== "in_cohort" && (
+      {status !== "new" && (
         <button
           disabled={loading}
           onClick={() => changeStatus("new")}

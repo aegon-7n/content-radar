@@ -12,10 +12,11 @@ import { TableSkeleton } from "@/components/ui/SkeletonCard";
 import { formatViews } from "@/lib/format";
 import { MOCK_PRODUCTS, type Platform } from "@/lib/mock-data";
 
-const MOCK_PRODUCT_ROWS = MOCK_PRODUCTS.map((p) => ({
+const MOCK_PRODUCT_ROWS: ProductRow[] = MOCK_PRODUCTS.map((p) => ({
   id: p.id,
   name: p.name,
   wbArticle: p.wbArticle,
+  needsReview: false,
   views: p.totalViews,
   videos: p.totalVideos,
   newVideos: 0,
