@@ -61,6 +61,11 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # Exit != 0 означает пропуски или API failures — сразу идёт алерт в Telegram.
 0 22 * * * root cd $APP_DIR && DATABASE_URL='$DB_URL' TIKAPI_KEY='$TT_KEY' YOUTUBE_API_KEY='$YT_KEY' HIKERAPI_KEY='$HK_KEY' APIFY_TOKEN='$AP_TOKEN' SOCKS_PROXY='$SOCKS' $PYTHON -m scraper.audit >> $LOG_DIR/audit.log 2>&1 || TELEGRAM_BOT_TOKEN='$TG_BOT_TOKEN' TELEGRAM_CHAT_ID='$TG_CHAT_ID' $APP_DIR/scripts/notify-telegram.sh "audit detected gaps" $LOG_DIR/audit.log
 
+# Дайджест бизнес-метрик → Telegram — каждый день в 02:30 МСК (23:30 UTC), после audit.
+# Нет API-запросов — только SQL. Алерты: вирусные ролики, WoW изменения, новые ролики.
+# Exit всегда 0 — только информационный, не операционный.
+30 23 * * * root cd $APP_DIR && DATABASE_URL='$DB_URL' TELEGRAM_BOT_TOKEN='$TG_BOT_TOKEN' TELEGRAM_CHAT_ID='$TG_CHAT_ID' $PYTHON -m scraper.analyze >> $LOG_DIR/analyze.log 2>&1
+
 # TLS cert expiry check — каждый понедельник в 09:00 МСК (06:00 UTC).
 # Отправляет Telegram-предупреждение если до истечения < 30 дней.
 0 6 * * 1 root TELEGRAM_BOT_TOKEN='$TG_BOT_TOKEN' TELEGRAM_CHAT_ID='$TG_CHAT_ID' bash $APP_DIR/scripts/check-tls.sh >> $LOG_DIR/tls-check.log 2>&1
@@ -78,6 +83,7 @@ echo ""
 echo "Задачи:"
 echo "  00:00 МСК — scraper.auto_discover (новые ролики)"
 echo "  00:10 МСК — scraper.run_daily     (метрики)"
+echo "  02:30 МСК — scraper.analyze       (дайджест бизнес-метрик → Telegram)"
 echo "  09:00 МСК пн — check-tls         (проверка TLS-сертификатов)"
 echo "  07:00 МСК пн — analyze_patterns  (AI-паттерны топа, Gemini 2.5 Flash)"
 echo "  01:00 МСК — scraper.audit         (проверка пропусков)"
