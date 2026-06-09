@@ -5,6 +5,7 @@ import { tenants, users, waitlistSignups } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { hash } from "bcryptjs";
 import { randomBytes } from "node:crypto";
+import { sendWelcomeEmail } from "@/lib/email/welcome";
 
 // Middleware already verifies Basic Auth for all /ceo-* paths.
 
@@ -82,6 +83,9 @@ export async function POST(request: NextRequest) {
     .where(eq(waitlistSignups.id, waitlistId));
 
   const loginUrl = `${process.env.NEXTAUTH_URL ?? "https://contentradar.app"}/login`;
+
+  // No-ops when RESEND_API_KEY is absent — fires automatically once key is set (TRU-55).
+  void sendWelcomeEmail({ email: adminEmail, firstName: adminName.split(" ")[0] ?? adminName });
 
   return NextResponse.json({ ok: true, email: adminEmail, password, loginUrl, tenantSlug: slug });
 }
