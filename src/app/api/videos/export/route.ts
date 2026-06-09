@@ -118,7 +118,9 @@ export async function GET(request: NextRequest) {
         escapeField(row.product_name),
         escapeField(row.wb_article),
         escapeField(new Date(row.published_at).toISOString()),
-        escapeField(Number(row.fail_streak ?? 0) >= 3 ? "недоступен" : ""),
+        escapeField(Number(row.fail_streak ?? 0) >= 3
+          ? (row.platform === "tiktok" ? "недоступно в регионе" : "недоступен")
+          : ""),
       ].join(",")
     );
 
