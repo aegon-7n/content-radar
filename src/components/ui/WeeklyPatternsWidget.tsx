@@ -10,10 +10,17 @@ type Pattern = {
   confidence: "sharp" | "medium";
 };
 
+type MetricObservation = {
+  label: string;
+  value: string;
+  detail?: string;
+};
+
 type PatternResponse =
   | { state: "empty" }
   | { state: "cold_start"; videos_this_week: number; threshold: number }
   | { state: "insufficient"; videos_analyzed: number }
+  | { state: "metric_insights"; observations: MetricObservation[]; videos_analyzed: number }
   | { state: "partial"; stale_patterns: Pattern[]; stale_period_label: string; next_update: string }
   | { state: "loaded"; patterns: Pattern[]; period_label: string; updated_at: string; videos_analyzed: number; next_update: string };
 
@@ -88,7 +95,7 @@ export default function WeeklyPatternsWidget() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-            Паттерны топа недели
+            {data.state === "metric_insights" ? "Факты о вашем контенте" : "Паттерны топа недели"}
           </span>
           {meta && (
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -143,6 +150,30 @@ export default function WeeklyPatternsWidget() {
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Ролики этой недели показали схожий результат — чётких паттернов не выявлено
         </p>
+      )}
+
+      {data.state === "metric_insights" && data.observations.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {data.observations.map((obs, i) => (
+            <div
+              key={i}
+              className="flex flex-col gap-1 p-4 rounded-lg flex-1 min-w-[220px]"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
+            >
+              <p className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                {obs.label}
+              </p>
+              <p className="text-base font-semibold leading-snug" style={{ color: "var(--text-primary)" }}>
+                {obs.value}
+              </p>
+              {obs.detail && (
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {obs.detail}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
       )}
 
       {patterns && patterns.length > 0 && (
