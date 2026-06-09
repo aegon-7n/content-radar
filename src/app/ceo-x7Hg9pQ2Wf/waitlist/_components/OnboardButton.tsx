@@ -21,6 +21,19 @@ export function OnboardButton({ waitlistId, defaultName, defaultContact, default
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  function buildMessage(r: Result): string {
+    return `Привет! Доступ к ContentRadar готов.\n\nСсылка: ${r.loginUrl}\nEmail: ${r.email}\nПароль: ${r.password}\n\nЗайдите, добавьте первого креатора в Настройки → Креаторы — ночью всё подтянется автоматически.`;
+  }
+
+  function handleCopy() {
+    if (!result) return;
+    navigator.clipboard.writeText(buildMessage(result)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   const [tenantName, setTenantName] = useState(defaultStore || defaultName || "");
   const [adminEmail, setAdminEmail] = useState(
@@ -132,12 +145,30 @@ export function OnboardButton({ waitlistId, defaultName, defaultContact, default
                 <p style={{ margin: "12px 0 0", fontSize: 11, color: "#64748B" }}>
                   Скопируй пароль сейчас — он не хранится в открытом виде.
                 </p>
-                <button
-                  onClick={() => { setOpen(false); setResult(null); }}
-                  style={{ marginTop: 16, padding: "8px 20px", borderRadius: 6, background: "#2D3748", border: "none", color: "#E2E8F0", cursor: "pointer", fontSize: 13 }}
-                >
-                  Закрыть
-                </button>
+                <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                  <button
+                    onClick={handleCopy}
+                    style={{
+                      flex: 1,
+                      padding: "8px 0",
+                      borderRadius: 6,
+                      background: copied ? "#10B98122" : "#5b5bd622",
+                      border: `1px solid ${copied ? "#10B98144" : "#5b5bd644"}`,
+                      color: copied ? "#10B981" : "#818CF8",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {copied ? "✓ Скопировано" : "📋 Текст для отправки"}
+                  </button>
+                  <button
+                    onClick={() => { setOpen(false); setResult(null); setCopied(false); }}
+                    style={{ padding: "8px 20px", borderRadius: 6, background: "#2D3748", border: "none", color: "#E2E8F0", cursor: "pointer", fontSize: 13 }}
+                  >
+                    Закрыть
+                  </button>
+                </div>
               </>
             ) : (
               <form onSubmit={onSubmit}>
