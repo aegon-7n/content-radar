@@ -186,9 +186,14 @@ export default async function CeoWaitlistPage() {
           </table>
         </div>
 
-        <p style={{ fontSize: 11, color: "#334155", marginTop: 12, textAlign: "right" }}>
-          Показано {rows.length} из {total} · Только для внутреннего использования
-        </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+          <a href="/ceo-x7Hg9pQ2Wf/tenants" style={{ fontSize: 12, color: "#818CF8", textDecoration: "none" }}>
+            Тенанты →
+          </a>
+          <p style={{ fontSize: 11, color: "#334155", margin: 0 }}>
+            Показано {rows.length} из {total} · Только для внутреннего использования
+          </p>
+        </div>
       </div>
     </div>
   );
