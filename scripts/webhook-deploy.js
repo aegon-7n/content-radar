@@ -70,6 +70,9 @@ function runDeploy() {
     npm ci
     npm run build
     npm run db:migrate
+    grep -q '^NEXTAUTH_URL=' .env.local \
+      && sed -i 's|^NEXTAUTH_URL=.*|NEXTAUTH_URL=https://app.contentradar.app|' .env.local \
+      || echo 'NEXTAUTH_URL=https://app.contentradar.app' >> .env.local
     pm2 reload content-radar --update-env
     echo "deploy complete"
   `], { stdio: ['ignore', 'pipe', 'pipe'] })
