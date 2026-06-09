@@ -45,6 +45,11 @@ export async function POST(request: NextRequest) {
 
   const { waitlistId, tenantName, adminEmail, adminName } = parsed.data;
 
+  const existingUser = await db.select({ id: users.id }).from(users).where(eq(users.email, adminEmail)).limit(1);
+  if (existingUser.length > 0) {
+    return NextResponse.json({ ok: false, error: "Email уже зарегистрирован в системе" }, { status: 409 });
+  }
+
   const password = generatePassword();
   const passwordHash = await hash(password, 12);
 
