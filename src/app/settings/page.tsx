@@ -35,7 +35,8 @@ function SettingsContent() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     const tab = searchParams.get("tab");
-    return (tab === "billing" ? "billing" : "creators") as TabId;
+    const validTabs: TabId[] = ["creators", "products", "videos", "import", "billing"];
+    return (validTabs.includes(tab as TabId) ? tab : "creators") as TabId;
   });
   const [toast, setToast] = useState<ToastState | null>(null);
 
