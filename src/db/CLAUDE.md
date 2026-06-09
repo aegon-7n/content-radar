@@ -18,7 +18,6 @@ tenants (1) ─┬─→ users (N)
 
 scraper_state    — отдельная таблица для метаданных четырёх крон-джобов (incl. pattern_analysis).
 waitlist_signups — лиды с публичного лендинга. Не связана с users.
-referral_codes   — промокоды партнёров. Не привязана к тенанту.
 ```
 
 **`tenants`** — организация (бренд/магазин). `id` (uuid PK), `name` (text), `slug` (text UNIQUE), `created_at`. Все пользовательские данные привязаны к тенанту.
@@ -47,10 +46,12 @@ referral_codes   — промокоды партнёров. Не привяза�
 |---|---|---|
 | `id` | serial | PK, auto-increment |
 | `name` | text | Имя заявителя (beta-скрининг) |
-| `email` | text NOT NULL | Контактный email заявителя |
+| `email` | text | Контактный email (nullable; rev1 — сейчас может отсутствовать) |
 | `phone` | text | Телефон (опционально) |
-| `telegram_handle` | text | Telegram-handle (beta-скрининг) |
-| `brand` | text NOT NULL | Название бренда/ниша |
+| `telegram_handle` | text | Telegram-handle (rev1, legacy) |
+| `brand` | text | Название бренда/ниша (nullable; rev1, legacy) |
+| `contact` | text | TG-handle или email (rev2 merged field) |
+| `store_url` | text | URL магазина на WB (rev2) |
 | `creators_range` | text NOT NULL | Кол-во креаторов (`"3-5"` / `"6-10"` / `"11-20"` / `"20+"`) |
 | `video_volume` | text | Примерный объём видео/мес (beta-скрининг) |
 | `marketplace` | text | Маркетплейс: `"WB"` / `"WB+Ozon"` / `"другие"` |

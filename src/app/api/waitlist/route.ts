@@ -68,7 +68,6 @@ const SubmitSchema = z.object({
   utmContent: z.string().max(128).optional().nullable(),
   utmTerm: z.string().max(128).optional().nullable(),
   referrer: z.string().max(2048).optional().nullable(),
-  referralCode: z.string().max(64).optional().nullable(),
   consent: z.literal(true),
   consentAcceptedAt: z.string().datetime().optional(),
 });

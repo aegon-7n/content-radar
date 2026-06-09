@@ -65,10 +65,7 @@ types/       глобальные .d.ts
 - `billing/webhooks/yookassa` — POST, принимает уведомления от ЮKassa (`payment.succeeded`, `payment.canceled`). Публичный (добавлен в middleware allowlist). Верифицирует платёж через re-fetch API.
 
 **Публичный приём заявок (без NextAuth-сессии)**
-- `waitlist` — POST с `Authorization: Bearer ${WAITLIST_INGEST_SECRET}`. Принимает заявки с лендинга (`content-radar-landing` на Vercel). Поток: Zod-валидация → in-memory rate limit (5 req/min/IP) → INSERT в `waitlist_signups` → increment `referral_codes.used_count` (если передан `referralCode`) → Resend email пользователю + Telegram-уведомление админу. Если `RESEND_API_KEY` или Telegram env не заданы — пропускает соответствующий шаг с `console.warn`, не падает. Путь `/api/waitlist` явно исключён из NextAuth-middleware через allowlist в `config.matcher`. Принимает опциональный `referralCode` (max 64, нормализуется в uppercase).
-
-**Реферальные коды (admin)**
-- `admin/referral-codes` — GET (список кодов) + POST (создание кода) + DELETE (`?code=CODE`, удаление). Только для авторизованных owner. Коды хранятся в `referral_codes` таблице (код, имя партнёра, счётчик использований).
+- `waitlist` — POST с `Authorization: Bearer ${WAITLIST_INGEST_SECRET}`. Принимает заявки с лендинга (`content-radar-landing` на Vercel). Поток: Zod-валидация → in-memory rate limit (5 req/min/IP) → INSERT в `waitlist_signups` → Resend email пользователю + Telegram-уведомление админу. Если `RESEND_API_KEY` или Telegram env не заданы — пропускает соответствующий шаг с `console.warn`, не падает. Путь `/api/waitlist` явно исключён из NextAuth-middleware через allowlist в `config.matcher`. Атрибуция источников через UTM-параметры (`utm_source`, `utm_campaign` и др.).
 
 ## Маршруты `/ceo-*` (CEO admin, изолированные)
 
