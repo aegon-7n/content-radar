@@ -32,6 +32,9 @@ logger = logging.getLogger(__name__)
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+# Telegram IPs are blocked by some ISPs (e.g. Russian providers block 149.154.x.x).
+# Route through the same SOCKS5 proxy used for TikTok when SOCKS_PROXY is set.
+SOCKS_PROXY = os.getenv("SOCKS_PROXY", "")
 
 # Вирусные пороги — при первом пересечении алерт
 VIRAL_THRESHOLDS = [100_000, 500_000, 1_000_000]
@@ -65,6 +68,7 @@ def _send_telegram(message: str) -> None:
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         logger.info("Telegram не настроен — пропускаем отправку")
         return
+    proxies = {"https": SOCKS_PROXY, "http": SOCKS_PROXY} if SOCKS_PROXY else None
     try:
         resp = requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
@@ -73,6 +77,7 @@ def _send_telegram(message: str) -> None:
                 "text": message,
                 "parse_mode": "HTML",
             },
+            proxies=proxies,
             timeout=(5, 15),
         )
         if not resp.ok:

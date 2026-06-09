@@ -49,6 +49,9 @@ chmod +x "$APP_DIR/scripts/check-tls.sh"
 cat > /etc/cron.d/content-radar << EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+# SOCKS_PROXY inherited by all jobs so notify-telegram.sh can reach api.telegram.org
+# (Telegram IPs 149.154.x.x are blocked by the ISP — same proxy as TikTok).
+SOCKS_PROXY=$SOCKS
 
 # Авто-обнаружение новых роликов — каждый день в 00:00 МСК (21:00 UTC).
 # На non-zero exit пушим алерт в Telegram (если токен задан).
@@ -64,7 +67,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # Дайджест бизнес-метрик → Telegram — каждый день в 02:30 МСК (23:30 UTC), после audit.
 # Нет API-запросов — только SQL. Алерты: вирусные ролики, WoW изменения, новые ролики.
 # Exit всегда 0 — только информационный, не операционный.
-30 23 * * * root cd $APP_DIR && DATABASE_URL='$DB_URL' TELEGRAM_BOT_TOKEN='$TG_BOT_TOKEN' TELEGRAM_CHAT_ID='$TG_CHAT_ID' $PYTHON -m scraper.analyze >> $LOG_DIR/analyze.log 2>&1
+30 23 * * * root cd $APP_DIR && DATABASE_URL='$DB_URL' TELEGRAM_BOT_TOKEN='$TG_BOT_TOKEN' TELEGRAM_CHAT_ID='$TG_CHAT_ID' SOCKS_PROXY='$SOCKS' $PYTHON -m scraper.analyze >> $LOG_DIR/analyze.log 2>&1
 
 # TLS cert expiry check — каждый понедельник в 09:00 МСК (06:00 UTC).
 # Отправляет Telegram-предупреждение если до истечения < 30 дней.

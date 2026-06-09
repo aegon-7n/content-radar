@@ -28,7 +28,15 @@ fi
 
 MESSAGE=$(printf '⚠️ %s\n\n<pre>%s</pre>' "$TITLE" "$TAIL")
 
+# Route through SOCKS5 proxy when set — needed when Telegram IPs (149.154.x.x)
+# are blocked by ISP. SOCKS_PROXY is the same tunnel used for TikTok.
+PROXY_ARGS=()
+if [[ -n "${SOCKS_PROXY:-}" ]]; then
+  PROXY_ARGS=(--proxy "${SOCKS_PROXY}")
+fi
+
 curl -s -X POST \
+  "${PROXY_ARGS[@]}" \
   "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
   -d "chat_id=${TELEGRAM_CHAT_ID}" \
   -d "parse_mode=HTML" \
