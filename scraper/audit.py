@@ -252,15 +252,27 @@ def instagram_count(username: Optional[str]) -> Optional[int] | str:
         return f"exc {e.__class__.__name__}"
 
 
+TRIAL_DAYS = 14  # keep in sync with TIER_CONFIG.trialDays
+
+
 def main() -> int:
     with _conn() as c, c.cursor() as cur:
-        # Only audit creators who have at least 1 video tracked — skips test/QA
-        # creators that have no real content (tenant-level filter was insufficient).
+        # Only audit creators from "live" tenants: active subscription OR still in
+        # trial window. This silences garbage-handle noise from expired-trial tenants
+        # (e.g. test accounts that set "gg" as their TikTok handle).
         cur.execute("""
             SELECT id, name,
                    tiktok_username, youtube_channel_id, instagram_username
             FROM creators
             WHERE id IN (SELECT DISTINCT creator_id FROM videos WHERE creator_id IS NOT NULL)
+              AND tenant_id IN (
+                SELECT t.id FROM tenants t
+                WHERE
+                  -- active subscription
+                  EXISTS (SELECT 1 FROM subscriptions s WHERE s.tenant_id = t.id AND s.status = 'active')
+                  -- OR trial still active (created within last TRIAL_DAYS days)
+                  OR t.created_at >= NOW() - INTERVAL '14 days'
+              )
             ORDER BY name
         """)
         creators = cur.fetchall()
