@@ -72,7 +72,7 @@ Cost cap: ~$0.06–$0.15/прогон (все тенанты). Превышен�
 Что **точно** требует вмешательства:
 - `lastStatus: 'fail'` где-либо.
 - `lastSuccessAt` старше 48 часов.
-- `audit` показывает `missing > 0` несколько дней подряд.
+- `audit` показывает `missing > 0` несколько дней подряд (порог — 3, см. ниже).
 
 ### Логи
 SSH на VPS, потом:
@@ -80,6 +80,8 @@ SSH на VPS, потом:
 tail -f /var/log/content-radar/daily.log     # метрики
 tail -f /var/log/content-radar/discover.log  # новые ролики
 tail -f /var/log/content-radar/audit.log     # сверка
+tail -f /var/log/content-radar/analyze.log   # ежедневный дайджест (23:30 UTC)
+tail -f /var/log/content-radar/patterns.log  # AI-анализ паттернов (понедельник 04:00 UTC)
 ```
 
 ### Расход API
@@ -105,10 +107,15 @@ tail -f /var/log/content-radar/audit.log     # сверка
 ### «Audit жалуется на GAP»
 Признаки: Telegram-алерт «audit detected gaps», в `audit.log` строки `WARNING GAP …`.
 
+**Контекст**: audit сравнивает «сколько роликов за 30 дней на платформе» vs «сколько в БД». Порог алерта — `GAP_WARN_THRESHOLD = 3`. Зазор 1–2 ролика нормален: auto_discover пропускает ролики без WB-артикула в описании (`skipped_no_article`), они никогда не попадут в БД. Алерт при ≥ 3 — реальная проблема.
+
+Аудит проверяет только «живых» тенантов: активная подписка или триал < 14 дней. Тест-аккаунты и истёкшие триалы исключены.
+
 Что проверить:
 1. Какая платформа? Если TikTok — проверь SOCKS-туннель: `curl --socks5 127.0.0.1:1080 https://www.tiktok.com -I`.
 2. Если Instagram — посмотри в `discover.log` ошибки от HikerAPI. Возможно, кончился баланс (`status=402`).
 3. Если YouTube — проверь не упёрлись ли в quota (10K units/день): в логе будут `403 quota exceeded`.
+4. Если креатор из нового тенанта — убедись, что тенант прошёл онбординг правильно (articles в описаниях роликов есть).
 
 ### «HikerAPI/TikAPI/Apify счёт растёт»
 1. Смотри график на дашборде провайдера.
