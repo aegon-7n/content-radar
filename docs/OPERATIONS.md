@@ -22,9 +22,10 @@
 ```
 00:00  scraper.auto_discover           → /var/log/content-radar/discover.log
 00:10  scraper.run_daily               → /var/log/content-radar/daily.log
-01:00  scraper.audit                   → /var/log/content-radar/audit.log
 02:30  scraper.analyze                 → /var/log/content-radar/analyze.log
 07:00 пн  scripts/analyze_patterns.py  → /var/log/content-radar/patterns.log
+09:00  scraper.audit                   → /var/log/content-radar/audit.log
+         (вынесен из 01:00 → 09:00 чтобы не конкурировать с TikAPI после ночного скрейпа)
 ```
 
 Все команды на non-zero exit пушат алерт в Telegram через `scripts/notify-telegram.sh`.

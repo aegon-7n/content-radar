@@ -37,7 +37,7 @@
 [cron МСК на VPS]                            [тот же VPS]
   00:00  scraper.auto_discover  ──┐
   00:10  scraper.run_daily      ──┼──→  PostgreSQL  ←──  Next.js (API + UI), запущен PM2
-  01:00  scraper.audit          ──┘          │                    │
+  09:00  scraper.audit          ──┘          │                    │
                                               └────── localhost ───┘
                                                                           │
                                                                           ▼
@@ -55,7 +55,7 @@
 | Auth | NextAuth (CredentialsProvider, JWT, multi-tenant) |
 | База | PostgreSQL (на прод-VPS / локальный postgres в деве) + Drizzle ORM |
 | Скрейпер | Python 3.11+, `requests`, `psycopg2`, `yt-dlp` (fallback). Cron по `setup-cron.sh`. |
-| Деплой | Один VPS на всё: фронт (PM2) + Postgres + cron-скрейпер. GitHub Actions: [deploy.yml](.github/workflows/deploy.yml) (SSH → git pull → build → migrate → pm2 reload), [ci.yml](.github/workflows/ci.yml) (только CI). |
+| Деплой | Один VPS на всё: фронт (PM2) + Postgres + cron-скрейпер. GitHub Actions: [deploy.yml](.github/workflows/deploy.yml) (build on GH Actions runner → rsync .next/ → pm2 reload; миграции применяются вручную через psql), [ci.yml](.github/workflows/ci.yml) (только CI). |
 
 ## Тёмные углы / что важно знать
 

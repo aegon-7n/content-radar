@@ -27,7 +27,7 @@
 - [x] **Alerting на бизнес-метрики**: "у Полины -50% просмотров за неделю" / "вирусный ролик >1M" → Telegram. Реализовано в `scraper/analyze.py` — запускается в 02:30 МСК, нет API-запросов, только SQL.
 - [x] **Обработка permanently_unavailable в UI**: тег «недоступен» на `/videos` (список + детальная + CSV), banner на детальной. _(реализовано в PR#41)_
 - [x] **Вынос секретов из setup-cron.sh**: ~~сейчас API-ключи захардкожены в скрипте~~ — теперь читает из `.env.local`. Старые ключи в git history, нужна ротация.
-- [ ] **Экспорт в Excel**: /api/export?format=xlsx&period=30d. Клиент раньше вёл Excel-таблицы, может хотеть автосгенерированные.
+- [x] **Экспорт в Excel**: `/api/videos/export?format=xlsx`. _(реализовано: `xlsx` пакет, `GET /api/videos/export?format=xlsx`, кнопка «Экспорт Excel» на /videos)_
 - [ ] **Исторические графики >30 дней**: сейчас delta-model считает max 30д. Для "покажи рост за 3 месяца" — нужна отдельная агрегация.
 - [ ] **Pinterest official API**: если клиент пришлёт developer credentials. Пока RSS + scraper (метрики пинов не парсятся из HTML с 2026, нужен API или Apify actor).
 - [ ] **TikTok proxy**: если клиент жалуется на ru_cross_border_block. Residential proxy ~$5-15/мес через US/EU.
