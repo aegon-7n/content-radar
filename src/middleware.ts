@@ -13,7 +13,28 @@ function unauthorizedBasic() {
   });
 }
 
+function buildCsp(nonce: string): string {
+  return [
+    "default-src 'self'",
+    // nonce covers Next.js RSC inline scripts; 'self' covers external chunks from /_next/static/
+    `script-src 'self' 'nonce-${nonce}'`,
+    // 'unsafe-inline' required for React style={} props (rendered as HTML style attributes)
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+
 export async function middleware(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const csp = buildCsp(nonce);
+
+  // Forward nonce to Next.js server so it applies it to RSC inline scripts.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+
   const { pathname } = request.nextUrl;
   const isApi = pathname.startsWith("/api/");
 
@@ -41,11 +62,15 @@ export async function middleware(request: NextRequest) {
       return unauthorizedBasic();
     }
 
-    return NextResponse.next();
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.headers.set("Content-Security-Policy", csp);
+    return res;
   }
 
   if (!isApi && !KNOWN_PAGE_ROUTES.test(pathname)) {
-    return NextResponse.next();
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.headers.set("Content-Security-Policy", csp);
+    return res;
   }
 
   try {
@@ -62,7 +87,9 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
-    return NextResponse.next();
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.headers.set("Content-Security-Policy", csp);
+    return res;
   } catch {
     if (isApi) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -72,7 +99,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Expanded from prior list: login/register/forgot-password/reset-password/invite now
+  // enter middleware so they also receive nonce-based CSP. They pass through unauthenticated
+  // (not in KNOWN_PAGE_ROUTES). Public API endpoints remain in the exclusion list.
   matcher: [
-    "/((?!login|register|invite|forgot-password|reset-password|_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|api/auth|api/ping|api/forgot-password|api/reset-password|api/scrape|api/waitlist|api/billing/webhooks|api/patterns/seed).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|api/auth|api/ping|api/forgot-password|api/reset-password|api/scrape|api/waitlist|api/billing/webhooks|api/patterns/seed).*)",
   ],
 };
