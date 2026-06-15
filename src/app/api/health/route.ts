@@ -1,31 +1,20 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
-import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/health — operational overview of the scraper pipeline.
+ * GET /api/health — public operational overview of the scraper pipeline.
  *
- * Used by the sidebar "Последнее обновление" widget and, later, by any
- * external uptime monitor. Returns counts + per-job state from
- * scraper_state, so the UI can render something like:
+ * Used by the sidebar "Последнее обновление" widget and external uptime
+ * monitors. Returns counts + per-job state from scraper_state. No auth
+ * required — added to middleware allowlist (TRU-481).
  *
- *   Discover:    00:02 сегодня • ok (added=21)
- *   Metrics:     00:17 сегодня • partial (ok=230 fail=2)
- *   Audit:       01:04 сегодня • ok (missing=0)
- *
- * Overall "healthy" flag is true iff every known job has status === "ok"
- * AND its last_run_at is within the last 25 hours (a single missed cron
- * window counts as "stale"). Never throws — on DB failure returns
- * `status: "error"` so the sidebar can show something instead of
- * crashing the whole render.
+ * Never throws — on DB failure returns `status: "error"` so the sidebar
+ * can show something instead of crashing the whole render.
  */
-export async function GET(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+export async function GET() {
 
   try {
     const [counts, state] = await Promise.all([
