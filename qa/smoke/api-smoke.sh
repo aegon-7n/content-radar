@@ -52,8 +52,8 @@ check "S13-H" GET "/api/last-sync"          "401" "GET /api/last-sync без с�
 echo ""
 echo "--- Public allowlist endpoints (must NOT return 401) ---"
 
-check "S13-I" GET  "/api/ping"      "200"     "GET /api/ping без сессии → 200 (публичный liveness probe)"
-# /api/health is intentionally auth-gated (TRU-171/TRU-288). Use /api/ping for uptime monitors.
+check "S13-I" GET  "/api/health"    "200"     "GET /api/health без сессии → 200 (публичный, TRU-481)"
+check "S13-K" GET  "/api/ping"      "200"     "GET /api/ping без сессии → 200 (публичный liveness probe)"
 # S13-J: /api/waitlist is in the middleware allowlist (public path).
 # The route only exports POST handler → GET returns 405 from Next.js,
 # proving the middleware let the request through (a 401 here would mean middleware blocked it).
